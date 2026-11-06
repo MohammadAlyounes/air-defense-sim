@@ -71,7 +71,7 @@ export const ROADMAP: readonly RoadmapStep[] = [
 ];
 
 /** The step the repository is currently on. Bump this when a step ships. */
-export const CURRENT_STEP = 1;
+export const CURRENT_STEP = 2;
 
 export const LAST_STEP = ROADMAP[ROADMAP.length - 1]?.step ?? 0;
 

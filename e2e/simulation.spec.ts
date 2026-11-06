@@ -3,8 +3,14 @@ import { expect, test, type Page } from '@playwright/test';
 const tick = async (page: Page) =>
   Number(await page.getByTestId('sim-clock').getAttribute('data-tick'));
 
+/** Opens the app and waits until it listens to the keyboard. */
+async function open(page: Page, url: string) {
+  await page.goto(url);
+  await expect(page.locator('html[data-app-ready]')).toBeAttached();
+}
+
 test('play, pause and step control the simulation clock', async ({ page }) => {
-  await page.goto('/?paused=1');
+  await open(page, '/?paused=1');
   const clock = page.getByTestId('sim-clock');
   await expect(clock).toHaveAttribute('data-tick', '0');
 
@@ -23,7 +29,7 @@ test('play, pause and step control the simulation clock', async ({ page }) => {
 });
 
 test('keyboard shortcuts drive playback', async ({ page }) => {
-  await page.goto('/?paused=1');
+  await open(page, '/?paused=1');
 
   await page.keyboard.press('Space');
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
@@ -42,7 +48,7 @@ test('keyboard shortcuts drive playback', async ({ page }) => {
 });
 
 test('the radar paints contacts and logs them', async ({ page }) => {
-  await page.goto('/?t=20&paused=1');
+  await open(page, '/?t=20&paused=1');
   const detect = page.locator('[data-stage="detect"]');
   await expect.poll(async () => Number(await detect.getAttribute('data-count'))).toBeGreaterThan(0);
   await expect(page.getByTestId('event-log')).toContainText('RADAR');
@@ -51,7 +57,7 @@ test('the radar paints contacts and logs them', async ({ page }) => {
 });
 
 test('restarting with the same seed replays the run exactly', async ({ page }) => {
-  await page.goto('/?paused=1');
+  await open(page, '/?paused=1');
   const log = page.getByTestId('event-log');
   for (let i = 0; i < 8; i++) await page.keyboard.press('Shift+Period');
   await expect.poll(() => tick(page)).toBe(400);
@@ -69,7 +75,7 @@ test('restarting with the same seed replays the run exactly', async ({ page }) =
 });
 
 test('concept cards open next to the features they explain', async ({ page }) => {
-  await page.goto('/?paused=1');
+  await open(page, '/?paused=1');
   await page.getByRole('button', { name: 'How the simulation clock works' }).click();
   await expect(page.getByRole('dialog')).toContainText('Fixed time step');
   await expect(page.getByRole('dialog')).toContainText('20 ms ticks');

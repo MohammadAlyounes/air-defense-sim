@@ -1,7 +1,9 @@
 import * as Popover from '@radix-ui/react-popover';
 import { GraduationCap } from 'lucide-react';
-import antennaRotation from '../../../docs/concepts/01-2-antenna-rotation.md?raw';
 import fixedTimeStep from '../../../docs/concepts/01-1-fixed-time-step.md?raw';
+import antennaRotation from '../../../docs/concepts/01-2-antenna-rotation.md?raw';
+import localCoordinates from '../../../docs/concepts/02-1-local-coordinates.md?raw';
+import seeingScale from '../../../docs/concepts/02-2-seeing-scale.md?raw';
 import { REPO_URL } from '../data/links';
 import { parseConceptCard, parseInline } from '../lib/cardMarkdown';
 
@@ -9,6 +11,8 @@ import { parseConceptCard, parseInline } from '../lib/cardMarkdown';
 const CONCEPTS = {
   fixedTimeStep: { markdown: fixedTimeStep, file: '01-1-fixed-time-step.md' },
   antennaRotation: { markdown: antennaRotation, file: '01-2-antenna-rotation.md' },
+  localCoordinates: { markdown: localCoordinates, file: '02-1-local-coordinates.md' },
+  seeingScale: { markdown: seeingScale, file: '02-2-seeing-scale.md' },
 } as const;
 
 export type ConceptId = keyof typeof CONCEPTS;

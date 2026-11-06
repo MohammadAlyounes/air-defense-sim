@@ -158,7 +158,12 @@ export class SimController {
 
   private record(events: readonly SimEvent[]): void {
     for (const event of events) {
-      this.log.unshift({ id: ++this.logSeq, timeS: event.timeS, ...describeEvent(event) });
+      this.log.unshift({
+        id: ++this.logSeq,
+        timeS: event.timeS,
+        aircraftId: event.id,
+        ...describeEvent(event),
+      });
     }
     if (this.log.length > LOG_LIMIT) this.log.length = LOG_LIMIT;
   }

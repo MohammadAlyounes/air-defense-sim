@@ -9,6 +9,7 @@ import { mkdir } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { chromium } from '@playwright/test';
 import { preview } from 'vite';
+import { waitForApp } from './wait-for-app.mjs';
 
 const { values } = parseArgs({
   options: {
@@ -43,7 +44,8 @@ try {
     });
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.evaluate(() => document.fonts.ready);
-    await page.waitForTimeout(300); // let the scope draw its first frames
+    await waitForApp(page);
+    await page.waitForTimeout(300); // let the scope and the 3D view draw a few frames
     const path = `${values.out}/${values.name}${shot.suffix}.png`;
     await page.screenshot({ path });
     console.log(`saved ${path}`);

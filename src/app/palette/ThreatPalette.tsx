@@ -1,13 +1,14 @@
 import clsx from 'clsx';
 import { Crosshair, MousePointerClick } from 'lucide-react';
+import { AffiliationShape } from '../components/AffiliationShape';
 import { Panel } from '../components/Panel';
 import { TrafficIcon } from '../components/TrafficIcon';
+import { AFFILIATION_STYLE } from '../data/affiliation';
 import {
   altitudeBar,
   RADAR_SIZE_BAR,
   speedBar,
   TRAFFIC_CATALOG,
-  type Affiliation,
   type TrafficType,
 } from '../data/threatCatalog';
 import { formatAltitude, formatAltitudeShort, formatSpeed } from '../lib/format';
@@ -42,14 +43,6 @@ export function ThreatPalette({ className }: { className?: string }) {
     </Panel>
   );
 }
-
-const AFFILIATION_STYLE: Readonly<
-  Record<Affiliation, { label: string; text: string; ring: string }>
-> = {
-  hostile: { label: 'Threat', text: 'text-hostile', ring: 'ring-hostile/25' },
-  friend: { label: 'Friend', text: 'text-friend', ring: 'ring-friend/25' },
-  neutral: { label: 'Civil', text: 'text-neutral', ring: 'ring-neutral/25' },
-};
 
 function ThreatCard({ type }: { type: TrafficType }) {
   const style = AFFILIATION_STYLE[type.affiliation];
@@ -139,16 +132,5 @@ function MiniStat({
         {value}
       </dd>
     </div>
-  );
-}
-
-/** Standard-style affiliation shapes: diamond = hostile, circle = friend, square = neutral. */
-function AffiliationShape({ affiliation }: { affiliation: Affiliation }) {
-  return (
-    <svg viewBox="0 0 10 10" className="size-2" aria-hidden="true">
-      {affiliation === 'hostile' && <path d="M5 0.5 9.5 5 5 9.5 0.5 5Z" fill="currentColor" />}
-      {affiliation === 'friend' && <circle cx="5" cy="5" r="4.2" fill="currentColor" />}
-      {affiliation === 'neutral' && <rect x="1" y="1" width="8" height="8" fill="currentColor" />}
-    </svg>
   );
 }

@@ -30,5 +30,11 @@ export function SimProvider({
 
   useKeyboardShortcuts(controller);
 
+  // Effects run in order, so by now the simulation is running and the keys are listened to.
+  // Browser tests and the media scripts wait for this before they press anything.
+  useEffect(() => {
+    document.documentElement.dataset.appReady = 'true';
+  }, []);
+
   return <SimContext.Provider value={controller}>{children}</SimContext.Provider>;
 }

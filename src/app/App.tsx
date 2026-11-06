@@ -1,21 +1,24 @@
 import { Box, Radar } from 'lucide-react';
+import { lazy, Suspense } from 'react';
 import { AnalysisBar } from './analysis-bar/AnalysisBar';
 import { useLiveSituation } from './analysis-bar/useLiveSituation';
 import { ConceptPopover } from './components/ConceptPopover';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Panel } from './components/Panel';
 import { TooltipProvider } from './components/Tooltip';
 import { Footer } from './layout/ChromeBars';
 import { PlayerBar } from './layout/PlayerBar';
 import { ThreatPalette } from './palette/ThreatPalette';
-import {
-  EventLogPanel,
-  InspectorPanel,
-  TelemetryPanel,
-  TrackTablePanel,
-} from './panels/ConsolePanels';
+import { EventLogPanel, TelemetryPanel, TrackTablePanel } from './panels/ConsolePanels';
+import { InspectorPanel } from './panels/InspectorPanel';
 import { SimProvider } from './sim/SimProvider';
-import { BattlespacePreview } from './views/BattlespacePreview';
+import { useSelectionGuard } from './view/useSelectionGuard';
+import { useViewShortcuts } from './view/useViewShortcuts';
+import { BattlespaceFallback } from './views/BattlespaceFallback';
 import { RadarScope } from './views/RadarScope';
+
+// three.js is large: load the 3D view in its own chunk, after the console is on screen.
+const Battlespace3D = lazy(() => import('./views/3d/Battlespace3D'));
 
 export function App() {
   return (
@@ -29,13 +32,31 @@ export function App() {
 
 function Console() {
   const situation = useLiveSituation();
+  useSelectionGuard();
+  useViewShortcuts();
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <AnalysisBar situation={situation} />
       <main className="console-grid min-h-0 flex-1 p-2 lg:overflow-auto">
         <ThreatPalette className="area-palette" />
-        <Panel title="3D battlespace" icon={Box} step={2} className="area-view">
-          <BattlespacePreview />
+        <Panel
+          title="3D battlespace"
+          icon={Box}
+          panelId="battlespace"
+          className="area-view h-[min(72svh,34rem)] lg:h-auto"
+          bodyClassName="relative"
+          actions={
+            <ConceptPopover
+              concept="localCoordinates"
+              label="How the scope and the 3D view share one map"
+            />
+          }
+        >
+          <ErrorBoundary fallback={<BattlespaceFallback state="unavailable" />}>
+            <Suspense fallback={<BattlespaceFallback state="loading" />}>
+              <Battlespace3D />
+            </Suspense>
+          </ErrorBoundary>
         </Panel>
         <Panel
           title="Sensor scope"

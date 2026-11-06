@@ -1,8 +1,10 @@
-import { Activity, ChevronRight, ListOrdered, ScanSearch, ScrollText } from 'lucide-react';
+import clsx from 'clsx';
+import { Activity, ListOrdered, ScrollText } from 'lucide-react';
 import { Panel } from '../components/Panel';
 import { Tooltip } from '../components/Tooltip';
 import { formatSimClock } from '../lib/format';
 import { useSimState } from '../sim/simContext';
+import { useViewStore } from '../view/viewStore';
 
 const TRACK_COLUMNS = ['#', 'Track', 'Type', 'Range', 'Alt', 'Speed', 'Stage'] as const;
 
@@ -37,33 +39,6 @@ export function TrackTablePanel({ className }: { className?: string }) {
           </tr>
         </tbody>
       </table>
-    </Panel>
-  );
-}
-
-const INSPECTOR_POINTS = [
-  'Identity, and the evidence behind it',
-  'Threat score, factor by factor',
-  'Why this launcher, and the chance of a hit',
-] as const;
-
-export function InspectorPanel() {
-  return (
-    <Panel title="Inspector · Why?" icon={ScanSearch} step={9}>
-      <div className="space-y-2.5 p-3 text-[12px] leading-relaxed text-ink-300">
-        <p>
-          Click any track, interceptor or decision to see what it is and{' '}
-          <strong className="font-semibold text-ink-100">why</strong> the system acted.
-        </p>
-        <ul className="space-y-1.5">
-          {INSPECTOR_POINTS.map((point) => (
-            <li key={point} className="flex items-center gap-1.5">
-              <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-accent" />
-              {point}
-            </li>
-          ))}
-        </ul>
-      </div>
     </Panel>
   );
 }
@@ -116,9 +91,13 @@ const SOURCE_STYLE = {
   radar: { label: 'RADAR', className: 'text-accent' },
 } as const;
 
-/** Simulation events, newest first: what really happens (scenario) and what the radar sees. */
+/**
+ * Simulation events, newest first: what really happens (scenario) and what the radar sees.
+ * Each line selects its aircraft, which makes the log the keyboard way to pick one.
+ */
 export function EventLogPanel() {
   const log = useSimState((state) => state.log);
+  const selectedId = useViewStore((state) => state.selectedId);
   return (
     <Panel
       title="Event log"
@@ -153,16 +132,27 @@ export function EventLogPanel() {
           data-testid="event-log"
         >
           {log.map((entry) => (
-            <li key={entry.id} className="flex gap-2 rounded px-1.5 py-1 hover:bg-ink-850">
-              <span className="shrink-0 tabular-nums text-ink-300">
-                {formatSimClock(entry.timeS).slice(2)}
-              </span>
-              <span
-                className={`w-16 shrink-0 font-semibold ${SOURCE_STYLE[entry.source].className}`}
+            <li key={entry.id}>
+              <button
+                type="button"
+                onClick={() => useViewStore.getState().select(entry.aircraftId)}
+                aria-current={entry.aircraftId === selectedId ? 'true' : undefined}
+                className={clsx(
+                  'flex w-full gap-2 rounded px-1.5 py-1 text-left transition-colors hover:bg-ink-850',
+                  entry.aircraftId === selectedId &&
+                    'bg-ink-800 shadow-[inset_2px_0_0_0_var(--color-accent)]',
+                )}
               >
-                {SOURCE_STYLE[entry.source].label}
-              </span>
-              <span className="text-ink-100">{entry.text}</span>
+                <span className="shrink-0 tabular-nums text-ink-300">
+                  {formatSimClock(entry.timeS).slice(2)}
+                </span>
+                <span
+                  className={`w-16 shrink-0 font-semibold ${SOURCE_STYLE[entry.source].className}`}
+                >
+                  {SOURCE_STYLE[entry.source].label}
+                </span>
+                <span className="text-ink-100">{entry.text}</span>
+              </button>
             </li>
           ))}
         </ol>

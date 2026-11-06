@@ -62,3 +62,23 @@ Aim points use `r = R·√u` (with `u` uniform), which spreads them evenly over 
 - **Display:** an echo fades as `exp(−age / (0.85 T))`. Its size follows the target's radar size class (tiny, small, medium or large).
 
 **Limitations:** detection is perfect in Step 1. There is no measurement noise, no missed detections, no false alarms, no radar horizon, no terrain masking and no clutter. Step 5 replaces this with the radar range equation, radar cross section, probabilistic detection, noise, Earth curvature, terrain masking and clutter.
+
+## Drawing the 3D view (Step 2)
+
+The 3D view only draws; it never changes the simulation.
+
+- **Scene coordinates:** kilometres with `y` up, as three.js expects: `scene = (east, up × stretch, −north) / 1000`. North points into the screen in the default camera.
+- **Height stretch:** `stretch` is 1, 2 (default) or 4, applied only when drawing. Labels and the inspector always show true altitudes.
+- **Constant on-screen size:** every frame, each aircraft model and the radar site is scaled to cover a fixed number of pixels:
+
+  ```
+  s = 2 · d · tan(θ/2) · pixels / (screen height · zoom)
+  ```
+
+  where `d` is the distance from the camera and `θ` the vertical field of view.
+
+- **Smooth motion:** positions are blended between the last two ticks with the clock's `α`, like the scope's antenna angle.
+- **Trails:** the simulation records each aircraft's position every 0.5 s (25 ticks) and keeps the last 30 s (60 points). Trails are part of the simulation state, so replays (and, later, rewinds) show exactly the same trails. A point's brightness falls linearly with its age.
+- **Search beam:** a vertical fan from the antenna out to 40 km and 20° up, turning with the blended antenna angle; its trail on the ground matches the scope's sweep.
+
+**Limitations:** the 20° beam is a drawing aid; the Step 1 radar has no elevation limit. The ground is flat until procedural terrain arrives in Step 4.

@@ -24,6 +24,8 @@ export interface Aircraft {
   /** True while the radar keeps painting it (dropped after two antenna turns without a paint). */
   contactHeld: boolean;
   lastPaint: PaintRecord | null;
+  /** Where it has been: positions sampled every 0.5 s, oldest first, last 30 s. */
+  trail: readonly Vec3[];
 }
 
 /** One radar detection: where the beam saw an echo, and when. */

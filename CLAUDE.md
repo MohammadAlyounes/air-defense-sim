@@ -44,7 +44,7 @@ An open-source, browser-based, educational air-defense simulator.
 
 ## Definition of done (every step)
 
-1. **It works in the running app.** Verify it in headless Chromium and capture screenshots, plus a GIF for visual features.
+1. **It works in the running app.** Verify it in headless Chromium and capture screenshots, plus an animated clip for visual features (GIF, or WebP when most of the picture moves).
 2. **Checks pass.** `npm run lint`, `npm run typecheck` and `npm test` all pass, and new physics has unit tests against known values.
 3. **README updated.** Progress checklist, a concept card for any new physics, and a build-log entry with a screenshot.
 4. **Devlog entry.** Add an entry to `docs/DEVLOG.md`: what was built, key decisions, and what comes next.
@@ -83,10 +83,10 @@ The full concept texts live in `docs/concepts/NN-M-slug.md` (step `NN`, order `M
 | `npm run check`                                      | Lint, typecheck, unit tests, format and docs checks          |
 | `npm run docs:sync` / `npm run docs:check`           | Copy concept cards into the README / verify they match       |
 | `npm run media:screenshots -- --name step-NN-<slug>` | README screenshots (run `npm run build` first)               |
-| `npm run media:gif -- --name … --selector …`         | GIF of part of the app (Playwright video + ffmpeg)           |
+| `npm run media:gif -- --name … --selector …`         | Animated GIF or WebP (`--format webp`) of part of the app    |
 | `npm run media:previews`                             | Social preview images from `scripts/media/preview-card.html` |
 
-Both media scripts accept `--query "seed=2026&t=75&paused=0"` (URL options from `src/app/sim/params.ts`) for repeatable shots.
+Both media scripts accept `--query "seed=2026&t=75&paused=0"` for repeatable shots: simulation options from `src/app/sim/params.ts`, view options (`select`, `camera`, `heights`, `labels`, `welcome=0`) from `src/app/view/viewParams.ts`. `media:gif` can also script the clip with `--actions` (timed key presses and clicks).
 
 Planned: `npm run demo:record` (Step 14).
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import antennaRotation from '../../../docs/concepts/01-2-antenna-rotation.md?raw';
 import fixedTimeStep from '../../../docs/concepts/01-1-fixed-time-step.md?raw';
+import antennaRotation from '../../../docs/concepts/01-2-antenna-rotation.md?raw';
+import localCoordinates from '../../../docs/concepts/02-1-local-coordinates.md?raw';
+import seeingScale from '../../../docs/concepts/02-2-seeing-scale.md?raw';
 import { parseConceptCard, parseInline } from './cardMarkdown';
 
 describe('parseConceptCard', () => {
@@ -32,7 +34,7 @@ describe('parseConceptCard', () => {
   });
 
   it('parses every concept card in docs/concepts', () => {
-    for (const markdown of [fixedTimeStep, antennaRotation]) {
+    for (const markdown of [fixedTimeStep, antennaRotation, localCoordinates, seeingScale]) {
       const card = parseConceptCard(markdown);
       expect(card.title.length).toBeGreaterThan(3);
       expect(card.hook.length).toBeGreaterThan(3);

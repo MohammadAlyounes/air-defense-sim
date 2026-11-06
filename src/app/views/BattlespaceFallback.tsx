@@ -1,7 +1,4 @@
-import { BookOpen } from 'lucide-react';
-import { GithubMark } from '../components/marks';
-import { PLAN_URL, REPO_URL } from '../data/links';
-import { CURRENT_STEP, LAST_STEP, roadmapStep } from '../data/roadmap';
+import { Box, TriangleAlert } from 'lucide-react';
 
 const WIDTH = 1000;
 const HEIGHT = 640;
@@ -15,63 +12,36 @@ const FLOOR_ROWS = Array.from(
 );
 
 /**
- * Placeholder for the 3D battlespace (Step 2): a stylized illustration of what the view
- * will show (terrain, radar coverage dome, a threat track and an interceptor).
+ * Shown while the 3D view loads, and instead of it when the browser cannot start WebGL:
+ * a drawing of the battlespace, so the console never shows an empty hole.
  */
-export function BattlespacePreview() {
-  const next = roadmapStep(CURRENT_STEP + 1);
+export function BattlespaceFallback({ state }: { state: 'loading' | 'unavailable' }) {
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[linear-gradient(to_bottom,#060b16,#0a1428_55%,#0b1a2e)]">
+    <div
+      className="absolute inset-0 flex flex-col overflow-hidden bg-[linear-gradient(to_bottom,#060b16,#0a1428_55%,#0b1a2e)]"
+      data-testid="battlespace-fallback"
+      data-state={state}
+    >
       <BattlespaceIllustration />
-
-      <div className="relative z-10 mx-auto flex max-w-2xl flex-col items-center px-6 pt-8 text-center sm:pt-10">
-        <span className="rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">
-          Building in public · Step {CURRENT_STEP} of {LAST_STEP}
-        </span>
-        <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight text-ink-100 sm:text-4xl">
-          See how an <span className="whitespace-nowrap">air-defense</span> system thinks.
-        </h2>
-        <p className="mt-3 max-w-xl text-balance text-[15px] leading-relaxed text-ink-200">
-          Drag a drone, missile or jet onto the map and watch a generic defense battery detect,
-          track, identify, evaluate, engage and assess it, with the physics explained in plain
-          language.
-        </p>
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <a
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-[13px] font-semibold text-ink-950 shadow-lg shadow-accent/20 transition hover:brightness-110"
-          >
-            <GithubMark className="size-4" />
-            Follow the build on GitHub
-          </a>
-          <a
-            href={PLAN_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-2 rounded-lg border border-ink-600 bg-ink-900/80 px-3.5 py-2 text-[13px] font-semibold text-ink-100 transition hover:border-accent/50"
-          >
-            <BookOpen aria-hidden="true" className="size-4 text-accent" />
-            Read the project plan
-          </a>
-        </div>
-        {next && (
-          <p className="mt-4 text-[12px] text-ink-300">
-            Next up:{' '}
-            <strong className="text-ink-100">
-              Step {next.step} · {next.title}
-            </strong>
-            . {next.summary}
+      <div className="relative z-10 mx-auto flex max-w-md flex-col items-center px-6 pt-10 text-center">
+        {state === 'loading' ? (
+          <p className="flex items-center gap-2 text-[13px] text-ink-200" role="status">
+            <Box aria-hidden="true" className="size-4 animate-pulse text-accent" />
+            Loading the 3D view…
           </p>
+        ) : (
+          <div className="rounded-xl border border-warn/40 bg-ink-900/85 px-4 py-3 text-[12.5px] leading-relaxed text-ink-200 backdrop-blur">
+            <p className="flex items-center justify-center gap-2 font-semibold text-ink-100">
+              <TriangleAlert aria-hidden="true" className="size-4 text-warn" />
+              The 3D view could not start
+            </p>
+            <p className="mt-1">
+              This browser or device has WebGL turned off. Everything else (the radar scope, the
+              controls and the event log) still works.
+            </p>
+          </div>
         )}
       </div>
-
-      {/* Keeps room for the illustration below the text on narrow screens. */}
-      <div className="min-h-56 flex-1 lg:min-h-0" />
-      <p className="relative z-10 px-3 pb-2 text-[10.5px] text-ink-300">
-        Illustration: the live 3D view arrives in Step 2.
-      </p>
     </div>
   );
 }

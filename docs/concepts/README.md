@@ -31,6 +31,7 @@ Cards are added as their steps land. File names are `NN-M-slug.md`: step `NN`, o
 | Step | Concepts                                                                                                  |
 | ---- | --------------------------------------------------------------------------------------------------------- |
 | 1    | [Fixed time step and determinism](01-1-fixed-time-step.md) · [Antenna rotation](01-2-antenna-rotation.md) |
+| 2    | [Local coordinates](02-1-local-coordinates.md) · [Seeing scale](02-2-seeing-scale.md)                     |
 | 3    | Detection range · proportional navigation                                                                 |
 | 4    | Air density · drag · turn radius                                                                          |
 | 5    | Radar equation · radar horizon · terrain masking · clutter                                                |

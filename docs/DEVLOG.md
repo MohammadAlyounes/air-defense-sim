@@ -2,6 +2,45 @@
 
 One short entry per step, newest first: what was built, the decisions behind it, and what comes next.
 
+## Step 2 · 3D scene (2026-11-06)
+
+**Built**
+
+- **3D battlespace (`src/app/views/3d`):** React Three Fiber, loaded on demand.
+  - The ground grid, range rings every 10 km and compass letters.
+  - The radar site with its turning antenna, the search beam and the beam's sweep on the ground, all driven by the same snapshots as the radar scope.
+- **Aircraft:**
+  - models extruded from the palette silhouettes (the drone is built from simple parts);
+  - drawn at a fixed size on screen, with a drop line to the ground and a fading 30-second trail;
+  - name tags that show the true altitude.
+- **Trails in the simulation:** each aircraft keeps its position every 0.5 s for the last 30 s, so trails are part of the deterministic state.
+- **Cameras:** Orbit, Top (north up, like the scope), Follow (behind the selected aircraft) and Radar (stand at the antenna and look out), on keys 1–4. Heights can be stretched ×1, ×2 or ×4, and the labels can be toggled (L).
+- **One selection everywhere:**
+  - Click an aircraft in 3D, an echo on the scope or a line in the event log.
+  - The scope boxes the aircraft's newest echo, and the inspector shows its ground truth: speed, altitude, heading, range, and what the radar knows about it.
+  - Esc clears the selection.
+- **Shareable views:** `?select=3&camera=follow&heights=4`, next to the simulation's `?seed=7&t=60`.
+- **Welcome card** for first-time visitors (dismissed once, it stays dismissed). The 3D view falls back to a drawing while it loads, or when the browser has no WebGL.
+- **Concept cards:** local coordinates (one map for the scope and the 3D view) and seeing scale (why heights are stretched and aircraft enlarged).
+- **Tests:** 28 new unit tests and 7 new browser tests.
+  - Unit tests cover the ENU-to-scene mapping, constant screen size, interpolation, trails, label projection, echo picking, the inspector's facts, the view store and URL view options.
+  - Browser tests cover rendering and the welcome card, selection from the 3D view, the scope and the event log, the cameras, heights and labels, and view links. The scope test runs the same seed in Node to know exactly where to click.
+
+**Decisions**
+
+- **Truth in 3D, perception on the scope.** The 3D view is labelled "Ground truth": it shows where aircraft really are, while the scope shows only what the radar painted. When tracking arrives (Step 6), the 3D view will show tracks next to the truth.
+- **Readable beats true to scale.** At true scale, a drone 30 km away is a twentieth of a pixel and the airspace is a thin sheet. So heights are stretched (×2 by default) and aircraft keep a fixed size on screen, while labels and the inspector always show true values. A concept card explains it.
+- **Draw only when something changes.** The canvas renders on demand: a new simulation frame, a view change or a camera move. A paused simulation costs no GPU time.
+- **Camera controls with a clamped clock.** drei's component passes the raw time since the last drawing to the camera controls. After a pause that time is seconds long, and camera transitions would jump to the end. The rig owns its camera-controls instance and clamps the step to 50 ms.
+- **Labels are one DOM layer, moved every frame.** drei's `Html` gives each label its own React root, which logged unmount errors as aircraft came and went. Labels are now ordinary elements, projected onto their anchors after the camera moves: crisp text, normal clicks, one pass.
+- **Trails are fat lines that fade to black.** Plain WebGL lines are one device pixel wide, which is barely visible on high-density screens. Wide lines in three.js have no per-point transparency, so a trail fades its colour towards black and uses max blending. On the dark scene that looks like transparency, and it avoids the bright dots that adding colours leaves where short segments overlap.
+- **Ground layers do not write depth.** From 100 km away, the depth buffer cannot separate layers a few metres apart, so they flickered. The ground, grid, sweep and rings are drawn in a fixed order instead; nothing is ever below the ground.
+- **three.js loads in its own chunk** (about 270 kB compressed) after the console is on screen, and stays cached between deploys because it rarely changes.
+- **A ready signal for tests.** The extra start-up work made one browser test press a key before React was listening. The app now sets `html[data-app-ready]`, and the tests and media scripts wait for it.
+- **Phones start without labels.** Seven tags crowd a small screen; tapping an aircraft shows its tag.
+
+**Next: Step 3 · First intercept.** Drag threats onto the map and run the first full loop, from detection to an interceptor guided by proportional navigation, with the analysis bar counting every stage.
+
 ## Step 1 · Simulation core (2026-11-06)
 
 **Built**

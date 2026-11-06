@@ -4,6 +4,8 @@ import type { LogSource } from './narrator';
 export interface LogEntry {
   id: number;
   timeS: number;
+  /** The aircraft the line is about (ground-truth id), so the line can select it. */
+  aircraftId: number;
   source: LogSource;
   text: string;
 }

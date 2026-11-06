@@ -13,7 +13,7 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 
 [![CI](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml)
 ![Status: building in public](https://img.shields.io/badge/status-building_in_public-fbbf24)
-![Progress: step 1 of 14](https://img.shields.io/badge/progress-step_1_of_14-22d3ee)
+![Progress: step 2 of 14](https://img.shields.io/badge/progress-step_2_of_14-22d3ee)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34d399)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
@@ -99,13 +99,55 @@ A search radar's antenna spins, so it sees each aircraft only when its beam swee
 
 [Going deeper →](docs/concepts/01-2-antenna-rotation.md)
 
+### Local coordinates — one map for the radar, the scope and the 3D view
+
+Every position is measured in metres from the battery: east (x), north (y) and up (z). The radar measures a bearing and a range, which the simulator turns into these flat local coordinates, accurate enough over a 40 km area. The 3D view draws the very same numbers, only turned so that "up" points up on your screen.
+
+- **Formula:** `east = range × sin(bearing)`, `north = range × cos(bearing)`
+- **Example:** an echo at bearing 090° and 20 km sits at east = 20 km, north = 0.
+- **See it:** click an echo on the radar scope: the 3D view highlights the same aircraft, in the same place.
+
+[Going deeper →](docs/concepts/02-1-local-coordinates.md)
+
+### Seeing scale — why heights are stretched and aircraft enlarged
+
+At true scale the battlespace is a thin sheet, 80 km across but only 11 km tall at an airliner's cruising height, and a 2 m drone 30 km away would be a twentieth of a pixel. So the 3D view stretches heights (×2 by default) and draws each aircraft at a fixed size on screen, however far away it is. Labels always show the true altitude.
+
+- **Formula:** `drawn height = true height × stretch`
+- **Example:** a cruise-missile-like target flying 50 m above the ground is drawn 100 m up at ×2, and 200 m up at ×4.
+- **See it:** switch the 3D view's Heights control between ×1, ×2 and ×4 and watch the drop lines grow.
+
+[Going deeper →](docs/concepts/02-2-seeing-scale.md)
+
 <!-- concepts:end -->
 
 **Coming next:** detection range and proportional navigation (Step 3) · air density, drag and turn radius (Step 4) · the radar equation, the radar horizon and terrain masking (Step 5).
 
 ## Build log
 
-Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-01-sim-core`. Newest step first.
+Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-02-3d-scene`. Newest step first.
+
+### Step 2 · 3D scene
+
+<p align="center"><img src="docs/media/step-02-3d-scene.webp" alt="The 3D battlespace: aircraft with fading trails cross the area while the radar beam sweeps; selecting a fast jet boxes its echo on the radar scope and fills the inspector, then the camera follows the jet and switches to the top view" width="100%" /></p>
+
+The battlespace in 3D, in step with the radar scope: select an aircraft in one view and every view follows.
+
+- **3D battlespace:** ground grid, range rings every 10 km, and the radar site with its turning antenna, search beam and sweep, all driven by the same simulation as the scope.
+- **Aircraft:** models built from the palette silhouettes, each with a drop line to the ground, a fading 30-second trail and a tag showing its true altitude.
+- **Cameras:** Orbit, Top (north up, like the scope), Follow and Radar (stand at the antenna and look out), on keys 1–4. Stretch heights ×1, ×2 or ×4; toggle labels with L.
+- **One selection everywhere:** click an aircraft in 3D, an echo on the scope or a line in the event log. The scope boxes its echo, and the inspector shows the ground truth: speed, altitude, heading, range and what the radar knows. Esc clears it.
+- **Shareable views:** [`?t=60&select=3&camera=follow`](https://mohammadalyounes.github.io/air-defense-sim/?t=60&select=3&camera=follow) opens the run one minute in, following the fast jet.
+
+> **Engineering note: one truth, many views.** The scope, the 3D view and the inspector all read the same pair of simulation snapshots, so they can never disagree. The 3D view only draws when something changes (a paused run costs no GPU time), and three.js loads in its own chunk after the console is on screen.
+
+<img src="docs/media/step-02-3d-scene.png" alt="The console with the 3D battlespace: a selected fast jet with its trail and drop line, its echo boxed on the radar scope, and its ground truth in the inspector" width="100%" />
+
+<details>
+<summary>Phone layout</summary>
+<br />
+<img src="docs/media/step-02-3d-scene-mobile.png" alt="The Step 2 console on a phone, with the 3D view at the top" width="320" />
+</details>
 
 ### Step 1 · Simulation core
 
@@ -152,7 +194,7 @@ The foundation everything else builds on.
 
 - [x] **Step 0 · Launchpad:** project scaffold, CI, live demo and the console shell
 - [x] **Step 1 · Simulation core:** deterministic clock, play/pause/step/speed, live radar scope
-- [ ] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
+- [x] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
 - [ ] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
 - [ ] **Step 4 · Environment:** terrain, atmosphere, wind and drag; three threat types with routes
 - [ ] **Step 5 · Radar realism:** radar equation, noise, horizon, terrain masking, clutter and coverage maps
@@ -170,21 +212,21 @@ The full specification is in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 
 ## Under the hood
 
-| Layer            | Choice                                                                 |
-| ---------------- | ---------------------------------------------------------------------- |
-| Language         | TypeScript (strict)                                                    |
-| App              | React 19, Vite 8                                                       |
-| 3D (from Step 2) | Three.js with React Three Fiber                                        |
-| Styling          | Tailwind CSS 4, Radix UI, Lucide icons                                 |
-| Simulation       | Plain TypeScript: fixed time step, seeded randomness, Web Worker ready |
-| App state        | Zustand                                                                |
-| Tests            | Vitest (unit), Playwright (browser)                                    |
-| CI/CD            | GitHub Actions → GitHub Pages                                          |
+| Layer      | Choice                                                                 |
+| ---------- | ---------------------------------------------------------------------- |
+| Language   | TypeScript (strict)                                                    |
+| App        | React 19, Vite 8                                                       |
+| 3D         | Three.js with React Three Fiber, loaded on demand                      |
+| Styling    | Tailwind CSS 4, Radix UI, Lucide icons                                 |
+| Simulation | Plain TypeScript: fixed time step, seeded randomness, Web Worker ready |
+| App state  | Zustand                                                                |
+| Tests      | Vitest (unit), Playwright (browser)                                    |
+| CI/CD      | GitHub Actions → GitHub Pages                                          |
 
 ```
 src/
   sim/      The engine: pure, deterministic TypeScript (clock, random numbers, traffic, radar)
-  app/      React UI: analysis bar, palette, radar scope, panels and the simulation driver
+  app/      React UI: analysis bar, palette, radar scope, 3D view, panels and the simulation driver
 e2e/        Browser tests
 docs/       Plan, architecture, models, devlog, concept cards and media
 scripts/    Docs sync, screenshots, GIFs and preview images

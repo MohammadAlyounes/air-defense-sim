@@ -1,4 +1,4 @@
-import type { RadarSize } from '../../sim';
+import type { Plot, RadarSize, Snapshot } from '../../sim';
 import type { RenderFrame } from '../sim/SimController';
 
 /**
@@ -27,6 +27,12 @@ const BLIP_RADIUS_PX: Readonly<Record<RadarSize, number>> = {
   medium: 2.8,
   large: 3.4,
 };
+/** Echoes fade like phosphor: brightness exp(-age / fade), with the fade 85% of a turn. */
+const FADE_TURNS = 0.85;
+/** Below this brightness an echo is no longer drawn (nor clickable). */
+const MIN_GLOW = 0.04;
+/** How close to an echo a click must land to pick it, in CSS pixels. */
+export const PICK_RADIUS_PX = 14;
 
 export function createScopeLayout(size: number, dpr: number, rangeM: number): ScopeLayout {
   const radiusPx = size / 2 - 4;
@@ -39,6 +45,46 @@ export function createScopeLayout(size: number, dpr: number, rangeM: number): Sc
     drawStatic(ctx, size, radiusPx, rangeM);
   }
   return { size, dpr, radiusPx, rangeM, staticLayer };
+}
+
+type ScopeGeometry = Pick<ScopeLayout, 'size' | 'radiusPx' | 'rangeM'>;
+
+/** Where a ground position (metres east and north of the battery) appears on the scope, in CSS pixels. */
+export function scopePoint(layout: ScopeGeometry, eastM: number, northM: number) {
+  const c = layout.size / 2;
+  const scale = layout.radiusPx / layout.rangeM;
+  return { x: c + eastM * scale, y: c - northM * scale };
+}
+
+/** Brightness of an echo `ageS` seconds after the paint (0 when not yet painted). */
+export const echoGlow = (ageS: number, periodS: number): number =>
+  ageS < 0 ? 0 : Math.exp(-ageS / (periodS * FADE_TURNS));
+
+/**
+ * The aircraft behind the visible echo nearest to a click at (x, y), in CSS pixels from the
+ * scope's top-left corner, or null when no echo is close enough. This uses the ground-truth
+ * link of each plot; the radar picture itself never shows it.
+ */
+export function pickEcho(
+  snapshot: Pick<Snapshot, 'plots' | 'radar'>,
+  timeS: number,
+  layout: ScopeGeometry,
+  x: number,
+  y: number,
+): number | null {
+  let best: number | null = null;
+  let bestDistance = PICK_RADIUS_PX;
+  for (const plot of snapshot.plots) {
+    if (echoGlow(timeS - plot.timeS, snapshot.radar.periodS) < MIN_GLOW) continue;
+    const p = scopePoint(layout, plot.position.x, plot.position.y);
+    const distance = Math.hypot(p.x - x, p.y - y);
+    // `<=`: on a tie, the newer echo (plots are oldest first) wins.
+    if (distance <= bestDistance) {
+      bestDistance = distance;
+      best = plot.truthId;
+    }
+  }
+  return best;
 }
 
 /** Screen position of a compass bearing at a given pixel radius. */
@@ -125,8 +171,14 @@ export function interpolateAzimuth(fromRad: number, toRad: number, alpha: number
   return (fromRad + delta * alpha) % TWO_PI;
 }
 
-export function drawScope(ctx: CanvasRenderingContext2D, layout: ScopeLayout, frame: RenderFrame) {
-  const { size, dpr, radiusPx, rangeM } = layout;
+export function drawScope(
+  ctx: CanvasRenderingContext2D,
+  layout: ScopeLayout,
+  frame: RenderFrame,
+  /** Aircraft selected in the UI: its newest echo gets a highlight box. */
+  selectedId: number | null = null,
+) {
+  const { size, dpr, radiusPx } = layout;
   const c = size / 2;
   const { previous, current, alpha } = frame;
 
@@ -164,15 +216,12 @@ export function drawScope(ctx: CanvasRenderingContext2D, layout: ScopeLayout, fr
   ctx.stroke();
 
   // Echoes: bright when painted, fading like phosphor until the beam comes round again.
-  const scale = radiusPx / rangeM;
-  const fadeS = current.radar.periodS * 0.85;
+  let selected: Plot | undefined;
   for (const plot of current.plots) {
-    const age = timeS - plot.timeS;
-    if (age < 0) continue;
-    const glow = Math.exp(-age / fadeS);
-    if (glow < 0.04) continue;
-    const x = c + plot.position.x * scale;
-    const y = c - plot.position.y * scale;
+    const glow = echoGlow(timeS - plot.timeS, current.radar.periodS);
+    if (glow < MIN_GLOW) continue;
+    if (plot.truthId === selectedId) selected = plot;
+    const { x, y } = scopePoint(layout, plot.position.x, plot.position.y);
     const r = BLIP_RADIUS_PX[plot.radarSize];
     ctx.fillStyle = `rgba(167, 243, 208, ${0.2 * glow})`;
     ctx.beginPath();
@@ -183,4 +232,28 @@ export function drawScope(ctx: CanvasRenderingContext2D, layout: ScopeLayout, fr
     ctx.arc(x, y, r, 0, TWO_PI);
     ctx.fill();
   }
+
+  if (selected) drawSelectionBox(ctx, scopePoint(layout, selected.position.x, selected.position.y));
+}
+
+/** Corner brackets around the selected aircraft's newest echo. */
+function drawSelectionBox(ctx: CanvasRenderingContext2D, { x, y }: { x: number; y: number }) {
+  const half = 9;
+  const arm = 4.5;
+  ctx.strokeStyle = 'rgba(228, 234, 245, 0.95)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (const [sx, sy] of [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ] as const) {
+    const cx = x + sx * half;
+    const cy = y + sy * half;
+    ctx.moveTo(cx - sx * arm, cy);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx, cy - sy * arm);
+  }
+  ctx.stroke();
 }

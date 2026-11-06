@@ -76,6 +76,21 @@ describe('Simulation: kinematics', () => {
       expect(Math.abs(drone.position.x - 5_000)).toBeLessThanOrEqual(700);
     }
   });
+
+  it('records a trail: one position every 0.5 s, keeping the last 30 s', () => {
+    const sim = emptySky();
+    sim.dispatch({ kind: 'spawnTraffic', type: 'jet', eastM: 0, northM: -30_000, headingRad: 0 });
+    sim.run(50); // spawn point, then samples at 0.5 s and 1 s
+    let jet = sim.snapshot().aircraft[0];
+    expect(jet?.trail).toHaveLength(3);
+    expect(jet?.trail.at(-1)).toEqual(jet?.position);
+
+    sim.run(50 * 60); // one more minute
+    jet = sim.snapshot().aircraft[0];
+    expect(jet?.trail).toHaveLength(60);
+    const [first, second] = jet?.trail ?? [];
+    expect((second?.y ?? 0) - (first?.y ?? 0)).toBeCloseTo(340 * 0.5, 6); // 0.5 s at 340 m/s
+  });
 });
 
 describe('Simulation: search radar', () => {

@@ -27,6 +27,9 @@ const PLOT_HISTORY_TURNS = 3;
 const LOSE_AFTER_TURNS = 2;
 /** Spread of a drone swarm around its leader, metres. */
 const SWARM_SPREAD_M = 700;
+/** Trail history: one position every 0.5 s, the last 30 s. */
+const TRAIL_EVERY_TICKS = 25;
+const TRAIL_LENGTH = 60;
 
 /**
  * The simulation engine. Pure and deterministic: the same seed and the same commands at the
@@ -108,10 +111,15 @@ export class Simulation {
     this.scenarioArrivals(tick, events);
 
     // Constant velocity, so one Euler step per tick is exact: p(t + Δt) = p(t) + v·Δt.
-    this.aircraft = this.aircraft.map((a) => ({
-      ...a,
-      position: add(a.position, scale(a.velocity, TICK_S)),
-    }));
+    const sampleTrail = tick % TRAIL_EVERY_TICKS === 0;
+    this.aircraft = this.aircraft.map((a) => {
+      const position = add(a.position, scale(a.velocity, TICK_S));
+      return {
+        ...a,
+        position,
+        trail: sampleTrail ? [...a.trail.slice(1 - TRAIL_LENGTH), position] : a.trail,
+      };
+    });
 
     this.sweep(tick, events);
     this.dropStaleContacts(tick, events);
@@ -281,6 +289,7 @@ export class Simulation {
       spawnTick: this.tickCount,
       contactHeld: false,
       lastPaint: null,
+      trail: [position],
     };
     this.aircraft.push(aircraft);
     events.push({
