@@ -1,0 +1,124 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Surfaces: a deep "operations console" navy. */
+  --color-ink-950: #060b16;
+  --color-ink-900: #0a1020;
+  --color-ink-850: #0d1527;
+  --color-ink-800: #111b31;
+  --color-ink-700: #18243f;
+  --color-ink-600: #22304f;
+  --color-ink-500: #33456b;
+  --color-ink-400: #5f7398;
+  --color-ink-300: #8fa0bf;
+  --color-ink-200: #bcc8dd;
+  --color-ink-100: #e4eaf5;
+
+  /* System accent. */
+  --color-accent: #22d3ee;
+  --color-accent-soft: #0e7490;
+
+  /* Affiliation colors: always paired with a shape, never color alone. */
+  --color-hostile: #f87171;
+  --color-suspect: #fb923c;
+  --color-unknown: #facc15;
+  --color-neutral: #4ade80;
+  --color-friend: #60a5fa;
+
+  /* Status. */
+  --color-ok: #34d399;
+  --color-warn: #fbbf24;
+  --color-alert: #fb7185;
+
+  --animate-sweep: sweep 6s linear infinite;
+
+  @keyframes sweep {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-ink-950);
+    color: var(--color-ink-100);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  /* Console layout: phones stack panels; laptops and up get the full console. */
+  .console-grid {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'view' 'palette' 'scope' 'tracks' 'bottom' 'timeline';
+  }
+
+  .area-palette {
+    grid-area: palette;
+  }
+  .area-view {
+    grid-area: view;
+  }
+  .area-scope {
+    grid-area: scope;
+  }
+  .area-tracks {
+    grid-area: tracks;
+  }
+  .area-bottom {
+    grid-area: bottom;
+  }
+  .area-timeline {
+    grid-area: timeline;
+  }
+
+  .bottom-grid {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (width >= 48rem) {
+    .bottom-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (width >= 64rem) {
+    .console-grid {
+      grid-template-columns: 17rem minmax(0, 1fr) minmax(18.5rem, 25rem);
+      grid-template-rows: minmax(17rem, 1.35fr) minmax(9rem, 1fr) 12.5rem auto;
+      grid-template-areas:
+        'palette view scope'
+        'palette view tracks'
+        'palette bottom bottom'
+        'palette timeline timeline';
+    }
+
+    .bottom-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+    }
+  }
+}
