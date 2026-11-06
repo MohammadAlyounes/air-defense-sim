@@ -15,7 +15,9 @@ One short entry per step: what was built, the decisions behind it, and what come
 **Decisions**
 
 - **TypeScript 6, not 7.** TypeScript 7 (the native compiler) is out, but typescript-eslint supports TypeScript only up to 6.0 today. We will move when the linter does.
-- **Playwright pinned to 1.63.0,** the version whose browser build is preinstalled in the cloud dev environment. CI installs its own browser.
+- **Playwright pinned to 1.63.0,** the version whose browser build is preinstalled in the cloud dev environment. In CI, browser tests run inside Playwright's official `v1.63.0-noble` container, so nothing is downloaded (installing Chromium on a bare runner took over eight minutes on the first run).
+- **CI and deploy are separate workflows.** `CI` checks the code; `Deploy` publishes to GitHub Pages only after CI passes on `main`. The CI badge therefore reports code health, not hosting.
+- **Tags and releases come from CI.** This cloud session can push branches but its git proxy rejects tag pushes (HTTP 403). The final commit of each step carries a `Step-Tag:` trailer, and CI creates the tag and a GitHub Release with notes taken from this devlog.
 - **Determinism is enforced by the linter.** `src/sim` cannot import UI libraries or call `Math.random()`, `Date.now()`, `new Date()` or browser APIs.
 - **The header belongs to the analysis bar.** Play, pause, step and the clock live in the bottom player bar, next to the timeline, like a video player.
 - **Deploy paths come from the environment.** CI sets `BASE_PATH=/<repo>/` and `VITE_SITE_URL`, so forks deploy to their own GitHub Pages without code changes.

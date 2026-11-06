@@ -47,7 +47,7 @@ An open-source, browser-based, educational air-defense simulator.
 2. **Checks pass.** `npm run lint`, `npm run typecheck` and `npm test` all pass, and new physics has unit tests against known values.
 3. **README updated.** Progress checklist, a concept card for any new physics, and a build-log entry with a screenshot.
 4. **Devlog entry.** Add an entry to `docs/DEVLOG.md`: what was built, key decisions, and what comes next.
-5. **Shipped.** Commit, push, and tag `step-NN-<slug>`.
+5. **Shipped.** Commit and push to `main`. The step's final commit ends with the trailer `Step-Tag: step-NN-<slug>`; once CI passes, the `release-step` job creates that tag and a GitHub Release from the devlog entry. (The cloud session's git proxy rejects tag pushes, so never push tags by hand from there.)
 
 ## Concept card format (README, docs and in-app)
 

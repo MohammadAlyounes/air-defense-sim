@@ -11,7 +11,6 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  # Cancel superseded pull-request runs, but never interrupt a deployment from main.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -29,30 +28,19 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run format:check
-      - name: Build for GitHub Pages
-        run: |
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          repo="${GITHUB_REPOSITORY#*/}"
-          export BASE_PATH="/${repo}/"
-          export VITE_SITE_URL="https://${owner}.github.io/${repo}/"
-          npm run build
-      - name: Upload site artifact
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: dist
+      - run: npm run build
 
   e2e:
     name: Browser tests
     runs-on: ubuntu-latest
+    # Playwright's official image ships the matching browser and system libraries,
+    # so there is nothing to download. Keep the tag in sync with @playwright/test.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - name: Upload traces on failure
         if: failure()
@@ -62,17 +50,19 @@ jobs:
           path: test-results
           retention-days: 7
 
-  deploy:
-    name: Deploy to GitHub Pages
+  # The last commit of a roadmap step carries a trailer such as `Step-Tag: step-00-launchpad`.
+  # Once the checks pass, this job creates that tag and a GitHub Release from docs/DEVLOG.md.
+  release-step:
+    name: Tag and release the step
     needs: [quality, e2e]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'Step-Tag:')
     runs-on: ubuntu-latest
     permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      contents: write
     steps:
-      - id: deployment
-        uses: actions/deploy-pages@v5
+      - uses: actions/checkout@v7
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: node scripts/release-step.mjs

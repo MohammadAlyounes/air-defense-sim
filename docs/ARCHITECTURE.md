@@ -54,7 +54,9 @@ Give the simulation the same scenario, the same random seed and the same list of
 
 ## Deployment
 
-GitHub Actions builds with two environment variables, then deploys `dist/` to GitHub Pages:
+Two GitHub Actions workflows:
 
-- `BASE_PATH=/<repo>/`, the sub-path GitHub Pages serves the site from;
-- `VITE_SITE_URL=https://<owner>.github.io/<repo>/`, the absolute URL that social preview tags need.
+- **CI** (`.github/workflows/ci.yml`) runs on every push and pull request: lint, type-check, unit tests, format check, build, and browser tests in Playwright's container. When the head commit carries a `Step-Tag:` trailer, it also creates the step's tag and GitHub Release (`scripts/release-step.mjs`).
+- **Deploy** (`.github/workflows/deploy.yml`) runs after CI succeeds on `main`. It builds with two environment variables and publishes `dist/` to GitHub Pages:
+  - `BASE_PATH=/<repo>/`, the sub-path GitHub Pages serves the site from;
+  - `VITE_SITE_URL=https://<owner>.github.io/<repo>/`, the absolute URL that social preview tags need.

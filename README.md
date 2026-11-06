@@ -81,7 +81,7 @@ Each step adds short concept cards here: what the idea is, one formula, one work
 
 ## Build log
 
-Every step is a git tag, so you can check out any stage of the project, for example `git checkout step-00-launchpad`.
+Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-00-launchpad`.
 
 ### Step 0 · Launchpad
 
