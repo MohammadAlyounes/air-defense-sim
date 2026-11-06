@@ -167,3 +167,5 @@ Created by [Mohammad Alyounes](https://github.com/MohammadAlyounes). Contributio
 ## License
 
 Code: [MIT](LICENSE). Documentation, lessons and concept cards: [CC BY 4.0](LICENSE-docs.md).
+
+If you share, fork or build on this project, please keep the credit "Created by Mohammad Alyounes" (see [NOTICE](NOTICE)). To cite it, use the **Cite this repository** button on GitHub ([CITATION.cff](CITATION.cff)).

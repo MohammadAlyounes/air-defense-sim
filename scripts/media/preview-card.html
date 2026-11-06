@@ -132,6 +132,25 @@
       .sep {
         color: #33456b;
       }
+      .author {
+        margin-top: 22px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 18px;
+        color: var(--ink-200);
+      }
+      .author strong {
+        color: var(--ink-100);
+        font-weight: 600;
+      }
+      .author .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--accent);
+        box-shadow: 0 0 12px rgba(34, 211, 238, 0.8);
+      }
       .credit {
         margin-left: auto;
         font-family: 'Inter', sans-serif;
@@ -174,6 +193,9 @@
         <p class="desc">
           Drag a drone, missile or jet onto the map and watch the full defense loop, with real
           physics explained in plain language.
+        </p>
+        <p class="author">
+          <span class="dot"></span><span>Created by <strong>Mohammad Alyounes</strong></span>
         </p>
       </div>
       <div class="scope">

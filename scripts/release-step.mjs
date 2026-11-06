@@ -5,6 +5,10 @@
 //
 // Release notes come from that step's entry in docs/DEVLOG.md ("## Step 3 · ..."),
 // with the step screenshot (docs/media/<tag>.png) on top when it exists.
+//
+// An existing release is left alone, unless the commit also carries `Step-Retag: true`:
+// then the old release and tag are removed and recreated at this commit (used for a late
+// fix to a step that has already shipped).
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,12 +29,20 @@ const stepNumber = match[2] === undefined ? null : Number(match[2]);
 const gh = (...args) =>
   execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
+const retag = /^Step-Retag:\s*(true|yes)\s*$/im.test(message);
+let exists = true;
 try {
   gh('release', 'view', tag);
+} catch {
+  exists = false;
+}
+if (exists && !retag) {
   console.log(`Release ${tag} already exists; nothing to do.`);
   process.exit(0);
-} catch {
-  // Not released yet: carry on.
+}
+if (exists) {
+  gh('release', 'delete', tag, '--cleanup-tag', '--yes');
+  console.log(`Removed the previous ${tag} release and tag; recreating them at ${sha}.`);
 }
 
 const entry = devlogEntry(stepNumber) ?? { title: tag, body: '' };
@@ -46,7 +58,27 @@ const notes = [
 
 const notesFile = join(tmpdir(), `${tag}-notes.md`);
 writeFileSync(notesFile, notes);
-gh('release', 'create', tag, '--target', sha, '--title', entry.title, '--notes-file', notesFile);
+// A just-deleted tag can take a moment to disappear, so retry creation a few times.
+for (let attempt = 1; ; attempt++) {
+  try {
+    gh(
+      'release',
+      'create',
+      tag,
+      '--target',
+      sha,
+      '--title',
+      entry.title,
+      '--notes-file',
+      notesFile,
+    );
+    break;
+  } catch (error) {
+    if (attempt >= 3) throw error;
+    console.log(`Creating the release failed (attempt ${attempt}); retrying in 5 s.`);
+    execFileSync('sleep', ['5']);
+  }
+}
 console.log(`Released ${tag}: ${entry.title}`);
 
 /** Returns the "## Step N · Title (date)" section of the devlog as { title, body }. */

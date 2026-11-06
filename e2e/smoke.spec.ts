@@ -23,6 +23,7 @@ test('the console shell loads without errors', async ({ page }) => {
   await expect(cards).toHaveCount(6);
 
   await expect(page.getByText('Standing by.')).toBeVisible();
+  await expect(page.getByRole('contentinfo')).toContainText('© 2026 Mohammad Alyounes');
   expect(errors).toEqual([]);
 });
 

@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use or build on this project, please cite it as below and keep the credit 'Created by Mohammad Alyounes'."
+title: 'Air Defense Simulator'
+type: software
+abstract: >-
+  An open-source, educational air-defense simulator: drag a drone, missile or jet
+  onto the map and watch a generic defense battery detect, track, identify,
+  evaluate, engage and assess it, with the physics explained in plain language.
+authors:
+  - given-names: Mohammad
+    family-names: Alyounes
+    alias: MohammadAlyounes
+repository-code: 'https://github.com/MohammadAlyounes/air-defense-sim'
+url: 'https://mohammadalyounes.github.io/air-defense-sim/'
+license: MIT
+date-released: 2026-11-06
+keywords:
+  - simulation
+  - education
+  - physics
+  - radar
+  - kalman filter
+  - proportional navigation

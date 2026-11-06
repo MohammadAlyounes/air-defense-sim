@@ -3,7 +3,7 @@ import { History, Pause, Play, ShieldCheck, StepForward, type LucideIcon } from 
 import type { SituationSummary } from '../analysis-bar/situation';
 import { StepBadge } from '../components/StepBadge';
 import { Tooltip } from '../components/Tooltip';
-import { PLAN_URL, REPO_URL, SAFETY_URL } from '../data/links';
+import { AUTHOR, PLAN_URL, REPO_URL, SAFETY_URL } from '../data/links';
 import { formatSimClock } from '../lib/format';
 
 /**
@@ -106,6 +106,18 @@ export function Footer() {
             Source code
           </a>
         </nav>
+        <p>
+          © {AUTHOR.copyrightYear}{' '}
+          <a
+            className="text-ink-200 hover:text-accent"
+            href={AUTHOR.url}
+            target="_blank"
+            rel="noreferrer author"
+          >
+            {AUTHOR.name}
+          </a>{' '}
+          · MIT License
+        </p>
       </div>
     </footer>
   );

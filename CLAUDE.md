@@ -20,6 +20,7 @@ An open-source, browser-based, educational air-defense simulator.
 4. **Easy to share and run.** A live demo on GitHub Pages, a demo video, and `npm install && npm run dev`.
 5. **A README that teaches.** Easy to scan. Every step adds concise physics concept cards and a build-log entry.
 6. **Safe and generic.** See the safety guardrails below.
+7. **Fixed author credit.** The header always shows "Created by Mohammad Alyounes" on every screen size, and the footer shows "© 2026 Mohammad Alyounes". Both come from `AUTHOR` in `src/app/data/links.ts`. Never remove, hide or change them; a browser test fails CI if you do. Keep the credit in the README, `NOTICE`, `CITATION.cff` and the social preview card too.
 
 ## Architecture rules
 
@@ -47,7 +48,7 @@ An open-source, browser-based, educational air-defense simulator.
 2. **Checks pass.** `npm run lint`, `npm run typecheck` and `npm test` all pass, and new physics has unit tests against known values.
 3. **README updated.** Progress checklist, a concept card for any new physics, and a build-log entry with a screenshot.
 4. **Devlog entry.** Add an entry to `docs/DEVLOG.md`: what was built, key decisions, and what comes next.
-5. **Shipped.** Commit and push to `main`. The step's final commit ends with the trailer `Step-Tag: step-NN-<slug>`; once CI passes, the `release-step` job creates that tag and a GitHub Release from the devlog entry. (The cloud session's git proxy rejects tag pushes, so never push tags by hand from there.)
+5. **Shipped.** Commit and push to `main`. The step's final commit ends with the trailer `Step-Tag: step-NN-<slug>`; once CI passes, the `release-step` job creates that tag and a GitHub Release from the devlog entry. (The cloud session's git proxy rejects tag pushes, so never push tags by hand from there.) To move an already released step to a newer commit, add `Step-Retag: true` as well.
 
 ## Concept card format (README, docs and in-app)
 
@@ -95,4 +96,5 @@ Planned: `npm run docs:sync` (first concept card) and `npm run demo:record` (Ste
 
 - **Code:** strict TypeScript, ESLint + Prettier, small pure functions in the sim.
 - **Commits:** imperative mood, prefixed with the step (`step-05: add radar horizon model`).
+- **Commit author:** Mohammad Alyounes <fcbmoh98@gmail.com>. In a fresh clone, run `git config author.name "Mohammad Alyounes"` and `git config author.email "fcbmoh98@gmail.com"`, and leave the committer and signing as configured. Keep the Claude `Co-Authored-By` trailer.
 - **Secrets:** never commit them. The optional Claude tutor uses the visitor's own API key, never a key stored in the repo.

@@ -20,6 +20,7 @@ v0.2 adds four things:
 5. **A README that is easy to read and teaches.** Every development step adds a short, plain-language explanation of the physics it introduced.
 6. **Useful, educational, real, attractive.** Real physics principles at textbook level, fictional equipment, polished visuals.
 7. **Generic, non-operational and safe** (Section 13).
+8. **Fixed author credit.** "Created by Mohammad Alyounes" is a permanent part of the header on every screen size, and appears in the footer, README, `NOTICE`, `CITATION.cff` and the social preview card.
 
 ## 2. Vision and audience
 
@@ -492,7 +493,8 @@ Each step ends with a working demo, passing tests, at least one README concept c
 | ------------------------- | ------------------------------------------------------------------------------------------------- |
 | Repository                | [`MohammadAlyounes/air-defense-sim`](https://github.com/MohammadAlyounes/air-defense-sim), public |
 | Name                      | "Air Defense Simulator" (no real system names)                                                    |
-| License                   | MIT (code) + CC BY 4.0 (docs, lessons)                                                            |
+| License                   | MIT (code) + CC BY 4.0 (docs, lessons): confirmed by the owner                                    |
+| Author credit             | "Created by Mohammad Alyounes", fixed in the header; commits authored by Mohammad Alyounes        |
 | UI language               | English for v1; UI text kept in one place so translations can be added later                      |
 | Visual style              | Dark operations-console theme + light projector theme                                             |
 | Claude features           | Optional "Ask Claude" tutor and scenario generator after v1.0                                     |

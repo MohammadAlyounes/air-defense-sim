@@ -8,4 +8,4 @@ Full legal text: https://creativecommons.org/licenses/by/4.0/legalcode
 
 Source code, including code samples inside the documentation, is licensed under the MIT License: see [LICENSE](LICENSE).
 
-© 2026 MohammadAlyounes
+© 2026 Mohammad Alyounes
