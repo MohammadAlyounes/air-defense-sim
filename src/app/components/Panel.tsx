@@ -9,6 +9,10 @@ interface PanelProps {
   /** Roadmap step in which this panel comes to life (shows an "arrives in" badge). */
   step?: number;
   subtitle?: string;
+  /** Small controls shown at the right of the header (for example a concept card). */
+  actions?: ReactNode;
+  /** Stable hook for tests and media scripts (`data-panel`). */
+  panelId?: string;
   className?: string;
   bodyClassName?: string;
   children: ReactNode;
@@ -20,6 +24,8 @@ export function Panel({
   icon: Icon,
   step,
   subtitle,
+  actions,
+  panelId,
   className,
   bodyClassName,
   children,
@@ -28,6 +34,7 @@ export function Panel({
   return (
     <section
       aria-labelledby={headingId}
+      data-panel={panelId}
       className={clsx(
         'flex min-h-0 flex-col overflow-hidden rounded-xl border border-ink-700/70 bg-ink-900/80 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.03)]',
         className,
@@ -42,7 +49,12 @@ export function Panel({
           {title}
         </h2>
         {subtitle && <span className="truncate text-[11px] text-ink-300">{subtitle}</span>}
-        {step !== undefined && <StepBadge step={step} className="ml-auto" />}
+        {(actions || step !== undefined) && (
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            {actions}
+            {step !== undefined && <StepBadge step={step} />}
+          </div>
+        )}
       </header>
       <div className={clsx('min-h-0 flex-1', bodyClassName)}>{children}</div>
     </section>

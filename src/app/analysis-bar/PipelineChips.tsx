@@ -1,22 +1,24 @@
 import clsx from 'clsx';
 import { ChevronRight } from 'lucide-react';
 import { Tooltip } from '../components/Tooltip';
+import { roadmapStep } from '../data/roadmap';
 import { STAGES, type StageId } from '../data/stages';
 
 interface PipelineChipsProps {
-  counts: Readonly<Record<StageId, number>>;
-  online: boolean;
+  /** Tracks in each stage; `null` for a stage that is not built yet. */
+  counts: Readonly<Record<StageId, number | null>>;
   className?: string;
 }
 
 /** The seven-stage defense loop with a live count of tracks in each stage. */
-export function PipelineChips({ counts, online, className }: PipelineChipsProps) {
+export function PipelineChips({ counts, className }: PipelineChipsProps) {
   return (
     <nav aria-label="Defense loop stages" className={clsx('overflow-x-auto', className)}>
       <ol className="flex w-max items-center gap-1 lg:mx-auto">
         {STAGES.map((stage, index) => {
           const count = counts[stage.id];
-          const active = online && count > 0;
+          const active = count !== null && count > 0;
+          const arrives = roadmapStep(stage.arrivesInStep);
           return (
             <li key={stage.id} className="flex items-center gap-1">
               <Tooltip
@@ -25,12 +27,18 @@ export function PipelineChips({ counts, online, className }: PipelineChipsProps)
                     <strong className="text-accent">{stage.label}</strong>
                     <br />
                     {stage.description}
+                    {count === null && arrives && (
+                      <span className="mt-1.5 block text-ink-300">
+                        Arrives in Step {arrives.step} · {arrives.title}.
+                      </span>
+                    )}
                   </>
                 }
               >
                 <button
                   type="button"
                   data-stage={stage.id}
+                  data-count={count ?? ''}
                   className={clsx(
                     'flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors',
                     active
@@ -47,7 +55,7 @@ export function PipelineChips({ counts, online, className }: PipelineChipsProps)
                       active ? 'bg-accent/20 text-accent' : 'bg-ink-800 text-ink-300',
                     )}
                   >
-                    {online ? count : '—'}
+                    {count ?? '—'}
                   </span>
                 </button>
               </Tooltip>

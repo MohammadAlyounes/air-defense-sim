@@ -15,7 +15,6 @@ export function AnalysisBar({ situation }: { situation: SituationSummary }) {
         <Brand />
         <PipelineChips
           counts={situation.stageCounts}
-          online={situation.online}
           className="order-last w-full lg:order-none lg:w-auto lg:min-w-0 lg:flex-1"
         />
         <BuildProgress className="ml-auto lg:ml-0" />

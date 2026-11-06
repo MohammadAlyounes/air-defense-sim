@@ -1,106 +1,65 @@
 /**
  * Threats and other air traffic the user can drop onto the map.
  *
- * All numbers are illustrative, round values chosen for teaching. They describe
- * generic object classes, not any real system (see SAFETY.md).
+ * Flight performance (speed, altitude, radar size) comes from the simulation core, so the
+ * palette and the physics can never disagree. This file adds the words shown in the UI.
  */
+import {
+  TRAFFIC,
+  TRAFFIC_IDS,
+  type Affiliation,
+  type AltitudeReference,
+  type RadarSize,
+  type TrafficPerformance,
+  type TrafficTypeId,
+} from '../../sim';
 
-export type Affiliation = 'hostile' | 'friend' | 'neutral';
-export type RadarSize = 'tiny' | 'small' | 'medium' | 'large';
-export type AltitudeReference = 'AGL' | 'MSL';
+export type { Affiliation, AltitudeReference, RadarSize };
 
-export interface TrafficType {
-  id: 'drone' | 'swarm' | 'cruise' | 'jet' | 'friendly' | 'airliner';
+export interface TrafficType extends TrafficPerformance {
   name: string;
-  affiliation: Affiliation;
-  /** Typical cruise speed, metres per second. */
-  speedMps: number;
-  /** Typical flight altitude, metres. */
-  altitudeM: number;
-  /** AGL = above ground level, MSL = above mean sea level. */
-  altitudeRef: AltitudeReference;
-  radarSize: RadarSize;
-  /** Objects spawned by one drop (a swarm is several drones). */
-  count: number;
   /** One line: why it is hard to stop, or why it must not be engaged. */
   insight: string;
   behavior: string;
 }
 
-export const TRAFFIC_CATALOG: readonly TrafficType[] = [
-  {
-    id: 'drone',
+const TEXT: Readonly<Record<TrafficTypeId, Pick<TrafficType, 'name' | 'insight' | 'behavior'>>> = {
+  drone: {
     name: 'Small drone',
-    affiliation: 'hostile',
-    speedMps: 40,
-    altitudeM: 300,
-    altitudeRef: 'AGL',
-    radarSize: 'tiny',
-    count: 1,
     insight: 'Tiny radar size; it blends into ground clutter.',
     behavior: 'Slow and low, pushed around by the wind.',
   },
-  {
-    id: 'swarm',
+  swarm: {
     name: 'Drone swarm',
-    affiliation: 'hostile',
-    speedMps: 40,
-    altitudeM: 300,
-    altitudeRef: 'AGL',
-    radarSize: 'tiny',
-    count: 6,
     insight: 'Many cheap targets at once saturate the defense.',
     behavior: 'A spread-out group arriving in staggered waves.',
   },
-  {
-    id: 'cruise',
+  cruise: {
     name: 'Cruise-missile-like',
-    affiliation: 'hostile',
-    speedMps: 240,
-    altitudeM: 50,
-    altitudeRef: 'AGL',
-    radarSize: 'small',
-    count: 1,
     insight: 'Hugs the terrain to hide below the radar horizon.',
     behavior: 'Fast, terrain-following, dog-leg route.',
   },
-  {
-    id: 'jet',
+  jet: {
     name: 'Fast jet',
-    affiliation: 'hostile',
-    speedMps: 340,
-    altitudeM: 6000,
-    altitudeRef: 'MSL',
-    radarSize: 'medium',
-    count: 1,
     insight: 'Fast and agile; it can out-turn a tired interceptor.',
     behavior: 'High-speed run with an evasive turn when engaged.',
   },
-  {
-    id: 'friendly',
+  friendly: {
     name: 'Friendly aircraft',
-    affiliation: 'friend',
-    speedMps: 200,
-    altitudeM: 4000,
-    altitudeRef: 'MSL',
-    radarSize: 'medium',
-    count: 1,
     insight: 'Must not be engaged: it answers identification checks.',
     behavior: 'Patrols the area and returns to base.',
   },
-  {
-    id: 'airliner',
+  airliner: {
     name: 'Civil airliner',
-    affiliation: 'neutral',
-    speedMps: 230,
-    altitudeM: 11000,
-    altitudeRef: 'MSL',
-    radarSize: 'large',
-    count: 1,
     insight: 'Must not be engaged: it flies the civil air corridor.',
     behavior: 'Steady cruise along the corridor.',
   },
-];
+};
+
+export const TRAFFIC_CATALOG: readonly TrafficType[] = TRAFFIC_IDS.map((id) => ({
+  ...TRAFFIC[id],
+  ...TEXT[id],
+}));
 
 /** Upper ends of the palette stat bars. */
 export const STAT_SCALE = { maxSpeedMps: 400, maxAltitudeM: 12_000 } as const;

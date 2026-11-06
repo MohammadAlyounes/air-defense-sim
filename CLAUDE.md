@@ -62,7 +62,7 @@ An open-source, browser-based, educational air-defense simulator.
 - **See it:** <where to see it in the sim>
 ```
 
-The full concept texts live in `docs/concepts/*.md`. The app imports them, and `npm run docs:sync` (added with the first concept card) copies the short cards into the README.
+The full concept texts live in `docs/concepts/NN-M-slug.md` (step `NN`, order `M`). The part above `<!-- more -->` is the card. The app imports the files (`ConceptPopover`), and `npm run docs:sync` copies the cards into the README between the `concepts:start` and `concepts:end` markers. CI runs `npm run docs:check` and fails if the README is out of date.
 
 ## README style
 
@@ -80,11 +80,15 @@ The full concept texts live in `docs/concepts/*.md`. The app imports them, and `
 | `npm run test:e2e`                                   | Browser tests (Playwright)                                   |
 | `npm run lint` / `npm run typecheck`                 | Code quality                                                 |
 | `npm run format` / `npm run format:check`            | Prettier                                                     |
-| `npm run check`                                      | Lint, typecheck, unit tests and format check in one go       |
+| `npm run check`                                      | Lint, typecheck, unit tests, format and docs checks          |
+| `npm run docs:sync` / `npm run docs:check`           | Copy concept cards into the README / verify they match       |
 | `npm run media:screenshots -- --name step-NN-<slug>` | README screenshots (run `npm run build` first)               |
+| `npm run media:gif -- --name … --selector …`         | GIF of part of the app (Playwright video + ffmpeg)           |
 | `npm run media:previews`                             | Social preview images from `scripts/media/preview-card.html` |
 
-Planned: `npm run docs:sync` (first concept card) and `npm run demo:record` (Step 14).
+Both media scripts accept `--query "seed=2026&t=75&paused=0"` (URL options from `src/app/sim/params.ts`) for repeatable shots.
+
+Planned: `npm run demo:record` (Step 14).
 
 ## Environment notes
 

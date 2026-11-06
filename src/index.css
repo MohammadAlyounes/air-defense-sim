@@ -109,7 +109,7 @@
   @media (width >= 64rem) {
     .console-grid {
       grid-template-columns: 17rem minmax(0, 1fr) minmax(18.5rem, 25rem);
-      grid-template-rows: minmax(17rem, 1.35fr) minmax(9rem, 1fr) 12.5rem auto;
+      grid-template-rows: minmax(19rem, 1.7fr) minmax(8rem, 1fr) 12.5rem auto;
       grid-template-areas:
         'palette view scope'
         'palette view tracks'

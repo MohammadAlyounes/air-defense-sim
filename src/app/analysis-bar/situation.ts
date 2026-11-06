@@ -6,46 +6,50 @@ export type WeaponsControl = 'HOLD' | 'TIGHT' | 'FREE';
 export type OperatorMode = 'MANUAL' | 'SEMI' | 'AUTO';
 
 /**
- * Everything the header analysis bar shows. The simulation engine fills this in
- * from Step 1 onward; until then the bar shows the standby state below.
+ * Everything the header analysis bar shows. A `null` field is a feature that is not built
+ * yet: the bar shows "—" and a tooltip names the roadmap step that brings it.
  */
 export interface SituationSummary {
-  /** False until the simulation engine is running; numbers then show as "—". */
-  online: boolean;
-  simTimeS: number;
-  speed: number;
-  stageCounts: Readonly<Record<StageId, number>>;
-  threats: { active: number; down: number; leaked: number };
-  interceptors: { ready: number; flying: number; used: number };
-  channels: { used: number; total: number };
+  stageCounts: Readonly<Record<StageId, number | null>>;
+  threats: { active: number; down: number; leaked: number } | null;
+  interceptors: { ready: number; flying: number; used: number } | null;
+  channels: { used: number; total: number } | null;
   nextImpact: { inSeconds: number; threat: string; asset: string } | null;
   weaponsControl: WeaponsControl;
   operatorMode: OperatorMode;
-  /** The command node's current top decision, in plain language. */
+  /** What is happening right now, in plain language. */
   now: string;
 }
 
-export const STANDBY_SITUATION: SituationSummary = {
-  online: false,
-  simTimeS: 0,
-  speed: 1,
-  stageCounts: {
-    detect: 0,
-    track: 0,
-    identify: 0,
-    evaluate: 0,
-    assign: 0,
-    engage: 0,
-    assess: 0,
-  },
-  threats: { active: 0, down: 0, leaked: 0 },
-  interceptors: { ready: 0, flying: 0, used: 0 },
-  channels: { used: 0, total: 4 },
-  nextImpact: null,
-  weaponsControl: 'TIGHT',
-  operatorMode: 'SEMI',
-  now: 'Standing by. The simulation engine comes online in Step 1.',
-};
+/** Roadmap step in which each header number comes to life. */
+export const KPI_ARRIVES_IN_STEP = {
+  threats: 7,
+  interceptors: 3,
+  channels: 8,
+  nextImpact: 7,
+} as const;
+
+/** The header as of Step 1: the radar is live; the rest of the defense loop is still to come. */
+export function liveSituation(input: { contactsHeld: number; now: string }): SituationSummary {
+  return {
+    stageCounts: {
+      detect: input.contactsHeld,
+      track: null,
+      identify: null,
+      evaluate: null,
+      assign: null,
+      engage: null,
+      assess: null,
+    },
+    threats: null,
+    interceptors: null,
+    channels: null,
+    nextImpact: null,
+    weaponsControl: 'TIGHT',
+    operatorMode: 'SEMI',
+    now: input.now,
+  };
+}
 
 export const WEAPONS_CONTROL_HELP: Readonly<Record<WeaponsControl, string>> = {
   HOLD: 'Weapons HOLD: fire only in self-defense.',

@@ -39,18 +39,35 @@ Give the simulation the same scenario, the same random seed and the same list of
 - **Trustworthy tests.** A test can assert the exact state after N ticks.
 - **Monte Carlo.** Change only the seed to explore the odds.
 
-## Current state (Step 0)
+## One frame, start to finish (Step 1)
 
-| Folder                 | Contents                                                                                                   |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `src/app/analysis-bar` | Header: pipeline chips, KPI strip, Now line. Driven by a `SituationSummary` object (standby until Step 1). |
-| `src/app/palette`      | Threat palette cards, built from `data/threatCatalog.ts`.                                                  |
-| `src/app/views`        | 3D battlespace illustration and radar scope preview.                                                       |
-| `src/app/panels`       | Track table, inspector, telemetry and event log panels.                                                    |
-| `src/app/layout`       | Player bar (transport controls and timeline) and footer.                                                   |
-| `src/app/components`   | Shared pieces: panel frame, tooltip, step badge, icons.                                                    |
-| `src/app/data`         | Plain, unit-tested data: defense-loop stages, traffic catalog, roadmap, links.                             |
-| `src/sim`              | Rules only for now. The engine starts in Step 1.                                                           |
+1. `requestAnimationFrame` calls `SimController`, which measures the real time since the last frame.
+2. `FixedStepClock` multiplies that time by the playback speed and returns a whole number of 20 ms ticks.
+3. The controller calls `Simulation.step()` that many times and keeps the last two snapshots.
+4. The radar scope redraws from those two snapshots, blended by the clock's leftover fraction `α`.
+5. About ten times per second, the controller publishes a small UI state (clock, contacts, NOW line, event log) to a Zustand store; React components read it from there.
+
+User actions (play, step, restart, and later "spawn here") call controller methods. Anything that changes the simulation itself becomes a `Command`, applied at the next tick and logged with its tick number.
+
+## Current state (Step 1)
+
+| Path                    | Contents                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------- |
+| `src/sim/core`          | `FixedStepClock`, seeded `Rng` (sfc32), vectors, state hash.                                  |
+| `src/sim/traffic.ts`    | Flight performance of every traffic type (single source for the palette too).                 |
+| `src/sim/radar.ts`      | Search radar sweep: antenna angle and the "beam swept past this bearing" test.                |
+| `src/sim/scenario.ts`   | Scenario traffic: entry points, straight courses, arrival times.                              |
+| `src/sim/simulation.ts` | The engine: commands, ticks, events, snapshots, state hash, replay.                           |
+| `src/app/sim`           | Driver (`SimController`), store, React provider, URL options, narrator, keyboard shortcuts.   |
+| `src/app/views`         | Live radar scope (canvas) and the 3D battlespace illustration.                                |
+| `src/app/analysis-bar`  | Header: pipeline chips, KPIs, NOW line. `null` values show "—" and the step that brings them. |
+| `src/app/layout`        | Player bar (controls, seed, timeline) and footer.                                             |
+| `src/app/panels`        | Event log (live), track table, inspector and telemetry placeholders.                          |
+| `src/app/components`    | Panel frame, tooltip, step badge, icons, concept-card popover.                                |
+| `src/app/data`          | Plain, unit-tested data: stages, traffic text, roadmap, links.                                |
+| `docs/concepts`         | Concept cards; copied into the README by `npm run docs:sync` and shown in the app.            |
+
+The models and their equations are in [MODELS.md](MODELS.md).
 
 ## Deployment
 

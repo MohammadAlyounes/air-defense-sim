@@ -1,6 +1,8 @@
 import { Activity, ChevronRight, ListOrdered, ScanSearch, ScrollText } from 'lucide-react';
 import { Panel } from '../components/Panel';
-import { CURRENT_STEP, ROADMAP, roadmapStep } from '../data/roadmap';
+import { Tooltip } from '../components/Tooltip';
+import { formatSimClock } from '../lib/format';
+import { useSimState } from '../sim/simContext';
 
 const TRACK_COLUMNS = ['#', 'Track', 'Type', 'Range', 'Alt', 'Speed', 'Stage'] as const;
 
@@ -109,36 +111,62 @@ export function TelemetryPanel() {
   );
 }
 
+const SOURCE_STYLE = {
+  scenario: { label: 'SCENARIO', className: 'text-ink-300' },
+  radar: { label: 'RADAR', className: 'text-accent' },
+} as const;
+
+/** Simulation events, newest first: what really happens (scenario) and what the radar sees. */
 export function EventLogPanel() {
-  const done = ROADMAP.filter((entry) => entry.step <= CURRENT_STEP);
-  const next = roadmapStep(CURRENT_STEP + 1);
+  const log = useSimState((state) => state.log);
   return (
     <Panel
       title="Event log"
-      subtitle="build events for now"
       icon={ScrollText}
-      step={9}
-      bodyClassName="overflow-y-auto"
+      panelId="event-log"
+      bodyClassName="flex flex-col"
+      actions={
+        <Tooltip
+          content={
+            <>
+              <strong className="text-ink-100">SCENARIO</strong>: what really happens in the sky.
+              <br />
+              <strong className="text-accent">RADAR</strong>: what the radar actually sees. The gap
+              between the two is a key idea of air defense.
+            </>
+          }
+        >
+          <span
+            tabIndex={0}
+            className="cursor-help text-[10.5px] text-ink-300 underline decoration-dotted"
+          >
+            truth vs. radar
+          </span>
+        </Tooltip>
+      }
     >
-      <ol className="space-y-1 p-2.5 font-mono text-[11px] leading-snug">
-        {done.map((entry) => (
-          <li key={entry.step} className="flex gap-2 rounded-md bg-ink-850/70 px-2 py-1.5">
-            <span className="shrink-0 font-semibold text-ok">BUILD</span>
-            <span className="text-ink-200">
-              Step {entry.step} · {entry.title}.{' '}
-              <span className="text-ink-300">{entry.summary}</span>
-            </span>
-          </li>
-        ))}
-        {next && (
-          <li className="flex gap-2 rounded-md px-2 py-1.5">
-            <span className="shrink-0 font-semibold text-warn">NEXT</span>
-            <span className="text-ink-200">
-              Step {next.step} · {next.title}. <span className="text-ink-300">{next.summary}</span>
-            </span>
-          </li>
-        )}
-      </ol>
+      {log.length === 0 ? (
+        <p className="p-3 text-[12px] text-ink-300">Events appear here as the simulation runs.</p>
+      ) : (
+        <ol
+          className="min-h-0 flex-1 space-y-px overflow-y-auto p-2 font-mono text-[11px] leading-snug"
+          data-testid="event-log"
+        >
+          {log.map((entry) => (
+            <li key={entry.id} className="flex gap-2 rounded px-1.5 py-1 hover:bg-ink-850">
+              <span className="shrink-0 tabular-nums text-ink-300">
+                {formatSimClock(entry.timeS).slice(2)}
+              </span>
+              <span
+                className={`w-16 shrink-0 font-semibold ${SOURCE_STYLE[entry.source].className}`}
+              >
+                {SOURCE_STYLE[entry.source].label}
+              </span>
+              <span className="text-ink-100">{entry.text}</span>
+            </li>
+          ))}
+        </ol>
+      )}
     </Panel>
   );
 }

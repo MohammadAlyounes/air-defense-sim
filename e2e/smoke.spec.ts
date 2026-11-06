@@ -7,7 +7,7 @@ test('the console shell loads without errors', async ({ page }) => {
     if (message.type() === 'error') errors.push(message.text());
   });
 
-  await page.goto('/');
+  await page.goto('/?paused=1');
 
   await expect(page).toHaveTitle(/Air Defense Simulator/);
   await expect(
@@ -22,7 +22,7 @@ test('the console shell loads without errors', async ({ page }) => {
   const cards = page.getByRole('list', { name: 'Air traffic you can add' }).getByRole('listitem');
   await expect(cards).toHaveCount(6);
 
-  await expect(page.getByText('Standing by.')).toBeVisible();
+  await expect(page.getByTestId('now-line')).toContainText('Ready. Press Play');
   await expect(page.getByRole('contentinfo')).toContainText('© 2026 Mohammad Alyounes');
   expect(errors).toEqual([]);
 });
@@ -52,7 +52,7 @@ test('stage chips explain themselves on hover', async ({ page }) => {
 
 test('phones get the compact header', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.goto('/?paused=1');
   await expect(page.getByText('Interceptors', { exact: true })).toBeHidden();
-  await expect(page.getByText('Standing by.')).toBeVisible();
+  await expect(page.getByTestId('now-line')).toBeVisible();
 });

@@ -13,7 +13,7 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 
 [![CI](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml)
 ![Status: building in public](https://img.shields.io/badge/status-building_in_public-fbbf24)
-![Progress: step 0 of 14](https://img.shields.io/badge/progress-step_0_of_14-22d3ee)
+![Progress: step 1 of 14](https://img.shields.io/badge/progress-step_1_of_14-22d3ee)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34d399)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
@@ -74,16 +74,61 @@ flowchart LR
 
 ## The physics, in plain language
 
-Each step adds short concept cards here: what the idea is, one formula, one worked example, and where to see it in the simulator. The first cards arrive with:
+Every step adds short concept cards: the idea in three sentences, one formula, one worked example, and where to see it in the simulator. The same cards open inside the app from the graduation-cap buttons.
 
-- **Step 1:** fixed time steps and determinism (why every run can be replayed exactly)
-- **Step 3:** detection range and proportional navigation
-- **Step 4:** air density, drag and turn radius
-- **Step 5:** the radar equation, the radar horizon and terrain masking
+<!-- concepts:start -->
+<!-- Generated from docs/concepts by `npm run docs:sync`. Edit the cards there. -->
+
+### Fixed time step — why every run can be replayed exactly
+
+The simulation advances in identical 20 ms ticks (50 per second), no matter how fast your screen redraws. Each tick runs the same equations with the same seeded random numbers, so the same seed and the same inputs always reproduce exactly the same run. That is what makes pausing, single-stepping, replays and fair comparisons possible.
+
+- **Formula:** `position(t + Δt) = position(t) + velocity × Δt`, with `Δt = 1/50 s`
+- **Example:** a small drone flying at 40 m/s moves exactly 0.8 m per tick, whether you watch at ¼× or at 16×.
+- **See it:** pause, then press Step: the clock moves by one 20 ms tick. Press Restart and the same blips reappear at the same moments.
+
+[Going deeper →](docs/concepts/01-1-fixed-time-step.md)
+
+### Antenna rotation — why blips jump instead of gliding
+
+A search radar's antenna spins, so it sees each aircraft only when its beam sweeps past. Between passes the screen keeps showing the last echo, slowly fading like the phosphor of an old radar tube. A faster spin refreshes the picture more often, but leaves the beam less time on each target.
+
+- **Formula:** `refresh interval = 360° ÷ rotation rate` (here, one turn every 4 s)
+- **Example:** a fast jet at 340 m/s moves 1.36 km between two passes of the beam.
+- **See it:** watch a fast-moving blip on the radar scope: each new echo lands a short jump ahead of the last one.
+
+[Going deeper →](docs/concepts/01-2-antenna-rotation.md)
+
+<!-- concepts:end -->
+
+**Coming next:** detection range and proportional navigation (Step 3) · air density, drag and turn radius (Step 4) · the radar equation, the radar horizon and terrain masking (Step 5).
 
 ## Build log
 
-Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-00-launchpad`.
+Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-01-sim-core`. Newest step first.
+
+### Step 1 · Simulation core
+
+<p align="center"><img src="docs/media/step-01-sim-core.gif" alt="The live radar scope: the beam sweeps clockwise, echoes glow as it passes and fade until the next pass" width="400" /></p>
+
+The simulator comes alive: a deterministic engine running at 50 ticks per second, a live radar scope, and controls to play, pause, step and replay.
+
+- **Simulation engine (`src/sim`):** pure TypeScript with a fixed 20 ms time step, a seeded random-number generator, scenario traffic that crosses the area, and a search radar whose rotating beam paints each aircraft as it sweeps past.
+- **Live radar scope:** a sweeping beam and echoes that fade like old phosphor; bigger aircraft return bigger blips.
+- **Player bar:** play/pause (Space), step one tick (.) or one second (Shift + .), speed from ¼× to 16× (+ / −), the seed, Restart (R) and New seed.
+- **Live header:** the Detect stage counts radar contacts and the NOW line describes the radar picture in plain words. Stages that arrive later say which step brings them.
+- **Event log:** SCENARIO lines (what really happens) next to RADAR lines (what the radar actually sees).
+- **Concept cards in the app:** the graduation-cap buttons open the same cards as this README.
+
+> **Engineering note: replay by construction.** A run is fully defined by its seed and the commands sent to it, each stamped with its tick. Unit tests rebuild runs from their command logs and compare state hashes; a browser test restarts the same seed and checks the event log matches line for line. Any moment is a link: [`?seed=7&t=60`](https://mohammadalyounes.github.io/air-defense-sim/?seed=7&t=60) opens seed 7, one minute in.
+
+<img src="docs/media/step-01-sim-core.png" alt="The console with the live radar scope, the Detect stage counting 7 contacts, the NOW line and the event log" width="100%" />
+
+<details>
+<summary>Phone layout</summary>
+<br />
+<img src="docs/media/step-01-sim-core-mobile.png" alt="The Step 1 console on a phone" width="320" />
+</details>
 
 ### Step 0 · Launchpad
 
@@ -106,7 +151,7 @@ The foundation everything else builds on.
 ## Roadmap
 
 - [x] **Step 0 · Launchpad:** project scaffold, CI, live demo and the console shell
-- [ ] **Step 1 · Simulation core:** deterministic clock, play/pause/step/speed, a target on the 2D scope
+- [x] **Step 1 · Simulation core:** deterministic clock, play/pause/step/speed, live radar scope
 - [ ] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
 - [ ] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
 - [ ] **Step 4 · Environment:** terrain, atmosphere, wind and drag; three threat types with routes
@@ -132,27 +177,29 @@ The full specification is in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 | 3D (from Step 2) | Three.js with React Three Fiber                                        |
 | Styling          | Tailwind CSS 4, Radix UI, Lucide icons                                 |
 | Simulation       | Plain TypeScript: fixed time step, seeded randomness, Web Worker ready |
+| App state        | Zustand                                                                |
 | Tests            | Vitest (unit), Playwright (browser)                                    |
 | CI/CD            | GitHub Actions → GitHub Pages                                          |
 
 ```
 src/
-  app/      React UI: analysis bar, threat palette, panels and views
-  sim/      Pure, deterministic simulation core (no UI code; starts in Step 1)
+  sim/      The engine: pure, deterministic TypeScript (clock, random numbers, traffic, radar)
+  app/      React UI: analysis bar, palette, radar scope, panels and the simulation driver
 e2e/        Browser tests
-docs/       Plan, architecture, devlog, concept cards and media
-scripts/    Screenshot and preview-image generators
+docs/       Plan, architecture, models, devlog, concept cards and media
+scripts/    Docs sync, screenshots, GIFs and preview images
 ```
 
-| Command            | What it does                                  |
-| ------------------ | --------------------------------------------- |
-| `npm run dev`      | Start the dev server                          |
-| `npm run build`    | Production build into `dist/`                 |
-| `npm test`         | Unit tests                                    |
-| `npm run test:e2e` | Browser tests                                 |
-| `npm run check`    | Lint, type-check, unit tests and format check |
+| Command             | What it does                                            |
+| ------------------- | ------------------------------------------------------- |
+| `npm run dev`       | Start the dev server                                    |
+| `npm run build`     | Production build into `dist/`                           |
+| `npm test`          | Unit tests                                              |
+| `npm run test:e2e`  | Browser tests                                           |
+| `npm run check`     | Lint, type-check, unit tests, format and docs checks    |
+| `npm run docs:sync` | Copy the concept cards from `docs/concepts` into README |
 
-More detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+More detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (how it fits together) and [docs/MODELS.md](docs/MODELS.md) (every equation and its limits).
 
 ## Safety and scope
 

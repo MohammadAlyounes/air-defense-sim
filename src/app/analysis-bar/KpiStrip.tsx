@@ -1,8 +1,10 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import { Tooltip } from '../components/Tooltip';
+import { roadmapStep } from '../data/roadmap';
 import { formatCountdown } from '../lib/format';
 import {
+  KPI_ARRIVES_IN_STEP,
   OPERATOR_MODE_HELP,
   OPERATOR_MODE_LABEL,
   WEAPONS_CONTROL_HELP,
@@ -11,16 +13,16 @@ import {
 
 /** Second row of the analysis bar: key numbers plus the plain-language NOW line. */
 export function KpiStrip({ situation: s }: { situation: SituationSummary }) {
-  const value = (n: number) => (s.online ? String(n) : '—');
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-ink-800/80 px-3 py-1.5 text-[12px]">
       {/* Phones get the pipeline and the NOW line only; the numbers start at tablet width. */}
       <div className="hidden flex-wrap items-center gap-x-5 gap-y-1.5 md:flex">
-        <KpiGroup situation={s} value={value} />
+        <KpiGroup situation={s} />
       </div>
       <p
         className="flex min-w-0 basis-full items-center gap-2 xl:basis-0 xl:flex-1"
         aria-live="polite"
+        data-testid="now-line"
       >
         <span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-[0.2em] text-accent">
           NOW
@@ -33,32 +35,34 @@ export function KpiStrip({ situation: s }: { situation: SituationSummary }) {
   );
 }
 
-function KpiGroup({
-  situation: s,
-  value,
-}: {
-  situation: SituationSummary;
-  value: (n: number) => string;
-}) {
+function KpiGroup({ situation: s }: { situation: SituationSummary }) {
   return (
     <>
-      <Kpi label="Threats">
-        <Num value={value(s.threats.active)} unit="active" />
-        <Num value={value(s.threats.down)} unit="down" tone={s.online ? 'ok' : undefined} />
-        <Num value={value(s.threats.leaked)} unit="leaked" tone={s.online ? 'alert' : undefined} />
+      <Kpi label="Threats" arrivesInStep={s.threats ? undefined : KPI_ARRIVES_IN_STEP.threats}>
+        <Num value={s.threats?.active} unit="active" />
+        <Num value={s.threats?.down} unit="down" tone="ok" />
+        <Num value={s.threats?.leaked} unit="leaked" tone="alert" />
       </Kpi>
-      <Kpi label="Interceptors">
-        <Num value={value(s.interceptors.ready)} unit="ready" />
-        <Num value={value(s.interceptors.flying)} unit="flying" />
-        <Num value={value(s.interceptors.used)} unit="used" />
+      <Kpi
+        label="Interceptors"
+        arrivesInStep={s.interceptors ? undefined : KPI_ARRIVES_IN_STEP.interceptors}
+      >
+        <Num value={s.interceptors?.ready} unit="ready" />
+        <Num value={s.interceptors?.flying} unit="flying" />
+        <Num value={s.interceptors?.used} unit="used" />
       </Kpi>
       <Kpi
         label="Fire channels"
         hint="Each tracking-radar channel can guide one engagement at a time. When every channel is busy, new threats have to wait: that is saturation."
+        arrivesInStep={s.channels ? undefined : KPI_ARRIVES_IN_STEP.channels}
       >
-        <ChannelMeter used={s.channels.used} total={s.channels.total} online={s.online} />
+        <ChannelMeter channels={s.channels} />
       </Kpi>
-      <Kpi label="Next impact" hint="Time until the most urgent threat reaches a defended asset.">
+      <Kpi
+        label="Next impact"
+        hint="Time until the most urgent threat reaches a defended asset."
+        arrivesInStep={s.nextImpact ? undefined : KPI_ARRIVES_IN_STEP.nextImpact}
+      >
         <span className="font-mono tabular-nums text-ink-100">
           {formatCountdown(s.nextImpact?.inSeconds ?? null)}
         </span>
@@ -82,7 +86,30 @@ function KpiGroup({
   );
 }
 
-function Kpi({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function Kpi({
+  label,
+  hint,
+  arrivesInStep,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  /** Set while the number is not built yet; adds "Arrives in Step N" to the tooltip. */
+  arrivesInStep?: number;
+  children: ReactNode;
+}) {
+  const arrives = arrivesInStep === undefined ? undefined : roadmapStep(arrivesInStep);
+  const tooltip =
+    hint || arrives ? (
+      <>
+        {hint}
+        {arrives && (
+          <span className={clsx('block text-ink-300', hint && 'mt-1.5')}>
+            Arrives in Step {arrives.step} · {arrives.title}.
+          </span>
+        )}
+      </>
+    ) : null;
   const text = (
     <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-300">
       {label}
@@ -90,8 +117,8 @@ function Kpi({ label, hint, children }: { label: string; hint?: string; children
   );
   return (
     <div className="flex items-center gap-2">
-      {hint ? (
-        <Tooltip content={hint}>
+      {tooltip ? (
+        <Tooltip content={tooltip}>
           <span tabIndex={0} className="cursor-help border-b border-dotted border-ink-500">
             {text}
           </span>
@@ -104,23 +131,26 @@ function Kpi({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
-function Num({ value, unit, tone }: { value: string; unit: string; tone?: 'ok' | 'alert' }) {
+function Num({ value, unit, tone }: { value?: number; unit: string; tone?: 'ok' | 'alert' }) {
   return (
     <span className="flex items-baseline gap-1">
       <span
         className={clsx(
           'font-mono tabular-nums',
-          tone === 'ok' ? 'text-ok' : tone === 'alert' ? 'text-alert' : 'text-ink-100',
+          value !== undefined && tone === 'ok' && 'text-ok',
+          value !== undefined && tone === 'alert' && 'text-alert',
+          (value === undefined || tone === undefined) && 'text-ink-100',
         )}
       >
-        {value}
+        {value ?? '—'}
       </span>
       <span className="text-ink-300">{unit}</span>
     </span>
   );
 }
 
-function ChannelMeter({ used, total, online }: { used: number; total: number; online: boolean }) {
+function ChannelMeter({ channels }: { channels: SituationSummary['channels'] }) {
+  const total = channels?.total ?? 4;
   return (
     <span className="flex items-center gap-1.5">
       <span className="flex gap-0.5" aria-hidden="true">
@@ -129,13 +159,13 @@ function ChannelMeter({ used, total, online }: { used: number; total: number; on
             key={i}
             className={clsx(
               'h-3 w-1.5 rounded-sm',
-              online && i < used ? 'bg-accent' : 'bg-ink-700',
+              channels && i < channels.used ? 'bg-accent' : 'bg-ink-700',
             )}
           />
         ))}
       </span>
       <span className="font-mono tabular-nums text-ink-100">
-        {online ? `${used}/${total}` : '—'}
+        {channels ? `${channels.used}/${channels.total}` : '—'}
       </span>
     </span>
   );
