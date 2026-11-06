@@ -26,6 +26,23 @@ test('the console shell loads without errors', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('the header always credits the author', async ({ page }) => {
+  for (const viewport of [
+    { width: 1600, height: 1000 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    const credit = page.getByRole('banner').getByTestId('author-credit');
+    await expect(credit).toBeVisible();
+    await expect(credit).toHaveText('Created by Mohammad Alyounes');
+    await expect(credit.getByRole('link', { name: 'Mohammad Alyounes' })).toHaveAttribute(
+      'href',
+      'https://github.com/MohammadAlyounes',
+    );
+  }
+});
+
 test('stage chips explain themselves on hover', async ({ page }) => {
   await page.goto('/');
   await page.locator('[data-stage="track"]').hover();

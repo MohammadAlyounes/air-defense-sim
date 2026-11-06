@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { GithubMark, LogoMark } from '../components/marks';
 import { Tooltip } from '../components/Tooltip';
-import { REPO_URL, ROADMAP_URL } from '../data/links';
+import { AUTHOR, REPO_URL, ROADMAP_URL } from '../data/links';
 import { CURRENT_STEP, LAST_STEP, roadmapStep } from '../data/roadmap';
 import { KpiStrip } from './KpiStrip';
 import { PipelineChips } from './PipelineChips';
@@ -25,6 +25,7 @@ export function AnalysisBar({ situation }: { situation: SituationSummary }) {
   );
 }
 
+/** Logo, title and the author credit. The credit is a fixed part of the header on every screen. */
 function Brand() {
   return (
     <div className="flex shrink-0 items-center gap-2.5">
@@ -33,8 +34,16 @@ function Brand() {
         <h1 className="text-[14px] font-semibold tracking-tight text-ink-100">
           Air Defense Simulator
         </h1>
-        <p className="hidden text-[10px] font-medium uppercase tracking-[0.16em] text-ink-300 sm:block">
-          Educational · Open source
+        <p className="text-[11px] text-ink-300" data-testid="author-credit">
+          Created by{' '}
+          <a
+            href={AUTHOR.url}
+            target="_blank"
+            rel="noreferrer author"
+            className="font-semibold text-ink-100 transition-colors hover:text-accent"
+          >
+            {AUTHOR.name}
+          </a>
         </p>
       </div>
     </div>
