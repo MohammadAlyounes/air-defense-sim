@@ -137,7 +137,7 @@ describe('describeNow', () => {
     expect(at(2)).toBe('Radar sweeping, one turn every 4 s. No contacts yet.');
     expect(at(5)).toBe('Radar sweeping, one turn every 4 s. 1 track: 1 unconfirmed.');
     expect(at(9)).toBe('Radar sweeping, one turn every 4 s. 1 track: 1 being identified.');
-    expect(at(10.5)).toBe('T1 assigned: launch in 1.0 s.');
+    expect(at(10.5)).toBe('T1 assigned: launch in 1.2 s.');
     expect(at(20)).toMatch(/^Engaging T1: interceptor I1 in flight, intercept in \d+ s\.$/);
     // Air drag slows the coasting interceptor: a 31 s flight.
     expect(at(43)).toBe('I1 hit T1. The radar will look again to confirm the kill.');

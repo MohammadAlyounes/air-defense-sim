@@ -34,5 +34,5 @@ Cards are added as their steps land. File names are `NN-M-slug.md`: step `NN`, o
 | 2    | [Local coordinates](02-1-local-coordinates.md) · [Seeing scale](02-2-seeing-scale.md)                                                                                       |
 | 3    | [Detection range](03-1-detection-range.md) · [Proportional navigation](03-2-proportional-navigation.md)                                                                     |
 | 4    | [Radar horizon](04-1-radar-horizon.md) · [Terrain masking](04-2-terrain-masking.md) · [Detection probability](04-3-detection-probability.md) · [Air drag](04-4-air-drag.md) |
-| 5    | Noise and the Kalman filter                                                                                                                                                 |
+| 5    | [Kalman filter](05-1-kalman-filter.md) · [Gating and association](05-2-gating-association.md)                                                                               |
 | 6    | Closest point of approach · engagement envelope · kill probability                                                                                                          |

@@ -75,7 +75,8 @@ describe('summarizeDefense', () => {
       [2, 'hostile', 'assign'], // the jet: a threat, first
       [1, 'friend', 'identify'],
     ]);
-    expect(rows[0]?.speedMps).toBeCloseTo(340, 6);
-    expect(rows[0]?.altitudeM).toBe(6_000);
+    expect(rows[0]?.speedMps).toBeCloseTo(340, 0);
+    // The Kalman filter's estimate: within a few metres of the true 6,000 m.
+    expect(rows[0]?.altitudeM).toBeCloseTo(6_000, -1);
   });
 });

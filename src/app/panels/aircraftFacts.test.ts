@@ -38,9 +38,9 @@ describe('aircraftFacts', () => {
     expect(at(1)).toEqual(['Not detected', 'Not engaged', 'not detected yet']);
     expect(aircraftFacts(sim.snapshot(), 1)?.trackDetail).toBe('seen on half the looks from 36 km');
     expect(at(3)).toEqual(['T1 · identifying', 'Waiting', 'identification check']);
-    // First echo at 2 s (the beam reaches the south), confirmed at 6 s, identified and
-    // assigned at 8 s, launch 1.5 s later.
-    expect(at(8.5)).toEqual(['T1 · hostile', 'Assigned', 'launch in 1.0 s']);
+    // First echo at 2 s (the beam reaches the south), confirmed at 6 s; the tracker commits
+    // echoes 0.2 s after the sweep, so it is identified and assigned at 8.2 s, launch 1.5 s later.
+    expect(at(8.5)).toEqual(['T1 · hostile', 'Assigned', 'launch in 1.2 s']);
     expect(at(20)?.[1]).toBe('Engaged by I1');
   });
 

@@ -50,7 +50,14 @@ export {
   type Terrain,
   type TerrainConfig,
 } from './terrain';
-export { trackPositionAt } from './tracker';
+export {
+  DEFAULT_TRACKER,
+  estimateAt,
+  trackEllipseAt,
+  trackPositionAt,
+  type TrackerConfig,
+} from './tracker';
+export { horizontalEllipse, type KalmanState } from './kalman';
 export {
   RADAR_CROSS_SECTION_M2,
   TRAFFIC,

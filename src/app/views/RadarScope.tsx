@@ -34,6 +34,7 @@ export function RadarScope() {
   const controller = useSimController();
   const selectedId = useViewStore((state) => state.selectedId);
   const coverageAltM = useViewStore((state) => state.coverageAltM);
+  const compareTruth = useViewStore((state) => state.compareTruth);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layoutRef = useRef<ScopeLayout | null>(null);
@@ -65,6 +66,7 @@ export function RadarScope() {
         controller.getFrame(),
         view.selectedId,
         coverageLayer(layout, view.coverageAltM),
+        view.compareTruth,
       );
       const { type, target, lastDrop } = usePlacementStore.getState();
       const ghost =
@@ -141,6 +143,7 @@ export function RadarScope() {
         data-testid="radar-scope"
         data-selected={selectedId ?? ''}
         data-coverage={coverageAltM ?? ''}
+        data-truth={compareTruth ? 'on' : 'off'}
         data-drop-zone="scope"
         role="img"
         aria-label="Radar scope: the battery at the centre, north up, range rings every 10 km over a faint relief map, with echoes from aircraft the beam has swept past. Click an echo to inspect the aircraft."
@@ -216,13 +219,39 @@ export function CoverageControl() {
         })}
       </div>
       <ConceptPopover concept="terrainMasking" label="Why low flyers can hide behind hills" />
+      <TruthToggle />
     </div>
+  );
+}
+
+/** Truth vs. perception: shows where aircraft really are next to the battery's tracks. */
+function TruthToggle() {
+  const compareTruth = useViewStore((state) => state.compareTruth);
+  const setCompareTruth = useViewStore((state) => state.setCompareTruth);
+  return (
+    <Tooltip content="Truth vs. perception (T): grey crosses show where aircraft really are, dashed lines the tracking error, and the 3D view adds the battery's tracks next to the truth.">
+      <button
+        type="button"
+        aria-pressed={compareTruth}
+        data-truth-toggle
+        onClick={() => setCompareTruth(!compareTruth)}
+        className={clsx(
+          'rounded-md border px-1.5 py-0.5 font-mono text-[10.5px] transition-colors',
+          compareTruth
+            ? 'border-accent/60 bg-accent/15 text-accent'
+            : 'border-ink-700 bg-ink-950/60 text-ink-300 hover:text-ink-100',
+        )}
+      >
+        truth
+      </button>
+    </Tooltip>
   );
 }
 
 /** What the scope's symbols mean, in one line. */
 export function ScopeLegend() {
   const coverageAltM = useViewStore((state) => state.coverageAltM);
+  const compareTruth = useViewStore((state) => state.compareTruth);
   return (
     <ul className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10.5px] text-ink-300">
       {LEGEND.map((item) => (
@@ -251,6 +280,20 @@ export function ScopeLegend() {
         </svg>
         defended area (5 km)
       </li>
+      <li className="flex items-center gap-1">
+        <svg viewBox="0 0 16 12" className="h-3 w-4" aria-hidden="true">
+          <ellipse cx="8" cy="6" rx="6.5" ry="3" fill="none" stroke="#facc15" strokeOpacity="0.7" />
+        </svg>
+        uncertainty (2σ)
+      </li>
+      {compareTruth && (
+        <li className="flex items-center gap-1">
+          <svg viewBox="0 0 12 12" className="size-3" aria-hidden="true">
+            <path d="M6 2v8M2 6h8" stroke="#cbd5e1" strokeWidth="1.5" />
+          </svg>
+          true position
+        </li>
+      )}
       {coverageAltM !== null && (
         <li className="flex items-center gap-1">
           <span className="size-3 rounded-sm bg-[rgba(251,146,60,0.45)]" aria-hidden="true" />

@@ -107,13 +107,22 @@ Aim points use `r = R·√u` (with `u` uniform), which spreads them evenly over 
 
 **Limitations:** no clutter, no Doppler processing, no jamming, no elevation limit to the beam. Detection does not depend on aspect or weather.
 
-## Tracks (Step 3)
+## Tracks (Steps 3 and 5)
 
-- **Tentative, then confirmed:** the first plot of an aircraft creates a track (T1, T2, …); the second confirms it. A tentative track whose next look brings no plot (after 1.25 turns) is dropped: most often a false alarm.
-- **Velocity:** the difference between the last two plots, divided by the time between them (4 s). Noisy since Step 4: a 0.15° bearing error at 30 km is 80 m, so velocities can be off by tens of m/s. Step 5 adds a Kalman filter.
-- **Position now:** the last plot moved on at the estimated velocity: `p(t) = p_last + v · (t − t_last)`.
-- **Association:** each plot joins the track of the aircraft that produced it. This uses the plot's link to the truth, a stand-in until Step 5 adds gating and nearest-neighbour association. A false alarm has no source, so it always starts a new tentative track.
-- **Dropped:** a confirmed track after three antenna turns (12 s) without a plot, unless an interceptor is still being guided to it or has just hit it (it is then kept until the kill assessment).
+- **Kalman filter (Step 5):** each track holds a constant-velocity estimate `x = [p, v]` (6 states) and its covariance `P`.
+  - Predict over `Δt`: `x⁻ = F x`, `P⁻ = F P Fᵀ + Q`, with `F = [[I, Δt·I], [0, I]]` and, per axis, `Q = q · [[Δt³/3, Δt²/2], [Δt²/2, Δt]]` (q = 4 m²/s³ horizontally, 30 m²/s³ vertically).
+  - Update with a plot `z`: `S = H P⁻ Hᵀ + R`, `K = P⁻ Hᵀ S⁻¹`, `x = x⁻ + K (z − H x⁻)`, Joseph form `P = (I − KH) P⁻ (I − KH)ᵀ + K R Kᵀ`.
+  - Measurement covariance: `R = J · diag(σr², σaz², σel²) · Jᵀ`, with `J` the Jacobian of the spherical-to-Cartesian conversion at the plot (floors of 1 m and 1 mrad, so the ideal radar's R is never singular).
+- **Starting a track:** the first plot gives the position (covariance R) and an unknown velocity (σ = 120 m/s horizontally, 30 m/s vertically). The second plot confirms it.
+- **Position now:** the filtered position moved on at the filtered velocity: `p(t) = p̂ + v̂ · (t − t_update)`. The uncertainty ellipse is the horizontal part of `P` predicted to `t`; the scope draws it at 2σ, the track table shows the one-sigma long axis.
+- **Association (Step 5):** gating plus global nearest neighbour.
+  - A plot may join a track only if `d² = νᵀ S⁻¹ ν ≤ 16.27` (chi-square, 3 degrees of freedom, 99.9%), with the track predicted to the plot's tick.
+  - All pairs inside their gates are sorted by `d²` and taken greedily, each plot and each track once; a track updated within the last half turn cannot take another plot.
+  - Plots are matched in batches covering 10 ticks (0.2 s, 18° of sweep) and committed when they are 10 ticks old, so close neighbours compete together. Leftover plots start tentative tracks.
+  - The tracker never reads the truth. Each track keeps a link to the aircraft behind its last plot (null for a false alarm), used only by the truth overlay, the tests and the physics.
+- **Dropped:** a tentative track whose next look brings no plot (after 1.25 turns), most often a false alarm; a confirmed track after three antenna turns (12 s) without a plot, unless an interceptor is still being guided to it or has just hit it (it is then kept until the kill assessment).
+
+**Limitations:** constant-velocity model only (no turn models or interacting multiple models); nearest-neighbour association can swap tracks between targets closer than the gate, most visibly when a drone swarm first appears.
 
 ## Identification and threat evaluation (Step 3)
 

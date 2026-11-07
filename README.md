@@ -13,7 +13,7 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 
 [![CI](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml)
 ![Status: building in public](https://img.shields.io/badge/status-building_in_public-fbbf24)
-![Progress: step 4 of 8](https://img.shields.io/badge/progress-step_4_of_8-22d3ee)
+![Progress: step 5 of 8](https://img.shields.io/badge/progress-step_5_of_8-22d3ee)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34d399)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
@@ -179,13 +179,46 @@ Once its motor burns out, an interceptor coasts and the air slows it down. Drag 
 
 [Going deeper →](docs/concepts/04-4-air-drag.md)
 
+### Kalman filter — how the tracker sees through the noise
+
+Every radar echo is a little off, so joining the raw blips would give a jittery track and a wild velocity. A Kalman filter keeps a best guess of position and velocity, together with how unsure it is, and moves the guess forward between echoes. When a new echo arrives, it blends the guess and the echo in proportion to how much it trusts each.
+
+- **Formula:** `x̂ ← x̂⁻ + K · (z − x̂⁻)`, with the gain `K = P⁻ / (P⁻ + R)` (in one dimension: P⁻ is the prediction's variance, R the echo's)
+- **Example:** a prediction good to ±80 m and an echo good to ±80 m give K = 0.5: the new estimate lies halfway, good to ±57 m (80 / √2). After a dozen echoes a jet's speed is known to within a few m/s, where two raw echoes 4 s apart could be 30 m/s off.
+- **See it:** the faint ellipse around each track on the scope is its 2σ uncertainty, and the track table's ±1σ column shrinks as echoes come in. Press T to compare tracks with the truth.
+
+[Going deeper →](docs/concepts/05-1-kalman-filter.md)
+
+### Gating and association — which echo belongs to which track
+
+With several targets, false alarms and noise, the tracker must decide which new echo continues which track, without knowing what made it. It draws a "gate" around each track's predicted position, sized by its uncertainty, and only echoes inside the gate are candidates. The closest pairs, measured in standard deviations, are matched first; leftover echoes start new tentative tracks.
+
+- **Formula:** `d² = νᵀ · S⁻¹ · ν < 16.3`, where ν is the gap between the echo and the prediction and S its expected spread (the 99.9% limit for three dimensions)
+- **Example:** a track predicted to ±100 m: an echo 250 m off is 2.5 standard deviations (d² = 6.3) and joins it; one 500 m off is 5 standard deviations (d² = 25) and starts a new track instead.
+- **See it:** drop a drone swarm: six echoes close together. Watch the tracks settle into one per drone after a few sweeps, and press T to see which track follows which drone.
+
+[Going deeper →](docs/concepts/05-2-gating-association.md)
+
 <!-- concepts:end -->
 
-**Coming next:** noise and the Kalman filter (Step 5) · the closest point of approach, engagement envelopes and kill probability (Step 6).
+**Coming next:** the closest point of approach, engagement envelopes and kill probability (Step 6).
 
 ## Build log
 
 Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first.
+
+### Step 5 · Tracking
+
+The battery's picture of the sky becomes a real estimate, with an honest measure of how sure it is.
+
+- **Kalman filter:** every track blends its prediction with each new echo, weighted by how much it trusts each. Positions jitter less than the raw echoes and velocities settle within a few m/s.
+- **Association without the truth:** echoes join tracks by gating and global nearest neighbour, matched in 0.2 s batches so close neighbours like a drone swarm compete fairly. The tracker never knows which aircraft made an echo.
+- **Uncertainty you can see:** a faint 2σ ellipse around each track on the scope, stretched sideways far out where bearing errors dominate, and a ±1σ column in the track table.
+- **Truth vs. perception:** press T (or "truth" under the scope) to see where aircraft really are: grey crosses and error lines on the scope, the battery's tracks as rings next to the real aircraft in 3D, and the tracking error in the inspector.
+
+> **Engineering note: a filter that checks its own honesty.** The unit tests feed the filter noisy measurements and check that its normalized innovation averages 3, the value a chi-square law with three degrees of freedom predicts. A filter that claimed to be surer than it is would fail.
+
+_Screenshots and a clip for this step come with the v1.0 media pass._
 
 ### Step 4 · Terrain & radar
 
@@ -295,7 +328,7 @@ The foundation everything else builds on.
 - [x] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
 - [x] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
 - [x] **Step 4 · Terrain & radar:** procedural terrain, radar horizon and terrain masking, detection probability, noise, false alarms, drag, coverage map
-- [ ] **Step 5 · Tracking:** Kalman tracking, association, uncertainty ellipses, truth vs. perception
+- [x] **Step 5 · Tracking:** Kalman tracking, association, uncertainty ellipses, truth vs. perception
 - [ ] **Step 6 · Decide & engage:** defended assets, "Why?" on every decision, kill probability, fire channels, operator approval
 - [ ] **Step 7 · Scenarios & lessons:** scenario library, share-by-link, guided lessons, after-action review, timeline
 - [ ] **Step 8 · Release v1.0:** onboarding, accessibility, demo video, final README and launch kit

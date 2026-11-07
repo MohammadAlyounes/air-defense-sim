@@ -1,5 +1,6 @@
 import type { Identity } from './c2';
 import type { Vec3 } from './core/vec';
+import type { KalmanState } from './kalman';
 import type {
   Affiliation,
   AircraftType,
@@ -66,9 +67,9 @@ export interface Track {
   /** Track number, shown as T1, T2, … */
   id: EntityId;
   /**
-   * The aircraft whose echoes feed this track, or null for a track started by a false alarm.
-   * Until Step 5 each echo is linked to its track by it (perfect association); Step 5 replaces
-   * that with gating and nearest-neighbour association.
+   * Ground-truth link, for the truth overlay, tests and the physics: the aircraft whose echo
+   * last joined this track, or null if that echo was a false alarm. The tracker itself never
+   * uses it: echoes join tracks by gating and nearest-neighbour association.
    */
   truthId: EntityId | null;
   createdTick: number;
@@ -76,10 +77,12 @@ export interface Track {
   detectedRangeM: number;
   paints: number;
   lastPaintTick: number;
-  /** Position of the last echo. */
+  /** Filtered position at the last echo. */
   position: Vec3;
-  /** Estimated from the last two echoes; null until the second one. */
+  /** Filtered velocity; null until the second echo confirms the track. */
   velocity: Vec3 | null;
+  /** The Kalman filter's state and covariance at the last echo. */
+  estimate: KalmanState;
   confirmedTick: number | null;
   identity: Identity;
   /** Set while the track's course passes close to the battery. */

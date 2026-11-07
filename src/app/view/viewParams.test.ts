@@ -13,6 +13,11 @@ describe('parseViewOptions', () => {
     });
   });
 
+  it('reads the truth comparison', () => {
+    expect(parseViewOptions('?truth=1').state).toEqual({ compareTruth: true });
+    expect(parseViewOptions('?truth=0').state).toEqual({ compareTruth: false });
+  });
+
   it('reads the coverage overlay height', () => {
     expect(parseViewOptions('?coverage=50').state).toEqual({ coverageAltM: 50 });
     expect(parseViewOptions('?coverage=1000').state).toEqual({ coverageAltM: 1000 });

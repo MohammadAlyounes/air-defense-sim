@@ -1,5 +1,6 @@
 import {
   groundRange,
+  trackEllipseAt,
   trackPositionAt,
   type Engagement,
   type Identity,
@@ -33,6 +34,8 @@ export interface TrackRow {
   rangeM: number;
   altitudeM: number;
   speedMps: number | null;
+  /** How sure the tracker is of its position: one-sigma error along the ellipse's long axis, m. */
+  sigmaM: number;
   /** The furthest stage of the loop this track has reached. */
   stage: StageId;
   /** Time to its closest approach to the battery, s, for threats. */
@@ -84,6 +87,7 @@ export function summarizeDefense(snapshot: Snapshot): DefenseSummary {
       rangeM: groundRange(at),
       altitudeM: at.z,
       speedMps: t.velocity ? Math.hypot(t.velocity.x, t.velocity.y, t.velocity.z) : null,
+      sigmaM: trackEllipseAt(t, snapshot.tick).majorM,
       stage: trackStage(t, engagementOf(t.engagementId)),
       threatInS: t.threat?.timeToClosestS ?? null,
     };
