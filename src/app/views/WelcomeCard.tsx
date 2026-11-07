@@ -1,4 +1,4 @@
-import { Keyboard, MousePointerClick, Rotate3d, X } from 'lucide-react';
+import { Hand, Keyboard, MousePointerClick, Rotate3d, X } from 'lucide-react';
 import { useId, useState } from 'react';
 import { GithubMark } from '../components/marks';
 import { REPO_URL } from '../data/links';
@@ -24,6 +24,7 @@ function rememberDismissed(): void {
 }
 
 const TIPS = [
+  { icon: Hand, text: 'Drag a threat from the palette onto the 3D view or the radar scope' },
   { icon: MousePointerClick, text: 'Click an aircraft, a radar echo or a log line to inspect it' },
   { icon: Rotate3d, text: 'Drag to orbit, scroll or pinch to zoom, right-drag to pan' },
   { icon: Keyboard, text: 'Space plays and pauses · 1–4 switch cameras · Esc clears' },
@@ -63,8 +64,9 @@ export function WelcomeCard() {
         See how an <span className="whitespace-nowrap">air-defense</span> system thinks.
       </h2>
       <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-200">
-        This is the sky around a generic defense battery (at the centre), drawn from ground truth:
-        where every aircraft really is. The radar scope shows only what the radar has seen.
+        A generic defense battery sits at the centre. Drop a drone, a missile or a jet anywhere and
+        watch it detect, track, identify and engage, while the radar scope shows only what the radar
+        has seen.
       </p>
       <ul className="mt-2.5 space-y-1.5 text-[12px] text-ink-200">
         {TIPS.map(({ icon: Icon, text }) => (

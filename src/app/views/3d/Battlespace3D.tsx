@@ -5,9 +5,12 @@ import { useViewStore } from '../../view/viewStore';
 import { WelcomeCard } from '../WelcomeCard';
 import { AircraftLayer } from './AircraftLayer';
 import { CameraRig } from './CameraRig';
+import { EffectsLayer } from './EffectsLayer';
 import { useRedrawOnChange } from './frame';
 import { LabelLayer, LabelProjector } from './Labels';
 import { RadarSite } from './RadarSite';
+import { InterceptorLayer } from './InterceptorLayer';
+import { PlacementGhost, PlacementZone } from './PlacementGhost';
 import { GroundAndRings } from './Scene';
 import { ViewControls } from './ViewControls';
 
@@ -19,7 +22,7 @@ const BACKGROUND = '#060b16';
  */
 export default function Battlespace3D() {
   return (
-    <div className="absolute inset-0" data-testid="battlespace">
+    <div className="absolute inset-0" data-testid="battlespace" data-drop-zone="battlespace">
       <div className="absolute inset-0">
         <Canvas
           frameloop="demand"
@@ -52,6 +55,10 @@ function Scene() {
       <GroundAndRings />
       <RadarSite />
       <AircraftLayer />
+      <InterceptorLayer />
+      <EffectsLayer />
+      <PlacementZone />
+      <PlacementGhost />
       <CameraRig />
       <LabelProjector />
       <FirstFrameSignal />

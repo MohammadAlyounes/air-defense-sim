@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { Crosshair, MousePointerClick } from 'lucide-react';
 import { AffiliationShape } from '../components/AffiliationShape';
+import { ConceptPopover } from '../components/ConceptPopover';
 import { Panel } from '../components/Panel';
 import { TrafficIcon } from '../components/TrafficIcon';
 import { AFFILIATION_STYLE } from '../data/affiliation';
@@ -12,20 +13,25 @@ import {
   type TrafficType,
 } from '../data/threatCatalog';
 import { formatAltitude, formatAltitudeShort, formatSpeed } from '../lib/format';
+import { usePlacementStore } from '../placement/placementStore';
+import { usePaletteCard } from '../placement/usePlacement';
 
-/** Cards for every kind of air traffic the user will be able to drag onto the map. */
+/** Cards for every kind of air traffic: drag one onto the map and the battery reacts. */
 export function ThreatPalette({ className }: { className?: string }) {
   return (
     <Panel
       title="Threat palette"
       icon={Crosshair}
-      step={3}
+      panelId="palette"
       className={className}
+      actions={<ConceptPopover concept="detectionRange" label="Why small drones are seen late" />}
       bodyClassName="overflow-y-auto"
     >
-      <p className="flex items-center gap-1.5 px-3 pt-2.5 text-[11.5px] text-ink-300">
-        <MousePointerClick aria-hidden="true" className="size-3.5 shrink-0 text-accent" />
-        Soon: drag a card onto the map.
+      <p className="flex items-start gap-1.5 px-3 pt-2.5 text-[11.5px] leading-snug text-ink-300">
+        <MousePointerClick aria-hidden="true" className="mt-px size-3.5 shrink-0 text-accent" />
+        <span>
+          Drag a card onto the 3D view or the radar scope, or click it, then click the map.
+        </span>
       </p>
       <ul
         aria-label="Air traffic you can add"
@@ -46,12 +52,24 @@ export function ThreatPalette({ className }: { className?: string }) {
 
 function ThreatCard({ type }: { type: TrafficType }) {
   const style = AFFILIATION_STYLE[type.affiliation];
+  const card = usePaletteCard(type.id);
+  const picked = usePlacementStore((s) => s.type === type.id);
   return (
     <li className="w-64 shrink-0 lg:w-auto">
-      <article
+      <div
+        role="button"
+        tabIndex={0}
+        aria-pressed={picked}
+        aria-label={`Place ${type.name.toLowerCase()}: ${type.insight}`}
         data-traffic={type.id}
-        title={type.behavior}
-        className="rounded-lg border border-ink-700 bg-ink-850/80 p-2 transition-colors hover:border-ink-500 hover:bg-ink-800"
+        title={`${type.behavior} Drag it onto the map, or click it and then the map.`}
+        {...card}
+        className={clsx(
+          'cursor-grab rounded-lg border p-2 transition-colors select-none active:cursor-grabbing',
+          picked
+            ? 'border-accent/70 bg-accent/10 shadow-[0_0_0_1px_var(--color-accent)]'
+            : 'border-ink-700 bg-ink-850/80 hover:border-ink-500 hover:bg-ink-800',
+        )}
       >
         <div className="flex items-start gap-2.5">
           <div
@@ -103,7 +121,7 @@ function ThreatCard({ type }: { type: TrafficType }) {
             fraction={RADAR_SIZE_BAR[type.radarSize]}
           />
         </dl>
-      </article>
+      </div>
     </li>
   );
 }

@@ -1,15 +1,16 @@
 import { useThree } from '@react-three/fiber';
 import { useEffect, useState } from 'react';
-import type { Affiliation, AircraftType, Snapshot } from '../../../sim';
+import type { Affiliation, AircraftType, Interceptor, Snapshot, Vec3 } from '../../../sim';
 import type { RenderFrame } from '../../sim/SimController';
 import { useSimController } from '../../sim/simContext';
+import { usePlacementStore } from '../../placement/placementStore';
 import { useViewStore } from '../../view/viewStore';
-import { interpolateAircraft, type InterpolatedAircraft } from './coords';
+import { interpolateAircraft, lerpVec, type InterpolatedAircraft } from './coords';
 
 /**
  * Glue between the simulation driver and the 3D canvas. The canvas renders on demand, so it
- * draws a new frame only when the simulation moves, the view settings change or the camera
- * moves.
+ * draws a new frame only when the simulation moves, the view settings change, traffic is
+ * being placed, or the camera moves.
  */
 export function useRedrawOnChange(): void {
   const controller = useSimController();
@@ -24,9 +25,11 @@ export function useRedrawOnChange(): void {
       invalidate();
     });
     const unsubscribeView = useViewStore.subscribe(() => invalidate());
+    const unsubscribePlacement = usePlacementStore.subscribe(() => invalidate());
     return () => {
       unsubscribeSim();
       unsubscribeView();
+      unsubscribePlacement();
     };
   }, [controller, invalidate]);
 }
@@ -86,4 +89,54 @@ export function useAircraftRoster(): readonly RosterEntry[] {
     [controller],
   );
   return roster;
+}
+
+export interface InterpolatedInterceptor {
+  interceptor: Interceptor;
+  position: Vec3;
+}
+
+let interceptorCache: { key: RenderFrame; value: Map<number, InterpolatedInterceptor> } | null =
+  null;
+
+/** Interceptor positions blended between the last two ticks, by id; computed once per frame. */
+export function interpolatedInterceptors(frame: RenderFrame): Map<number, InterpolatedInterceptor> {
+  const key = interceptorCache?.key;
+  if (
+    interceptorCache &&
+    key?.current === frame.current &&
+    key.previous === frame.previous &&
+    key.alpha === frame.alpha
+  ) {
+    return interceptorCache.value;
+  }
+  const before = new Map(frame.previous.interceptors.map((i) => [i.id, i.position]));
+  const value = new Map(
+    frame.current.interceptors.map((interceptor) => {
+      const old = before.get(interceptor.id);
+      const position = old ? lerpVec(old, interceptor.position, frame.alpha) : interceptor.position;
+      return [interceptor.id, { interceptor, position }] as const;
+    }),
+  );
+  interceptorCache = { key: frame, value };
+  return value;
+}
+
+/** Ids of the interceptors in flight; re-renders only when one launches or ends. */
+export function useInterceptorIds(): readonly number[] {
+  const controller = useSimController();
+  const [ids, setIds] = useState(() => controller.getFrame().current.interceptors.map((i) => i.id));
+  useEffect(
+    () =>
+      controller.onFrame((frame) => {
+        const next = frame.current.interceptors;
+        setIds((previous) =>
+          previous.length === next.length && previous.every((id, i) => id === next[i]?.id)
+            ? previous
+            : next.map((i) => i.id),
+        );
+      }),
+    [controller],
+  );
+  return ids;
 }

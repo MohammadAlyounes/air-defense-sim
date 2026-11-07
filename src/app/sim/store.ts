@@ -1,4 +1,6 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
+import type { AircraftType } from '../../sim';
+import type { DefenseSummary } from './defenseSummary';
 import type { LogSource } from './narrator';
 
 export interface LogEntry {
@@ -8,6 +10,19 @@ export interface LogEntry {
   aircraftId: number;
   source: LogSource;
   text: string;
+}
+
+/** A short summary after an engagement ends: a confirmed kill, or a threat that got through. */
+export interface ResultCard {
+  id: number;
+  kind: 'kill' | 'leak';
+  timeS: number;
+  trackId: number | null;
+  /** What it really was: revealed after the fact. */
+  type: AircraftType;
+  detectedRangeM: number | null;
+  detectionToKillS: number | null;
+  interceptorsFired: number | null;
 }
 
 /**
@@ -26,6 +41,10 @@ export interface SimUiState {
   now: string;
   /** Newest first. */
   log: readonly LogEntry[];
+  /** Stage counts and key numbers for the analysis bar. */
+  defense: DefenseSummary;
+  /** Newest first, the last few. */
+  results: readonly ResultCard[];
 }
 
 export type SimStore = StoreApi<SimUiState>;

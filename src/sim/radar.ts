@@ -1,17 +1,34 @@
 /**
- * Search radar, Step 1 version: a rotating antenna that paints every aircraft its beam
- * sweeps past, within range. Detection is perfect for now; the radar equation, noise,
- * the radar horizon and terrain masking arrive in Step 5.
+ * Search radar: a rotating antenna that paints every aircraft its beam sweeps past, as long as
+ * the echo is strong enough. Step 3 adds detection range by radar size (the fourth-root law);
+ * noise, false alarms, the radar horizon and terrain masking arrive in Step 5.
  */
 
 export interface SearchRadarConfig {
   /** Seconds per antenna turn. */
   periodS: number;
-  /** Maximum ground range at which the radar paints targets, metres. */
+  /** Instrumented range: the radar ignores echoes from farther away, metres. */
   rangeM: number;
+  /** Range at which a 1 m² target is just detected, metres. */
+  referenceRangeM: number;
 }
 
-export const DEFAULT_SEARCH_RADAR: SearchRadarConfig = { periodS: 4, rangeM: 40_000 };
+export const DEFAULT_SEARCH_RADAR: SearchRadarConfig = {
+  periodS: 4,
+  rangeM: 40_000,
+  referenceRangeM: 30_000,
+};
+
+/**
+ * Farthest range at which a target with radar cross section `rcsM2` is detected.
+ *
+ * The radar equation says the echo's signal-to-noise ratio grows with the cross section and
+ * falls with the fourth power of range (`SNR ∝ σ / R⁴`). Setting it equal to the detection
+ * threshold gives `R = R_ref · (σ / 1 m²)^(1/4)`, capped by the instrumented range.
+ */
+export function detectionRangeM(rcsM2: number, radar: SearchRadarConfig): number {
+  return Math.min(radar.rangeM, radar.referenceRangeM * Math.pow(rcsM2, 0.25));
+}
 
 const TWO_PI = 2 * Math.PI;
 

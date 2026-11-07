@@ -14,6 +14,8 @@ export interface AutoTrafficConfig {
   entryRangeM: number;
   /** Each aircraft flies straight toward a random point this close to the battery. */
   aimRadiusM: number;
+  /** Hostile traffic heads for the battery itself: it aims this close to it. */
+  hostileAimRadiusM: number;
   mix: readonly { value: AircraftType; weight: number }[];
 }
 
@@ -23,6 +25,7 @@ export const DEFAULT_AUTO_TRAFFIC: AutoTrafficConfig = {
   arrivalEveryS: [14, 28],
   entryRangeM: 38_000,
   aimRadiusM: 14_000,
+  hostileAimRadiusM: 1_500,
   mix: [
     { value: 'drone', weight: 3 },
     { value: 'cruise', weight: 2 },
@@ -53,7 +56,9 @@ export function planFlight(rng: Rng, config: AutoTrafficConfig, underway: boolea
   const entryY = config.entryRangeM * Math.cos(entryBearing);
 
   // sqrt keeps aim points evenly spread over the disc instead of bunched in the middle.
-  const aimRange = config.aimRadiusM * Math.sqrt(rng.next());
+  const radius =
+    performance.affiliation === 'hostile' ? config.hostileAimRadiusM : config.aimRadiusM;
+  const aimRange = radius * Math.sqrt(rng.next());
   const aimBearing = rng.range(0, TWO_PI);
   const dx = aimRange * Math.sin(aimBearing) - entryX;
   const dy = aimRange * Math.cos(aimBearing) - entryY;

@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { ChevronRight, Crosshair, ScanSearch, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AffiliationShape } from '../components/AffiliationShape';
+import { ConceptPopover } from '../components/ConceptPopover';
 import { Panel } from '../components/Panel';
 import { StepBadge } from '../components/StepBadge';
 import { Tooltip } from '../components/Tooltip';
@@ -10,7 +11,15 @@ import { AFFILIATION_STYLE } from '../data/affiliation';
 import { TRAFFIC_BY_ID } from '../data/threatCatalog';
 import { useSimController } from '../sim/simContext';
 import { useViewStore } from '../view/viewStore';
-import { aircraftFacts, type AircraftFacts } from './aircraftFacts';
+import { aircraftFacts, type AircraftFacts, type FactTone } from './aircraftFacts';
+
+const TONE: Readonly<Record<FactTone, string>> = {
+  plain: 'text-ink-100',
+  accent: 'text-accent',
+  ok: 'text-ok',
+  warn: 'text-warn',
+  alert: 'text-alert',
+};
 
 const UPDATE_MS = 100;
 
@@ -50,6 +59,12 @@ export function InspectorPanel() {
       icon={ScanSearch}
       panelId="inspector"
       bodyClassName="overflow-y-auto"
+      actions={
+        <ConceptPopover
+          concept="proportionalNavigation"
+          label="How an interceptor steers to its target"
+        />
+      }
     >
       {selectedId === null ? <Empty /> : <Details key={selectedId} id={selectedId} />}
     </Panel>
@@ -151,13 +166,13 @@ function Details({ id }: { id: number }) {
         <Fact label="Altitude" value={facts.altitude} detail={facts.altitudeRef} />
         <Fact label="Heading" value={facts.heading} detail={facts.headingPoint} />
         <Fact label="Range" value={facts.range} detail={facts.bearing} />
+        <Fact label="Track" value={facts.track} detail={facts.trackDetail} />
         <Fact
-          label="Radar"
-          value={facts.radar}
-          detail={facts.radarDetail}
-          tone={facts.radar === 'Contact held' ? 'text-accent' : 'text-ink-100'}
+          label="Defense"
+          value={facts.defense}
+          detail={facts.defenseDetail}
+          tone={TONE[facts.defenseTone]}
         />
-        <Fact label="In the area" value={facts.inArea} detail="since it appeared" />
       </dl>
     </div>
   );

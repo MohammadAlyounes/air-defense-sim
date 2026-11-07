@@ -1,8 +1,9 @@
 import clsx from 'clsx';
 import { ChevronRight } from 'lucide-react';
+import { useState } from 'react';
 import { Tooltip } from '../components/Tooltip';
 import { roadmapStep } from '../data/roadmap';
-import { STAGES, type StageId } from '../data/stages';
+import { STAGES, type Stage, type StageId } from '../data/stages';
 
 interface PipelineChipsProps {
   /** Tracks in each stage; `null` for a stage that is not built yet. */
@@ -15,57 +16,68 @@ export function PipelineChips({ counts, className }: PipelineChipsProps) {
   return (
     <nav aria-label="Defense loop stages" className={clsx('overflow-x-auto', className)}>
       <ol className="flex w-max items-center gap-1 lg:mx-auto">
-        {STAGES.map((stage, index) => {
-          const count = counts[stage.id];
-          const active = count !== null && count > 0;
-          const arrives = roadmapStep(stage.arrivesInStep);
-          return (
-            <li key={stage.id} className="flex items-center gap-1">
-              <Tooltip
-                content={
-                  <>
-                    <strong className="text-accent">{stage.label}</strong>
-                    <br />
-                    {stage.description}
-                    {count === null && arrives && (
-                      <span className="mt-1.5 block text-ink-300">
-                        Arrives in Step {arrives.step} · {arrives.title}.
-                      </span>
-                    )}
-                  </>
-                }
-              >
-                <button
-                  type="button"
-                  data-stage={stage.id}
-                  data-count={count ?? ''}
-                  className={clsx(
-                    'flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors',
-                    active
-                      ? 'border-accent/60 bg-accent/10 text-accent'
-                      : 'border-ink-700 bg-ink-900 text-ink-300 hover:border-ink-500 hover:text-ink-100',
-                  )}
-                >
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.1em]">
-                    {stage.label}
-                  </span>
-                  <span
-                    className={clsx(
-                      'min-w-5 rounded px-1 text-center font-mono text-[11px] tabular-nums',
-                      active ? 'bg-accent/20 text-accent' : 'bg-ink-800 text-ink-300',
-                    )}
-                  >
-                    {count ?? '—'}
-                  </span>
-                </button>
-              </Tooltip>
-              {index < STAGES.length - 1 && (
-                <ChevronRight aria-hidden="true" className="size-3 shrink-0 text-ink-500" />
-              )}
-            </li>
-          );
-        })}
+        {STAGES.map((stage, index) => (
+          <li key={stage.id} className="flex items-center gap-1">
+            <StageChip stage={stage} count={counts[stage.id]} />
+            {index < STAGES.length - 1 && (
+              <ChevronRight aria-hidden="true" className="size-3 shrink-0 text-ink-500" />
+            )}
+          </li>
+        ))}
       </ol>
     </nav>
+  );
+}
+
+/** One stage: its name and live count. The chip pulses when a track enters the stage. */
+function StageChip({ stage, count }: { stage: Stage; count: number | null }) {
+  const active = count !== null && count > 0;
+  const arrives = roadmapStep(stage.arrivesInStep);
+  // Remember the last count while rendering, so a rise can restart the pulse animation.
+  const [previous, setPrevious] = useState(count);
+  const [pulses, setPulses] = useState(0);
+  if (count !== previous) {
+    setPrevious(count);
+    if (count !== null && previous !== null && count > previous) setPulses(pulses + 1);
+  }
+  return (
+    <Tooltip
+      content={
+        <>
+          <strong className="text-accent">{stage.label}</strong>
+          <br />
+          {stage.description}
+          {count === null && arrives && (
+            <span className="mt-1.5 block text-ink-300">
+              Arrives in Step {arrives.step} · {arrives.title}.
+            </span>
+          )}
+        </>
+      }
+    >
+      <button
+        type="button"
+        data-stage={stage.id}
+        data-count={count ?? ''}
+        className={clsx(
+          'flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors',
+          active
+            ? 'border-accent/60 bg-accent/10 text-accent'
+            : 'border-ink-700 bg-ink-900 text-ink-300 hover:border-ink-500 hover:text-ink-100',
+        )}
+      >
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em]">{stage.label}</span>
+        <span
+          key={pulses}
+          className={clsx(
+            'min-w-5 rounded px-1 text-center font-mono text-[11px] tabular-nums',
+            active ? 'bg-accent/20 text-accent' : 'bg-ink-800 text-ink-300',
+            pulses > 0 && 'animate-chip-pulse motion-reduce:animate-none',
+          )}
+        >
+          {count ?? '—'}
+        </span>
+      </button>
+    </Tooltip>
   );
 }

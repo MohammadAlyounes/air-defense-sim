@@ -2,22 +2,40 @@ import clsx from 'clsx';
 import { Activity, ListOrdered, ScrollText } from 'lucide-react';
 import { Panel } from '../components/Panel';
 import { Tooltip } from '../components/Tooltip';
+import { STAGES } from '../data/stages';
 import { formatSimClock } from '../lib/format';
+import { formatKm } from '../sim/narrator';
 import { useSimState } from '../sim/simContext';
 import { useViewStore } from '../view/viewStore';
 
-const TRACK_COLUMNS = ['#', 'Track', 'Type', 'Range', 'Alt', 'Speed', 'Stage'] as const;
+const TRACK_COLUMNS = ['Track', 'Identity', 'Range', 'Alt', 'Speed', 'Stage'] as const;
 
+const IDENTITY_TEXT = {
+  pending: { label: 'identifying', className: 'text-unknown' },
+  hostile: { label: 'hostile', className: 'text-hostile' },
+  friend: { label: 'friendly', className: 'text-friend' },
+  neutral: { label: 'civil', className: 'text-neutral' },
+} as const;
+
+const STAGE_LABEL = Object.fromEntries(STAGES.map((stage) => [stage.id, stage.label]));
+const grouped = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+
+/**
+ * The battery's tracks, most urgent first: threats by time to their closest approach, then the
+ * rest by range. A row selects its aircraft. Step 6 adds track quality and uncertainty.
+ */
 export function TrackTablePanel({ className }: { className?: string }) {
+  const rows = useSimState((state) => state.defense.tracks);
+  const selectedId = useViewStore((state) => state.selectedId);
   return (
     <Panel
       title="Track table"
       icon={ListOrdered}
-      step={6}
+      panelId="tracks"
       className={className}
       bodyClassName="overflow-auto"
     >
-      <table className="w-full text-left text-[11.5px]">
+      <table className="w-full text-left text-[11.5px]" data-testid="track-table">
         <thead className="sticky top-0 bg-ink-900 text-[10px] uppercase tracking-[0.08em] text-ink-300">
           <tr>
             {TRACK_COLUMNS.map((column) => (
@@ -31,12 +49,62 @@ export function TrackTablePanel({ className }: { className?: string }) {
             ))}
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td colSpan={TRACK_COLUMNS.length} className="px-3 py-6 text-center text-ink-300">
-              No tracks yet. Tracks appear here, ranked by urgency, once the radar starts scanning.
-            </td>
-          </tr>
+        <tbody className="font-mono tabular-nums">
+          {rows.length === 0 ? (
+            <tr>
+              <td
+                colSpan={TRACK_COLUMNS.length}
+                className="px-3 py-6 text-center font-sans text-ink-300"
+              >
+                No tracks yet: the radar has not detected anything. Drag a threat onto the map.
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => {
+              const identity = IDENTITY_TEXT[row.identity];
+              const busy = row.stage === 'engage' || row.stage === 'assess';
+              return (
+                <tr
+                  key={row.id}
+                  onClick={() => useViewStore.getState().select(row.truthId)}
+                  className={clsx(
+                    'cursor-pointer border-t border-ink-800/70 transition-colors hover:bg-ink-850',
+                    row.truthId === selectedId && 'bg-ink-800',
+                  )}
+                >
+                  <td className="py-1 pr-2 pl-3">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        useViewStore.getState().select(row.truthId);
+                      }}
+                      aria-current={row.truthId === selectedId ? 'true' : undefined}
+                      className="font-semibold text-ink-100 hover:text-accent"
+                    >
+                      T{row.id}
+                    </button>
+                  </td>
+                  <td className={clsx('px-2 py-1 font-sans', identity.className)}>
+                    {identity.label}
+                  </td>
+                  <td className="px-2 py-1 text-ink-200">{formatKm(row.rangeM)}</td>
+                  <td className="px-2 py-1 text-ink-200">{grouped.format(row.altitudeM)} m</td>
+                  <td className="px-2 py-1 text-ink-200">
+                    {row.speedMps === null ? '—' : `${grouped.format(row.speedMps)} m/s`}
+                  </td>
+                  <td
+                    className={clsx(
+                      'py-1 pr-3 pl-2 font-sans',
+                      busy ? 'text-accent' : row.threatInS !== null ? 'text-warn' : 'text-ink-300',
+                    )}
+                  >
+                    {STAGE_LABEL[row.stage]}
+                  </td>
+                </tr>
+              );
+            })
+          )}
         </tbody>
       </table>
     </Panel>
@@ -89,6 +157,8 @@ export function TelemetryPanel() {
 const SOURCE_STYLE = {
   scenario: { label: 'SCENARIO', className: 'text-ink-300' },
   radar: { label: 'RADAR', className: 'text-accent' },
+  command: { label: 'COMMAND', className: 'text-warn' },
+  weapon: { label: 'WEAPON', className: 'text-ok' },
 } as const;
 
 /**
@@ -110,8 +180,13 @@ export function EventLogPanel() {
             <>
               <strong className="text-ink-100">SCENARIO</strong>: what really happens in the sky.
               <br />
-              <strong className="text-accent">RADAR</strong>: what the radar actually sees. The gap
-              between the two is a key idea of air defense.
+              <strong className="text-accent">RADAR</strong>: what the radar actually sees.
+              <br />
+              <strong className="text-warn">COMMAND</strong>: what the command node decides.
+              <br />
+              <strong className="text-ok">WEAPON</strong>: what the interceptors do.
+              <br />
+              The gap between truth and what the radar sees is a key idea of air defense.
             </>
           }
         >

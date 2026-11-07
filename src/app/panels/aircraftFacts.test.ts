@@ -2,18 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { Simulation } from '../../sim';
 import { aircraftFacts } from './aircraftFacts';
 
-function jetFlyingNorth() {
-  const sim = new Simulation({ seed: 1, autoTraffic: false });
+function jetFlyingAt(sim = new Simulation({ seed: 1, autoTraffic: false })) {
   sim.dispatch({ kind: 'spawnTraffic', type: 'jet', eastM: 0, northM: -30_000, headingRad: 0 });
   return sim;
 }
 
 describe('aircraftFacts', () => {
   it('describes an aircraft in plain units', () => {
-    const sim = jetFlyingNorth();
+    const sim = jetFlyingAt();
     sim.run(50); // one second
-    const facts = aircraftFacts(sim.snapshot(), 1);
-    expect(facts).toMatchObject({
+    expect(aircraftFacts(sim.snapshot(), 1)).toMatchObject({
       type: 'jet',
       affiliation: 'hostile',
       speed: '340 m/s',
@@ -24,27 +22,45 @@ describe('aircraftFacts', () => {
       headingPoint: 'north',
       range: '30 km south',
       bearing: 'bearing 180°',
-      inArea: '0:00',
     });
   });
 
-  it('says what the radar knows: not seen yet, then held', () => {
-    const sim = jetFlyingNorth();
-    sim.run(50);
-    expect(aircraftFacts(sim.snapshot(), 1)).toMatchObject({
-      radar: 'Not seen yet',
-      radarDetail: 'waiting for the beam',
+  it('says what the battery knows and does about it, stage by stage', () => {
+    const sim = jetFlyingAt();
+    const at = (seconds: number) => {
+      sim.run(Math.round(seconds * 50) - sim.tick);
+      const facts = aircraftFacts(sim.snapshot(), 1);
+      return [facts?.track, facts?.defense, facts?.defenseDetail];
+    };
+    // Before the beam reaches the south: not detected; a jet is seen from about 36 km.
+    expect(at(1)).toEqual(['Not detected', 'Not engaged', 'not detected yet']);
+    expect(aircraftFacts(sim.snapshot(), 1)?.trackDetail).toBe('radar sees it from 36 km');
+    expect(at(3)).toEqual(['T1 · identifying', 'Waiting', 'identification check']);
+    // First echo at 2 s (the beam reaches the south), confirmed at 6 s, identified and
+    // assigned at 8 s, launch 1.5 s later.
+    expect(at(8.5)).toEqual(['T1 · hostile', 'Assigned', 'launch in 1.0 s']);
+    expect(at(20)?.[1]).toBe('Engaged by I1');
+  });
+
+  it('shows friendly aircraft as never engaged', () => {
+    const sim = new Simulation({ seed: 1, autoTraffic: false });
+    sim.dispatch({
+      kind: 'spawnTraffic',
+      type: 'friendly',
+      eastM: 0,
+      northM: -20_000,
+      headingRad: 0,
     });
-    // The beam starts north and turns clockwise in 4 s: it reaches the south at t = 2 s.
-    sim.run(75);
+    sim.run(50 * 10);
     expect(aircraftFacts(sim.snapshot(), 1)).toMatchObject({
-      radar: 'Contact held',
-      radarDetail: 'painted 0.5 s ago',
+      track: 'T1 · friendly',
+      defense: 'Never engaged',
+      defenseDetail: 'identified friendly',
     });
   });
 
   it('returns null once the aircraft has gone', () => {
-    const sim = jetFlyingNorth();
+    const sim = jetFlyingAt();
     sim.run(1);
     expect(aircraftFacts(sim.snapshot(), 99)).toBeNull();
   });

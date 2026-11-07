@@ -11,11 +11,13 @@ import { PlayerBar } from './layout/PlayerBar';
 import { ThreatPalette } from './palette/ThreatPalette';
 import { EventLogPanel, TelemetryPanel, TrackTablePanel } from './panels/ConsolePanels';
 import { InspectorPanel } from './panels/InspectorPanel';
+import { PlacementOverlay } from './placement/PlacementOverlay';
 import { SimProvider } from './sim/SimProvider';
 import { useSelectionGuard } from './view/useSelectionGuard';
 import { useViewShortcuts } from './view/useViewShortcuts';
 import { BattlespaceFallback } from './views/BattlespaceFallback';
-import { RadarScope } from './views/RadarScope';
+import { RadarScope, ScopeLegend } from './views/RadarScope';
+import { ResultToasts } from './views/ResultToasts';
 
 // three.js is large: load the 3D view in its own chunk, after the console is on screen.
 const Battlespace3D = lazy(() => import('./views/3d/Battlespace3D'));
@@ -57,6 +59,7 @@ function Console() {
               <Battlespace3D />
             </Suspense>
           </ErrorBoundary>
+          <ResultToasts />
         </Panel>
         <Panel
           title="Sensor scope"
@@ -72,9 +75,7 @@ function Console() {
           }
         >
           <RadarScope />
-          <p className="text-center text-[11px] leading-snug text-ink-300">
-            Search radar · one turn every 4 s · rings every 10 km
-          </p>
+          <ScopeLegend />
         </Panel>
         <TrackTablePanel className="area-tracks" />
         <div className="area-bottom bottom-grid">
@@ -85,6 +86,7 @@ function Console() {
         <PlayerBar className="area-timeline" />
       </main>
       <Footer />
+      <PlacementOverlay />
     </div>
   );
 }

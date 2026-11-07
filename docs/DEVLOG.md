@@ -2,6 +2,43 @@
 
 One short entry per step, newest first: what was built, the decisions behind it, and what comes next.
 
+## Step 3 · First intercept (2026-11-07)
+
+**Built**
+
+- **Drag-and-drop threats (`src/app/placement`):**
+  - Drag a palette card onto the 3D view or the radar scope; or click a card, then the map (this also works on touch screens); or press Enter twice.
+  - While placing, a ghost shows the route to the battery in both views, with a readout of range, bearing, altitude, time to the battery and the range at which the radar will first see it. The mouse wheel sets the altitude.
+  - Each drop becomes a recorded `spawnTraffic` command, so drops replay exactly.
+- **Detection range by radar size:** every size class has an illustrative radar cross section, and the detection range follows the fourth-root law, `R = 30 km × (σ / 1 m²)^¼`. A drone is first seen at 9.5 km, a jet at 36 km.
+- **The defense loop, version 1 (`src/sim`):**
+  - **Track:** the first echo creates a tentative track; the second confirms it and gives its velocity.
+  - **Identify:** an identification check 2 s later: friends answer, civil aircraft broadcast a transponder code, anything else is hostile.
+  - **Evaluate:** a hostile whose course passes within 5 km of the battery is a threat, ranked by time to its closest approach.
+  - **Assign:** the command node solves for the predicted intercept point and gives the most urgent reachable threat the next launch slot (1.5 s preparation, 2 s between launches, 12 rounds, one reloaded every 30 s).
+  - **Engage:** interceptors boost, coast and steer by true proportional navigation with a 30 g limit, integrated in 2 ms sub-steps; the fuze goes off at the analytically computed closest approach, lethal within 15 m.
+  - **Assess:** on its next look the radar confirms the kill (no echo where the track should be), or sees the target again and the battery fires another interceptor.
+  - **Leaks:** a hostile that comes within 2 km of the battery got through.
+  - Scenario hostiles now head for the battery; friendly and civil traffic still passes by.
+- **Analysis bar v1:** a live count for each stage (as a funnel; a chip pulses when a track moves on), threats active, down and leaked, interceptors ready, flying and used, the next impact, and a NOW line that narrates the engagement from the battery's point of view.
+- **Views:** identity symbols, track numbers, velocity leaders, interceptors and predicted intercept points on the scope; a live track table; a launcher, interceptor models with trails and boost glow, intercept rings and the defended area in 3D; result cards after each kill or leak; the inspector shows the selected aircraft's track and what the defense is doing about it.
+- **Concept cards:** detection range, and proportional navigation.
+- **Tests:** 32 new unit tests and 4 new browser tests.
+  - Unit tests check proportional navigation against hand-computed commands, a full flight from launch to fuze, the analytic closest approach, the intercept solver, detection ranges, the whole loop (including shoot-look-shoot after a miss, leaks, launch intervals, and never engaging friendly or civil traffic), replays with engagements, the header funnel, the track table, the NOW line and the placement rules.
+  - Browser tests drag a threat onto the map and wait for its confirmed kill, check the stage counts, and place threats from the keyboard and by tapping.
+
+**Decisions**
+
+- **The command node only sees its tracks.** Identification, evaluation and the intercept solution use the battery's perception, never the truth. Two simplifications remain, both marked in the code: echoes are linked to tracks by the true identity of their source (Step 6 replaces this with gating), and the interceptor is guided to the real target, as if the tracking radar were perfect (Steps 5 and 6 add noise).
+- **One visible step at a time.** A track needs a second echo (4 s) to be confirmed, identification takes 2 s, and a launch 1.5 s more. Instant decisions would be unrealistic, and every stage of the analysis bar would flash past in one tick.
+- **Shoot-look-shoot.** After a shot the battery waits for the radar's next look before firing again at the same target, so interceptors are not wasted on targets that are already destroyed.
+- **Exact endgames.** At closing speeds near 1 km/s a 20 ms tick is 20 m, more than the lethal radius. Interceptors move in 2 ms sub-steps, and the closest approach inside each sub-step is solved in closed form, so a fast pair cannot skip past each other.
+- **Perfect hits, for now.** With perfect tracking and no drag, proportional navigation hits a non-maneuvering target almost dead centre. Misses arrive with radar noise, drag and maneuvering targets in later steps; the shoot-look-shoot path is already tested by forcing a miss.
+- **Touch places by tapping.** A finger dragging a card would fight the palette's scrolling, so on touch screens you tap a card, then the map. Mouse and pen can do both; the keyboard can place too.
+- **Media as animated WebP.** The Step 3 clip shows the whole console, so it uses WebP (2.3 MB) like Step 2. The clip script can now script drags.
+
+**Next: Step 4 · Environment.** Procedural terrain, the standard atmosphere, wind and drag; threat behaviors with routes, terrain following and evasive turns.
+
 ## Step 2 · 3D scene (2026-11-06)
 
 **Built**

@@ -1,3 +1,4 @@
+import type { Identity } from './c2';
 import type { Vec3 } from './core/vec';
 import type { Affiliation, AircraftType, RadarSize, TrafficTypeId } from './traffic';
 
@@ -21,11 +22,12 @@ export interface Aircraft {
   /** Metres per second. */
   velocity: Vec3;
   spawnTick: number;
-  /** True while the radar keeps painting it (dropped after two antenna turns without a paint). */
-  contactHeld: boolean;
+  /** The radar's last paint of it, if any. */
   lastPaint: PaintRecord | null;
   /** Where it has been: positions sampled every 0.5 s, oldest first, last 30 s. */
   trail: readonly Vec3[];
+  /** A hostile that came within the leak radius of the battery: it got through. */
+  leaked: boolean;
 }
 
 /** One radar detection: where the beam saw an echo, and when. */
@@ -42,18 +44,162 @@ export interface Plot {
   truthId: EntityId;
 }
 
+/**
+ * The battery's picture of one aircraft, built from radar plots: perception, not truth.
+ * A track starts tentative at the first echo and is confirmed by the second.
+ */
+export interface Track {
+  /** Track number, shown as T1, T2, … */
+  id: EntityId;
+  /**
+   * The aircraft whose echoes feed this track. Step 3 links each echo to its track by it
+   * (perfect association); Step 6 replaces that with gating and nearest-neighbour association.
+   */
+  truthId: EntityId;
+  createdTick: number;
+  /** Ground range at the first echo, m. */
+  detectedRangeM: number;
+  paints: number;
+  lastPaintTick: number;
+  /** Position of the last echo. */
+  position: Vec3;
+  /** Estimated from the last two echoes; null until the second one. */
+  velocity: Vec3 | null;
+  confirmedTick: number | null;
+  identity: Identity;
+  /** Set while the track's course passes close to the battery. */
+  threat: Threat | null;
+  /** The engagement in progress: interceptor in flight, or waiting for the radar to assess. */
+  engagementId: EntityId | null;
+  /** Interceptors launched at this track so far. */
+  interceptorsFired: number;
+}
+
+export interface Threat {
+  /** How close the course passes the battery, m. */
+  closestApproachM: number;
+  /** Time until it gets there, s. */
+  timeToClosestS: number;
+}
+
+/** An interceptor in flight: a point mass guided by proportional navigation. */
+export interface Interceptor {
+  /** Interceptor number, shown as I1, I2, … */
+  id: EntityId;
+  engagementId: EntityId;
+  trackId: EntityId;
+  /** The aircraft the tracking radar guides it to. */
+  targetId: EntityId;
+  launchTick: number;
+  position: Vec3;
+  velocity: Vec3;
+  /** Recent positions, every 0.1 s, oldest first, last 6 s. */
+  trail: readonly Vec3[];
+}
+
+export type MissReason = 'passed' | 'outOfTime' | 'ground' | 'targetGone';
+
+/**
+ * The command node's record of one shot: assigned to a launch slot, then flying, then a hit
+ * or a miss, kept until the radar has assessed the result.
+ */
+export interface Engagement {
+  id: EntityId;
+  trackId: EntityId;
+  targetId: EntityId;
+  /** What the target really is: revealed in the result card, never used by the defense. */
+  targetType: AircraftType;
+  assignedTick: number;
+  /** Planned launch tick while assigned; the actual one once launched. */
+  launchTick: number;
+  interceptorId: EntityId | null;
+  state: 'assigned' | 'flying' | 'hit' | 'missed';
+  /** Predicted intercept point and flight time: planned at assignment, updated at launch. */
+  predictedPoint: Vec3;
+  predictedTimeS: number;
+  endTick: number | null;
+  /** Closest approach to the target, m (once the interceptor has passed it). */
+  missDistanceM: number | null;
+  missReason: MissReason | null;
+}
+
+export interface LauncherState {
+  ready: number;
+  capacity: number;
+  nextLaunchTick: number;
+  /** When the next round will be ready, while reloading. */
+  nextReloadTick: number | null;
+}
+
+/** Brief visual markers for the views: launches, intercepts, misses and leaks. */
+export interface Effect {
+  kind: 'launch' | 'intercept' | 'miss' | 'leak';
+  tick: number;
+  position: Vec3;
+}
+
+export interface DefenseStats {
+  /** Hostile tracks the radar confirmed destroyed. */
+  threatsDown: number;
+  /** Hostiles that reached the battery. */
+  threatsLeaked: number;
+  interceptorsFired: number;
+  hits: number;
+  misses: number;
+}
+
 interface EventBase {
   tick: number;
   timeS: number;
+  /** The aircraft the event is about (ground truth), so the UI can select it. */
   id: EntityId;
+}
+
+interface TrackEventBase extends EventBase {
+  trackId: EntityId;
 }
 
 /** Things that happened during a tick. Structured data only; the UI turns them into words. */
 export type SimEvent =
   | (EventBase & { kind: 'trafficEntered'; type: AircraftType; bearingRad: number; rangeM: number })
   | (EventBase & { kind: 'trafficLeft'; type: AircraftType })
-  | (EventBase & { kind: 'contactNew'; bearingRad: number; rangeM: number })
-  | (EventBase & { kind: 'contactLost'; bearingRad: number; rangeM: number });
+  | (EventBase & { kind: 'threatLeaked'; type: AircraftType })
+  | (TrackEventBase & { kind: 'contactNew'; bearingRad: number; rangeM: number })
+  | (TrackEventBase & { kind: 'contactLost'; bearingRad: number; rangeM: number })
+  | (TrackEventBase & { kind: 'trackConfirmed'; speedMps: number; altitudeM: number })
+  | (TrackEventBase & { kind: 'identified'; identity: Exclude<Identity, 'pending'> })
+  | (TrackEventBase & { kind: 'threatEvaluated'; closestApproachM: number; timeToClosestS: number })
+  | (TrackEventBase & {
+      kind: 'engagementAssigned';
+      /** Time until its launch slot, s. */
+      launchInS: number;
+      predictedTimeS: number;
+      predictedRangeM: number;
+    })
+  | (TrackEventBase & { kind: 'engagementCancelled' })
+  | (TrackEventBase & {
+      kind: 'interceptorLaunched';
+      interceptorId: EntityId;
+      predictedTimeS: number;
+      predictedRangeM: number;
+    })
+  | (TrackEventBase & {
+      kind: 'interceptResult';
+      interceptorId: EntityId;
+      hit: boolean;
+      /** Closest approach, m; null if the target was already gone. */
+      missDistanceM: number | null;
+      reason: MissReason | null;
+    })
+  | (TrackEventBase & {
+      kind: 'killAssessed';
+      type: AircraftType;
+      detectedRangeM: number;
+      /** From the first echo to the intercept, s. */
+      detectionToKillS: number;
+      interceptorsFired: number;
+    })
+  | (TrackEventBase & { kind: 'targetSurvived' });
 
 /** The only way to change a running simulation from outside. Every command is logged. */
 export type Command =
@@ -78,6 +224,8 @@ export interface RadarView {
   azimuthRad: number;
   periodS: number;
   rangeM: number;
+  /** Range at which a 1 m² target is just detected, m. */
+  referenceRangeM: number;
 }
 
 /** A read-only picture of the simulation at one tick, for rendering. */
@@ -88,5 +236,12 @@ export interface Snapshot {
   radar: RadarView;
   aircraft: readonly Aircraft[];
   plots: readonly Plot[];
+  /** Number of tracks the radar holds (tentative and confirmed). */
   contactsHeld: number;
+  tracks: readonly Track[];
+  interceptors: readonly Interceptor[];
+  engagements: readonly Engagement[];
+  launcher: LauncherState;
+  effects: readonly Effect[];
+  stats: DefenseStats;
 }

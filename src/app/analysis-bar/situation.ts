@@ -1,4 +1,5 @@
 import type { StageId } from '../data/stages';
+import type { DefenseSummary } from '../sim/defenseSummary';
 
 /** Weapons control status: when the battery is allowed to fire. */
 export type WeaponsControl = 'HOLD' | 'TIGHT' | 'FREE';
@@ -6,14 +7,15 @@ export type WeaponsControl = 'HOLD' | 'TIGHT' | 'FREE';
 export type OperatorMode = 'MANUAL' | 'SEMI' | 'AUTO';
 
 /**
- * Everything the header analysis bar shows. A `null` field is a feature that is not built
- * yet: the bar shows "—" and a tooltip names the roadmap step that brings it.
+ * Everything the header analysis bar shows. A number whose feature is not built yet is null:
+ * the bar shows "—" and a tooltip names the roadmap step that brings it.
  */
 export interface SituationSummary {
   stageCounts: Readonly<Record<StageId, number | null>>;
   threats: { active: number; down: number; leaked: number } | null;
   interceptors: { ready: number; flying: number; used: number } | null;
   channels: { used: number; total: number } | null;
+  /** Null when no threat is inbound. */
   nextImpact: { inSeconds: number; threat: string; asset: string } | null;
   weaponsControl: WeaponsControl;
   operatorMode: OperatorMode;
@@ -23,30 +25,27 @@ export interface SituationSummary {
 
 /** Roadmap step in which each header number comes to life. */
 export const KPI_ARRIVES_IN_STEP = {
-  threats: 7,
+  threats: 3,
   interceptors: 3,
   channels: 8,
-  nextImpact: 7,
+  nextImpact: 3,
 } as const;
 
-/** The header as of Step 1: the radar is live; the rest of the defense loop is still to come. */
-export function liveSituation(input: { contactsHeld: number; now: string }): SituationSummary {
+/**
+ * The header as of Step 3: the whole loop runs in a first version. Fire channels arrive with
+ * the tracking radar's limits in Step 8, together with operator approval (the battery fires on
+ * its own until then: AUTO, at hostiles only: weapons TIGHT).
+ */
+export function liveSituation(input: { defense: DefenseSummary; now: string }): SituationSummary {
+  const { defense } = input;
   return {
-    stageCounts: {
-      detect: input.contactsHeld,
-      track: null,
-      identify: null,
-      evaluate: null,
-      assign: null,
-      engage: null,
-      assess: null,
-    },
-    threats: null,
-    interceptors: null,
+    stageCounts: defense.stages,
+    threats: defense.threats,
+    interceptors: defense.interceptors,
     channels: null,
-    nextImpact: null,
+    nextImpact: defense.nextImpact,
     weaponsControl: 'TIGHT',
-    operatorMode: 'SEMI',
+    operatorMode: 'AUTO',
     now: input.now,
   };
 }
@@ -60,7 +59,7 @@ export const WEAPONS_CONTROL_HELP: Readonly<Record<WeaponsControl, string>> = {
 export const OPERATOR_MODE_HELP: Readonly<Record<OperatorMode, string>> = {
   MANUAL: 'Manual: you approve every shot.',
   SEMI: 'Semi-auto: the system recommends, you confirm.',
-  AUTO: 'Auto: the system engages on its own, within the rules.',
+  AUTO: 'Auto: the system engages on its own, within the rules. Step 8 lets you approve each shot.',
 };
 
 export const OPERATOR_MODE_LABEL: Readonly<Record<OperatorMode, string>> = {

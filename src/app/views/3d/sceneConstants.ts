@@ -8,3 +8,7 @@ export const RING_STEP_KM = 10;
 export const RING_LABEL_BEARING_RAD = (200 * Math.PI) / 180;
 /** N, E, S and W letters sit just outside the outer ring. */
 export const COMPASS_RADIUS_KM = RADAR_RANGE_KM + 3;
+/** Hostiles whose course passes inside this ring are threats (the command node's threat radius). */
+export const DEFENDED_RADIUS_KM = 5;
+/** Its label sits along this bearing (south-south-east), just outside the ring. */
+export const DEFENDED_LABEL_BEARING_RAD = (155 * Math.PI) / 180;

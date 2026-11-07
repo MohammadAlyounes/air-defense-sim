@@ -40,6 +40,27 @@
       transform: rotate(360deg);
     }
   }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+
+  /* A stage chip's count lights up when a track enters the stage. */
+  --animate-chip-pulse: chip-pulse 0.9s ease-out;
+
+  @keyframes chip-pulse {
+    0% {
+      background-color: var(--color-accent);
+      color: var(--color-ink-950);
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 70%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 6px transparent;
+    }
+  }
 }
 
 @layer base {

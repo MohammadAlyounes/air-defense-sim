@@ -1,7 +1,21 @@
-import { FixedStepClock, Simulation, TICK_S, type SimEvent, type Snapshot } from '../../sim';
-import { describeEvent, describeNow, nearestRecentEcho } from './narrator';
+import {
+  FixedStepClock,
+  Simulation,
+  TICK_S,
+  type Command,
+  type SimEvent,
+  type Snapshot,
+} from '../../sim';
+import { summarizeDefense } from './defenseSummary';
+import { describeEvent, describeNow } from './narrator';
 import { SPEED_PRESETS, type LaunchOptions } from './params';
-import { createSimStore, type LogEntry, type SimStore, type SimUiState } from './store';
+import {
+  createSimStore,
+  type LogEntry,
+  type ResultCard,
+  type SimStore,
+  type SimUiState,
+} from './store';
 
 /** What the renderer needs each frame: the last two ticks and how far we are between them. */
 export interface RenderFrame {
@@ -15,6 +29,9 @@ type FrameListener = (frame: RenderFrame) => void;
 
 const LOG_LIMIT = 100;
 const PUBLISH_INTERVAL_MS = 100;
+/** Events the NOW line may still mention, in simulated seconds. */
+const RECENT_S = 5;
+const RESULT_LIMIT = 4;
 
 /**
  * Drives the simulation in real time. Each animation frame it converts the elapsed wall-clock
@@ -31,6 +48,9 @@ export class SimController {
   private speed: number;
   private log: LogEntry[] = [];
   private logSeq = 0;
+  private recent: SimEvent[] = [];
+  private results: ResultCard[] = [];
+  private resultSeq = 0;
   private rafId: number | null = null;
   private lastFrameMs: number | null = null;
   private lastPublishMs = Number.NEGATIVE_INFINITY;
@@ -42,7 +62,11 @@ export class SimController {
     this.sim = new Simulation({ seed: options.seed });
     this.current = this.sim.snapshot();
     this.previous = this.current;
-    if (options.startAtS > 0) this.advance(Math.round(options.startAtS / TICK_S));
+    if (options.startAtS > 0) {
+      this.advance(Math.round(options.startAtS / TICK_S));
+      // Result cards are for what you see happen: keep only the last few seconds' worth.
+      this.results = this.results.filter((r) => this.sim.timeS - r.timeS <= RECENT_S);
+    }
     this.store = createSimStore(this.uiState());
   }
 
@@ -86,6 +110,15 @@ export class SimController {
     this.emitFrame();
   }
 
+  /**
+   * Sends a command to the simulation; it takes effect at the next tick and is recorded for
+   * replay. While paused, that tick runs at once, so the result shows straight away.
+   */
+  dispatch(command: Command): void {
+    this.sim.dispatch(command);
+    if (!this.running) this.step(1);
+  }
+
   setSpeed(speed: number): void {
     if (!SPEED_PRESETS.includes(speed) || speed === this.speed) return;
     this.speed = speed;
@@ -108,6 +141,8 @@ export class SimController {
     this.clock.reset();
     this.log = [];
     this.logSeq = 0;
+    this.recent = [];
+    this.results = [];
     this.current = this.sim.snapshot();
     this.previous = this.current;
     this.publish();
@@ -164,8 +199,15 @@ export class SimController {
         aircraftId: event.id,
         ...describeEvent(event),
       });
+      const result = resultCard(event, this.resultSeq + 1);
+      if (result) {
+        this.resultSeq += 1;
+        this.results = [result, ...this.results].slice(0, RESULT_LIMIT);
+      }
     }
     if (this.log.length > LOG_LIMIT) this.log.length = LOG_LIMIT;
+    const since = this.sim.timeS - RECENT_S;
+    this.recent = [...this.recent, ...events].filter((e) => e.timeS >= since);
   }
 
   private emitFrame(): void {
@@ -174,7 +216,7 @@ export class SimController {
   }
 
   private uiState(): SimUiState {
-    const { tick, timeS, contactsHeld, radar } = this.current;
+    const { tick, timeS, contactsHeld } = this.current;
     return {
       running: this.running,
       speed: this.speed,
@@ -182,15 +224,10 @@ export class SimController {
       tick,
       timeS,
       contactsHeld,
-      now: describeNow({
-        running: this.running,
-        tick,
-        timeS,
-        periodS: radar.periodS,
-        contactsHeld,
-        nearest: nearestRecentEcho(this.current),
-      }),
+      now: describeNow({ running: this.running, snapshot: this.current, recent: this.recent }),
       log: [...this.log],
+      defense: summarizeDefense(this.current),
+      results: [...this.results],
     };
   }
 
@@ -198,4 +235,33 @@ export class SimController {
     this.lastPublishMs = nowMs;
     this.store.setState(this.uiState());
   }
+}
+
+/** Turns a kill or a leak into a result card for the UI. */
+function resultCard(event: SimEvent, id: number): ResultCard | null {
+  if (event.kind === 'killAssessed') {
+    return {
+      id,
+      kind: 'kill',
+      timeS: event.timeS,
+      trackId: event.trackId,
+      type: event.type,
+      detectedRangeM: event.detectedRangeM,
+      detectionToKillS: event.detectionToKillS,
+      interceptorsFired: event.interceptorsFired,
+    };
+  }
+  if (event.kind === 'threatLeaked') {
+    return {
+      id,
+      kind: 'leak',
+      timeS: event.timeS,
+      trackId: null,
+      type: event.type,
+      detectedRangeM: null,
+      detectionToKillS: null,
+      interceptorsFired: null,
+    };
+  }
+  return null;
 }

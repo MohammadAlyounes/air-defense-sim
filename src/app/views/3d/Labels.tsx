@@ -11,6 +11,8 @@ import { interpolated, useAircraftRoster, type RosterEntry } from './frame';
 import { anchorLabel, projectLabels } from './labelAnchors';
 import {
   COMPASS_RADIUS_KM,
+  DEFENDED_LABEL_BEARING_RAD,
+  DEFENDED_RADIUS_KM,
   RADAR_RANGE_KM,
   RING_LABEL_BEARING_RAD,
   RING_STEP_KM,
@@ -61,6 +63,13 @@ function GroundLabels() {
           <span className="font-mono text-[10px] text-ink-300/80">{radius} km</span>
         </FixedLabel>
       ))}
+      <FixedLabel
+        x={(DEFENDED_RADIUS_KM + 0.8) * Math.sin(DEFENDED_LABEL_BEARING_RAD)}
+        y={0.05}
+        z={-(DEFENDED_RADIUS_KM + 0.8) * Math.cos(DEFENDED_LABEL_BEARING_RAD)}
+      >
+        <span className="font-mono text-[10px] text-warn/80">defended area</span>
+      </FixedLabel>
       {COMPASS.map(([letter, x, z]) => (
         <FixedLabel key={letter} x={x * COMPASS_RADIUS_KM} y={0.05} z={z * COMPASS_RADIUS_KM}>
           <span className="font-mono text-[12px] font-semibold text-accent/80">{letter}</span>

@@ -1,11 +1,24 @@
-import type { Plot, RadarSize, Snapshot } from '../../sim';
+import {
+  DEFAULT_DEFENSE,
+  TICK_S,
+  trackPositionAt,
+  TRAFFIC,
+  type Effect,
+  type Identity,
+  type RadarSize,
+  type Snapshot,
+  type Track,
+  type TrafficTypeId,
+  type Vec3,
+} from '../../sim';
 import type { RenderFrame } from '../sim/SimController';
 
 /**
  * Draws the radar scope (a PPI: plan position indicator). The battery is at the centre,
  * north is up and distance from the centre is ground range. Static parts (rings, ticks,
- * labels) are drawn once per resize into an offscreen layer; each frame adds the sweep and
- * the fading echoes.
+ * labels, the defended area) are drawn once per resize into an offscreen layer; each frame
+ * adds the sweep, the fading echoes, and the battery's picture: its tracks, its interceptors
+ * and where they are heading.
  */
 
 export interface ScopeLayout {
@@ -31,10 +44,33 @@ const BLIP_RADIUS_PX: Readonly<Record<RadarSize, number>> = {
 const FADE_TURNS = 0.85;
 /** Below this brightness an echo is no longer drawn (nor clickable). */
 const MIN_GLOW = 0.04;
-/** How close to an echo a click must land to pick it, in CSS pixels. */
+/** How close to an echo or a track a click must land to pick it, in CSS pixels. */
 export const PICK_RADIUS_PX = 14;
+/** Velocity leaders show where each track will be in this many seconds. */
+const LEADER_S = 30;
 
-export function createScopeLayout(size: number, dpr: number, rangeM: number): ScopeLayout {
+/** Track symbol colours: the same colour language as the rest of the console. */
+export const IDENTITY_COLOR: Readonly<Record<Identity, string>> = {
+  pending: '#facc15',
+  hostile: '#f87171',
+  friend: '#60a5fa',
+  neutral: '#4ade80',
+};
+
+const EFFECT_STYLE: Readonly<Record<Effect['kind'], { color: string; seconds: number }>> = {
+  launch: { color: '34, 211, 238', seconds: 0.8 },
+  intercept: { color: '228, 234, 245', seconds: 1.6 },
+  miss: { color: '143, 160, 191', seconds: 1.2 },
+  leak: { color: '251, 113, 133', seconds: 2.5 },
+};
+
+export function createScopeLayout(
+  size: number,
+  dpr: number,
+  rangeM: number,
+  /** Courses passing inside this ring are threats (shown dashed). */
+  defendedRadiusM = DEFAULT_DEFENSE.threatRadiusM,
+): ScopeLayout {
   const radiusPx = size / 2 - 4;
   const staticLayer = document.createElement('canvas');
   staticLayer.width = Math.round(size * dpr);
@@ -42,7 +78,7 @@ export function createScopeLayout(size: number, dpr: number, rangeM: number): Sc
   const ctx = staticLayer.getContext('2d');
   if (ctx) {
     ctx.scale(dpr, dpr);
-    drawStatic(ctx, size, radiusPx, rangeM);
+    drawStatic(ctx, size, radiusPx, rangeM, defendedRadiusM);
   }
   return { size, dpr, radiusPx, rangeM, staticLayer };
 }
@@ -61,12 +97,12 @@ export const echoGlow = (ageS: number, periodS: number): number =>
   ageS < 0 ? 0 : Math.exp(-ageS / (periodS * FADE_TURNS));
 
 /**
- * The aircraft behind the visible echo nearest to a click at (x, y), in CSS pixels from the
- * scope's top-left corner, or null when no echo is close enough. This uses the ground-truth
- * link of each plot; the radar picture itself never shows it.
+ * The aircraft behind the track symbol or visible echo nearest to a click at (x, y), in CSS
+ * pixels from the scope's top-left corner, or null when nothing is close enough. This uses
+ * the ground-truth link of each track and plot; the radar picture itself never shows it.
  */
 export function pickEcho(
-  snapshot: Pick<Snapshot, 'plots' | 'radar'>,
+  snapshot: Pick<Snapshot, 'plots' | 'radar'> & Partial<Pick<Snapshot, 'tracks'>>,
   timeS: number,
   layout: ScopeGeometry,
   x: number,
@@ -74,6 +110,15 @@ export function pickEcho(
 ): number | null {
   let best: number | null = null;
   let bestDistance = PICK_RADIUS_PX;
+  for (const track of snapshot.tracks ?? []) {
+    const at = trackPositionAt(track, timeS / TICK_S);
+    const p = scopePoint(layout, at.x, at.y);
+    const distance = Math.hypot(p.x - x, p.y - y);
+    if (distance <= bestDistance) {
+      bestDistance = distance;
+      best = track.truthId;
+    }
+  }
   for (const plot of snapshot.plots) {
     if (echoGlow(timeS - plot.timeS, snapshot.radar.periodS) < MIN_GLOW) continue;
     const p = scopePoint(layout, plot.position.x, plot.position.y);
@@ -93,7 +138,13 @@ const polar = (c: number, bearingRad: number, r: number) => ({
   y: c - r * Math.cos(bearingRad),
 });
 
-function drawStatic(ctx: CanvasRenderingContext2D, size: number, radius: number, rangeM: number) {
+function drawStatic(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  radius: number,
+  rangeM: number,
+  defendedRadiusM: number,
+) {
   const c = size / 2;
 
   const background = ctx.createRadialGradient(c, c, 0, c, c, radius);
@@ -155,6 +206,15 @@ function drawStatic(ctx: CanvasRenderingContext2D, size: number, radius: number,
     ctx.fillText(label, p.x, p.y);
   }
 
+  // The defended area: hostiles whose course passes inside it are threats.
+  ctx.save();
+  ctx.setLineDash([3, 4]);
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+  ctx.beginPath();
+  ctx.arc(c, c, (defendedRadiusM / rangeM) * radius, 0, TWO_PI);
+  ctx.stroke();
+  ctx.restore();
+
   // The battery at the centre.
   ctx.fillStyle = '#22d3ee';
   ctx.beginPath();
@@ -175,7 +235,7 @@ export function drawScope(
   ctx: CanvasRenderingContext2D,
   layout: ScopeLayout,
   frame: RenderFrame,
-  /** Aircraft selected in the UI: its newest echo gets a highlight box. */
+  /** Aircraft selected in the UI: its track gets a highlight box. */
   selectedId: number | null = null,
 ) {
   const { size, dpr, radiusPx } = layout;
@@ -216,11 +276,9 @@ export function drawScope(
   ctx.stroke();
 
   // Echoes: bright when painted, fading like phosphor until the beam comes round again.
-  let selected: Plot | undefined;
   for (const plot of current.plots) {
     const glow = echoGlow(timeS - plot.timeS, current.radar.periodS);
     if (glow < MIN_GLOW) continue;
-    if (plot.truthId === selectedId) selected = plot;
     const { x, y } = scopePoint(layout, plot.position.x, plot.position.y);
     const r = BLIP_RADIUS_PX[plot.radarSize];
     ctx.fillStyle = `rgba(167, 243, 208, ${0.2 * glow})`;
@@ -233,10 +291,156 @@ export function drawScope(
     ctx.fill();
   }
 
-  if (selected) drawSelectionBox(ctx, scopePoint(layout, selected.position.x, selected.position.y));
+  const tick = previous.tick + (current.tick - previous.tick) * alpha;
+  drawEffects(ctx, layout, current.effects, timeS);
+  drawEngagements(ctx, layout, frame);
+  for (const track of current.tracks) drawTrack(ctx, layout, track, tick);
+
+  // The selected aircraft: a box around its track symbol.
+  const selected = current.tracks.find((t) => t.truthId === selectedId);
+  if (selected) {
+    const at = trackPositionAt(selected, tick);
+    drawSelectionBox(ctx, scopePoint(layout, at.x, at.y));
+  }
 }
 
-/** Corner brackets around the selected aircraft's newest echo. */
+/** One track: its identity symbol, a velocity leader and its number. */
+function drawTrack(ctx: CanvasRenderingContext2D, layout: ScopeLayout, track: Track, tick: number) {
+  const at = trackPositionAt(track, tick);
+  const { x, y } = scopePoint(layout, at.x, at.y);
+  const scale = layout.radiusPx / layout.rangeM;
+  const color = IDENTITY_COLOR[track.identity];
+  const confirmed = track.confirmedTick !== null;
+  ctx.save();
+  ctx.globalAlpha = confirmed ? 1 : 0.55;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 1.5;
+
+  if (track.velocity) {
+    ctx.globalAlpha *= 0.6;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + track.velocity.x * LEADER_S * scale, y - track.velocity.y * LEADER_S * scale);
+    ctx.stroke();
+    ctx.globalAlpha = confirmed ? 1 : 0.55;
+  }
+
+  const r = confirmed ? 5 : 4;
+  ctx.beginPath();
+  switch (track.identity) {
+    case 'hostile':
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x + r, y);
+      ctx.lineTo(x, y + r);
+      ctx.lineTo(x - r, y);
+      ctx.closePath();
+      break;
+    case 'friend':
+      ctx.arc(x, y, r, 0, TWO_PI);
+      break;
+    case 'neutral':
+      ctx.rect(x - r * 0.85, y - r * 0.85, r * 1.7, r * 1.7);
+      break;
+    case 'pending':
+      ctx.setLineDash([2, 2]);
+      ctx.arc(x, y, r, 0, TWO_PI);
+      break;
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.font = '600 9px "JetBrains Mono Variable", ui-monospace, monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`T${track.id}`, x + 7, y - 7);
+  ctx.restore();
+}
+
+/** Interceptors in flight (the battery knows where its own are), and where they are heading. */
+function drawEngagements(ctx: CanvasRenderingContext2D, layout: ScopeLayout, frame: RenderFrame) {
+  const { previous, current, alpha } = frame;
+  const before = new Map(previous.interceptors.map((i) => [i.id, i.position]));
+  for (const missile of current.interceptors) {
+    const old = before.get(missile.id);
+    const at = old ? lerp(old, missile.position, alpha) : missile.position;
+    const head = scopePoint(layout, at.x, at.y);
+    const engagement = current.engagements.find((e) => e.id === missile.engagementId);
+
+    // Dotted line to the predicted intercept point, marked with a small cross.
+    if (engagement) {
+      const aim = scopePoint(layout, engagement.predictedPoint.x, engagement.predictedPoint.y);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.45)';
+      ctx.setLineDash([1.5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(head.x, head.y);
+      ctx.lineTo(aim.x, aim.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.85)';
+      ctx.beginPath();
+      ctx.moveTo(aim.x - 3.5, aim.y - 3.5);
+      ctx.lineTo(aim.x + 3.5, aim.y + 3.5);
+      ctx.moveTo(aim.x + 3.5, aim.y - 3.5);
+      ctx.lineTo(aim.x - 3.5, aim.y + 3.5);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // The last two seconds of its path, fading out.
+    const recent = missile.trail.slice(-20);
+    for (let i = 1; i < recent.length; i++) {
+      const a = recent[i - 1];
+      const b = recent[i];
+      if (!a || !b) continue;
+      const pa = scopePoint(layout, a.x, a.y);
+      const pb = scopePoint(layout, b.x, b.y);
+      ctx.strokeStyle = `rgba(34, 211, 238, ${(0.6 * i) / recent.length})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(34, 211, 238, 0.35)';
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 4, 0, TWO_PI);
+    ctx.fill();
+    ctx.fillStyle = '#e6fdff';
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 1.8, 0, TWO_PI);
+    ctx.fill();
+  }
+}
+
+/** Launches, intercepts, misses and leaks: a ring that grows and fades. */
+function drawEffects(
+  ctx: CanvasRenderingContext2D,
+  layout: ScopeLayout,
+  effects: readonly Effect[],
+  timeS: number,
+) {
+  for (const effect of effects) {
+    const style = EFFECT_STYLE[effect.kind];
+    const t = (timeS - effect.tick * TICK_S) / style.seconds;
+    if (t < 0 || t > 1) continue;
+    const { x, y } = scopePoint(layout, effect.position.x, effect.position.y);
+    ctx.strokeStyle = `rgba(${style.color}, ${1 - t})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, 4 + 14 * t, 0, TWO_PI);
+    ctx.stroke();
+  }
+}
+
+const lerp = (a: Vec3, b: Vec3, t: number): Vec3 => ({
+  x: a.x + (b.x - a.x) * t,
+  y: a.y + (b.y - a.y) * t,
+  z: a.z + (b.z - a.z) * t,
+});
+
+/** Corner brackets around the selected aircraft's track. */
 function drawSelectionBox(ctx: CanvasRenderingContext2D, { x, y }: { x: number; y: number }) {
   const half = 9;
   const arm = 4.5;
@@ -256,4 +460,72 @@ function drawSelectionBox(ctx: CanvasRenderingContext2D, { x, y }: { x: number; 
     ctx.lineTo(cx, cy - sy * arm);
   }
   ctx.stroke();
+}
+
+/** Ground point of a screen position on the scope (CSS pixels from its corner), metres. */
+export function groundPointAt(layout: ScopeGeometry, x: number, y: number) {
+  const c = layout.size / 2;
+  const scale = layout.radiusPx / layout.rangeM;
+  return { eastM: (x - c) / scale, northM: (c - y) / scale };
+}
+
+export interface ScopeGhost {
+  type: TrafficTypeId;
+  at: { eastM: number; northM: number };
+  valid: boolean;
+  /** Time to reach the battery, s, shown next to the ghost. */
+  timeToBatteryS: number;
+}
+
+/**
+ * Traffic being placed: a ghost symbol with its route to the battery, and a ripple where the
+ * last one was placed. Drawn over the scope by the same frame.
+ */
+export function drawPlacement(
+  ctx: CanvasRenderingContext2D,
+  layout: ScopeLayout,
+  ghost: ScopeGhost | null,
+  ripple: { at: { eastM: number; northM: number }; progress: number } | null,
+) {
+  const c = layout.size / 2;
+  if (ghost) {
+    const p = scopePoint(layout, ghost.at.eastM, ghost.at.northM);
+    const color = ghost.valid ? IDENTITY_COLOR[TRAFFIC[ghost.type].affiliation] : '#8fa0bf';
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.8;
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(c, c);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 7, 0, TWO_PI);
+    ctx.stroke();
+    ctx.globalAlpha = 0.35;
+    ctx.fill();
+    if (ghost.valid) {
+      ctx.globalAlpha = 1;
+      ctx.font = '600 10px "JetBrains Mono Variable", ui-monospace, monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const s = Math.round(ghost.timeToBatteryS);
+      const time = s < 60 ? `${s} s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      ctx.fillText(time, p.x + 10, p.y - 10);
+    }
+    ctx.restore();
+  }
+  if (ripple && ripple.progress < 1) {
+    const p = scopePoint(layout, ripple.at.eastM, ripple.at.northM);
+    ctx.strokeStyle = `rgba(34, 211, 238, ${1 - ripple.progress})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5 + 22 * ripple.progress, 0, TWO_PI);
+    ctx.stroke();
+  }
 }

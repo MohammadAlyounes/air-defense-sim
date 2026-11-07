@@ -4,6 +4,8 @@ import fixedTimeStep from '../../../docs/concepts/01-1-fixed-time-step.md?raw';
 import antennaRotation from '../../../docs/concepts/01-2-antenna-rotation.md?raw';
 import localCoordinates from '../../../docs/concepts/02-1-local-coordinates.md?raw';
 import seeingScale from '../../../docs/concepts/02-2-seeing-scale.md?raw';
+import detectionRange from '../../../docs/concepts/03-1-detection-range.md?raw';
+import proportionalNavigation from '../../../docs/concepts/03-2-proportional-navigation.md?raw';
 import { REPO_URL } from '../data/links';
 import { parseConceptCard, parseInline } from '../lib/cardMarkdown';
 
@@ -13,6 +15,11 @@ const CONCEPTS = {
   antennaRotation: { markdown: antennaRotation, file: '01-2-antenna-rotation.md' },
   localCoordinates: { markdown: localCoordinates, file: '02-1-local-coordinates.md' },
   seeingScale: { markdown: seeingScale, file: '02-2-seeing-scale.md' },
+  detectionRange: { markdown: detectionRange, file: '03-1-detection-range.md' },
+  proportionalNavigation: {
+    markdown: proportionalNavigation,
+    file: '03-2-proportional-navigation.md',
+  },
 } as const;
 
 export type ConceptId = keyof typeof CONCEPTS;

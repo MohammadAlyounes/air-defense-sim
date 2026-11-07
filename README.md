@@ -13,7 +13,7 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 
 [![CI](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml)
 ![Status: building in public](https://img.shields.io/badge/status-building_in_public-fbbf24)
-![Progress: step 2 of 14](https://img.shields.io/badge/progress-step_2_of_14-22d3ee)
+![Progress: step 3 of 14](https://img.shields.io/badge/progress-step_3_of_14-22d3ee)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34d399)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
@@ -119,13 +119,56 @@ At true scale the battlespace is a thin sheet, 80 km across but only 11 km tall 
 
 [Going deeper →](docs/concepts/02-2-seeing-scale.md)
 
+### Detection range — why small drones are seen late
+
+A radar sees an object by the echo it sends back, and that echo weakens very fast with distance: twice as far gives one sixteenth of the signal. So the range at which an object is first detected grows only with the fourth root of its radar cross section, which is how big it looks to radar. An object with a hundredth of the cross section is seen at about a third of the range.
+
+- **Formula:** `R_detect = R_ref × (σ / 1 m²)^(1/4)`, with `R_ref = 30 km` here
+- **Example:** a small drone (σ = 0.01 m²) is first seen at 30 × 0.01^¼ ≈ 9.5 km; a fast jet (2 m²) at about 36 km.
+- **See it:** drag a drone onto the map: the readout says the radar sees it from 9.5 km, and the scope stays empty until it gets there.
+
+[Going deeper →](docs/concepts/03-1-detection-range.md)
+
+### Proportional navigation — why the interceptor leads its target
+
+An interceptor that always points at its target ends up in a long tail chase. Instead, it watches the line of sight to the target and turns just enough to stop that line from rotating: if the line of sight holds still while the distance shrinks, the two are on a collision course. Sailors use the same rule to spot a collision: constant bearing, decreasing range.
+
+- **Formula:** `a = N × Vc × λ̇` (sideways acceleration = navigation constant × closing speed × line-of-sight turn rate), with `N = 4`
+- **Example:** closing at 500 m/s while the line of sight turns at 0.02 rad/s, the interceptor steers at 4 × 500 × 0.02 = 40 m/s², about 4 g.
+- **See it:** watch an interceptor on the scope or in the 3D view: it flies toward the cyan cross (the predicted intercept point), not toward where the target is now.
+
+[Going deeper →](docs/concepts/03-2-proportional-navigation.md)
+
 <!-- concepts:end -->
 
-**Coming next:** detection range and proportional navigation (Step 3) · air density, drag and turn radius (Step 4) · the radar equation, the radar horizon and terrain masking (Step 5).
+**Coming next:** air density, drag and turn radius (Step 4) · the radar equation, the radar horizon and terrain masking (Step 5) · noise and the Kalman filter (Step 6).
 
 ## Build log
 
-Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-02-3d-scene`. Newest step first.
+Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first.
+
+### Step 3 · First intercept
+
+<p align="center"><img src="docs/media/step-03-first-intercept.webp" alt="A cruise-missile-like threat is dragged from the palette onto the 3D view; the radar tracks it, an interceptor launches and destroys it, and a result card sums up the engagement. Then a drone swarm dropped on the radar scope draws five interceptors at once." width="100%" /></p>
+
+The first full defense loop. Drag a threat onto the map and watch the battery detect, track, identify, evaluate, assign, engage and assess it, with every stage counted live in the header.
+
+- **Drag-and-drop threats:** drag a palette card onto the 3D view or the radar scope (or click a card, then the map; or press Enter twice). A ghost shows its route to the battery, how long it will take and when the radar will first see it; the mouse wheel sets its altitude.
+- **Detection range by radar size:** small objects are seen late. A drone appears at 9.5 km, a cruise-missile-like target at 17 km, a jet at 36 km.
+- **The loop, version 1:** echoes become tracks; an identification check sorts friend, civil and hostile; hostiles heading for the battery are threats; the command node predicts an intercept point and fires; the radar looks again to confirm the kill, or the battery fires again.
+- **Interceptors:** boost, coast and steer by proportional navigation, with a 30 g limit, computed in 2 ms steps with an exact closest approach. Friendly and civil aircraft are never engaged.
+- **Live analysis bar:** a count for each stage (the chips pulse as tracks move on), threats active, down and leaked, interceptors ready, flying and used, the next impact, and a NOW line that narrates the engagement.
+- **Everywhere else:** track symbols, interceptors and predicted intercept points on the scope; a live track table; launcher, interceptor trails and intercept rings in 3D; the inspector shows what the battery knows and does about the selected aircraft; result cards after each kill.
+
+> **Engineering note: perception drives decisions.** The command node only ever uses its tracks: positions and velocities estimated from radar echoes, never the hidden truth. The truth is used where the physics needs it (the interceptor meets the real target) and to reveal, after the fact, what a target really was. That separation is what Steps 5 and 6 build on, when noise makes perception imperfect.
+
+<img src="docs/media/step-03-first-intercept.png" alt="The console mid-engagement: a result card for a destroyed cruise-missile-like target, two interceptors in flight, the header counting every stage, the track table and the inspector following an engaged target" width="100%" />
+
+<details>
+<summary>Phone layout</summary>
+<br />
+<img src="docs/media/step-03-first-intercept-mobile.png" alt="The Step 3 console on a phone, with a result card over the 3D view" width="320" />
+</details>
 
 ### Step 2 · 3D scene
 
@@ -195,10 +238,10 @@ The foundation everything else builds on.
 - [x] **Step 0 · Launchpad:** project scaffold, CI, live demo and the console shell
 - [x] **Step 1 · Simulation core:** deterministic clock, play/pause/step/speed, live radar scope
 - [x] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
-- [ ] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
+- [x] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
 - [ ] **Step 4 · Environment:** terrain, atmosphere, wind and drag; three threat types with routes
 - [ ] **Step 5 · Radar realism:** radar equation, noise, horizon, terrain masking, clutter and coverage maps
-- [ ] **Step 6 · Tracking:** Kalman tracking, uncertainty ellipses, track table, truth vs. perception
+- [ ] **Step 6 · Tracking:** Kalman tracking, uncertainty ellipses, track quality, truth vs. perception
 - [ ] **Step 7 · Identify & evaluate:** identification, friendly and civil traffic, threat ranking with "Why?"
 - [ ] **Step 8 · Engage:** engagement envelopes, kill probability, doctrine and missile phases
 - [ ] **Step 9 · Assess:** kill assessment and re-engagement; full analysis bar, log, telemetry, inspector
@@ -225,7 +268,7 @@ The full specification is in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 
 ```
 src/
-  sim/      The engine: pure, deterministic TypeScript (clock, random numbers, traffic, radar)
+  sim/      The engine: pure, deterministic TypeScript (clock, traffic, radar, tracks, command node, interceptors)
   app/      React UI: analysis bar, palette, radar scope, 3D view, panels and the simulation driver
 e2e/        Browser tests
 docs/       Plan, architecture, models, devlog, concept cards and media

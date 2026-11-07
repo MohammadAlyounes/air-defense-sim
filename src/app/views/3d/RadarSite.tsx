@@ -17,7 +17,8 @@ import { RADAR_RANGE_KM as RANGE_KM } from './sceneConstants';
 /** Top of the search beam's vertical fan, for drawing (a generic 20° elevation coverage). */
 const BEAM_TOP_KM = RANGE_KM * Math.tan((20 * Math.PI) / 180);
 const ACCENT = new Color('#22d3ee');
-const SITE_PX = 34;
+/** On-screen size of the site model (radar and launcher), pixels. */
+const SITE_PX = 42;
 
 /** The vertical fan of the search beam, pointing north before rotation; fades with range and height. */
 const BEAM_POSITIONS = new Float32Array([0, 0, 0, 0, 0, -RANGE_KM, 0, BEAM_TOP_KM, -RANGE_KM]);
@@ -54,7 +55,7 @@ const SWEEP_FRAGMENT = /* glsl */ `
   }
 `;
 
-/** The battery at the centre: radar site, rotating antenna and its sweeping beam. */
+/** The battery at the centre: radar site with its rotating antenna and sweeping beam, and the launcher. */
 export function RadarSite() {
   const controller = useSimController();
   const heightScale = useViewStore((state) => state.heightScale);
@@ -127,6 +128,29 @@ export function RadarSite() {
             <meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.6} />
           </mesh>
         </group>
+        <Launcher />
+      </group>
+    </group>
+  );
+}
+
+/** A generic launcher next to the radar: a base and a rack of four canted tubes. */
+function Launcher() {
+  return (
+    <group position={[0.62, 0, 0.32]} rotation-y={-0.5}>
+      <mesh position-y={0.06}>
+        <boxGeometry args={[0.34, 0.12, 0.44]} />
+        <meshStandardMaterial color="#16354a" emissive="#0e7490" emissiveIntensity={0.25} />
+      </mesh>
+      <group position={[0, 0.2, 0.02]} rotation-x={0.6}>
+        {[-0.065, 0.065].flatMap((x) =>
+          [-0.06, 0.06].map((y) => (
+            <mesh key={`${x}:${y}`} position={[x, y, 0]} rotation-x={Math.PI / 2}>
+              <cylinderGeometry args={[0.05, 0.05, 0.46, 10]} />
+              <meshStandardMaterial color="#cfe8f3" emissive="#22d3ee" emissiveIntensity={0.2} />
+            </mesh>
+          )),
+        )}
       </group>
     </group>
   );

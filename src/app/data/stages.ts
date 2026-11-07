@@ -21,14 +21,14 @@ export const STAGES = [
   {
     id: 'identify',
     label: 'Identify',
-    arrivesInStep: 7,
+    arrivesInStep: 3,
     description:
       'What is it, and whose is it? Speed and altitude suggest the type; an identification check separates friend, civil and hostile.',
   },
   {
     id: 'evaluate',
     label: 'Evaluate',
-    arrivesInStep: 7,
+    arrivesInStep: 3,
     description:
       'Which threat is most urgent? The command node ranks threats by how soon, and how close, they will reach a defended asset.',
   },

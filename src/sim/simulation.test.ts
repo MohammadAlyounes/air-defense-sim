@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_SEARCH_RADAR, detectionRangeM } from './radar';
 import { Simulation } from './simulation';
 
 /** A simulation with an empty sky, for tests that place their own traffic. */
@@ -79,7 +80,14 @@ describe('Simulation: kinematics', () => {
 
   it('records a trail: one position every 0.5 s, keeping the last 30 s', () => {
     const sim = emptySky();
-    sim.dispatch({ kind: 'spawnTraffic', type: 'jet', eastM: 0, northM: -30_000, headingRad: 0 });
+    // Passing 20 km east of the battery: no threat, so nothing shoots it down.
+    sim.dispatch({
+      kind: 'spawnTraffic',
+      type: 'jet',
+      eastM: 20_000,
+      northM: -30_000,
+      headingRad: 0,
+    });
     sim.run(50); // spawn point, then samples at 0.5 s and 1 s
     let jet = sim.snapshot().aircraft[0];
     expect(jet?.trail).toHaveLength(3);
@@ -96,8 +104,8 @@ describe('Simulation: kinematics', () => {
 describe('Simulation: search radar', () => {
   it('paints a target once per antenna turn, when the beam passes its bearing', () => {
     const sim = emptySky();
-    // A slow drone 10 km due east: the beam starts at north, turns clockwise and reaches it after ~1 s.
-    sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM: 10_000, northM: 0, headingRad: 0 });
+    // A slow drone 8 km due east: the beam starts at north, turns clockwise and reaches it after ~1 s.
+    sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM: 8_000, northM: 0, headingRad: 0 });
     sim.run(600); // three 4-second turns
     const plots = sim.snapshot().plots;
     expect(plots).toHaveLength(3);
@@ -106,14 +114,15 @@ describe('Simulation: search radar', () => {
 
   it('reports a new contact, then loses it when the target flies out of range', () => {
     const sim = emptySky();
+    // A jet is detected out to about 35.7 km: painted once at 35.3 km, then out of reach.
     sim.dispatch({
       kind: 'spawnTraffic',
       type: 'jet',
-      eastM: 39_000,
+      eastM: 35_000,
       northM: 0,
       headingRad: Math.PI / 2,
     });
-    const events = sim.run(600);
+    const events = sim.run(1_100);
     expect(events.map((e) => e.kind)).toEqual([
       'trafficEntered',
       'contactNew',
@@ -124,12 +133,30 @@ describe('Simulation: search radar', () => {
 
   it('counts only the contacts the radar has actually painted', () => {
     const sim = emptySky();
-    sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM: 10_000, northM: 0, headingRad: 0 });
-    sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM: -10_000, northM: 0, headingRad: 0 });
+    sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM: 8_000, northM: 0, headingRad: 0 });
+    sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM: -8_000, northM: 0, headingRad: 0 });
     sim.run(10);
     expect(sim.snapshot().contactsHeld).toBe(0); // the beam has not reached them yet
     sim.run(200);
     expect(sim.snapshot().contactsHeld).toBe(2);
+  });
+});
+
+describe('Simulation: detection range', () => {
+  it('sees big targets farther than small ones: the fourth-root law', () => {
+    expect(detectionRangeM(1, DEFAULT_SEARCH_RADAR)).toBeCloseTo(30_000, 6);
+    expect(detectionRangeM(0.01, DEFAULT_SEARCH_RADAR)).toBeCloseTo(9_487, 0); // drone
+    expect(detectionRangeM(0.1, DEFAULT_SEARCH_RADAR)).toBeCloseTo(16_870, 0); // cruise-like
+    expect(detectionRangeM(2, DEFAULT_SEARCH_RADAR)).toBeCloseTo(35_676, 0); // jet
+    expect(detectionRangeM(40, DEFAULT_SEARCH_RADAR)).toBe(40_000); // airliner: capped
+  });
+
+  it('paints a drone at 9 km but not at 10 km', () => {
+    const sim = emptySky();
+    sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM: 9_000, northM: 0, headingRad: 0 });
+    sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM: -10_000, northM: 0, headingRad: 0 });
+    sim.run(250); // more than one turn
+    expect(new Set(sim.snapshot().plots.map((p) => p.truthId))).toEqual(new Set([1]));
   });
 });
 

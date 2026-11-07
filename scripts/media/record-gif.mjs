@@ -6,8 +6,10 @@
 // The clip is cropped to the element(s) matching `--selector` (the box around all of them).
 //
 // `--actions` scripts the clip: a JSON list of steps at given seconds into the recording,
-// each pressing a key or clicking an element, e.g.
+// each pressing a key, clicking an element or dragging one onto another, e.g.
 //   --actions '[{"at":2,"click":"[data-aircraft-label] button"},{"at":4,"key":"3"}]'
+//   --actions '[{"at":1,"drag":"[data-traffic=\"jet\"]","to":"[data-panel=\"battlespace\"]","toX":0.6,"toY":0.5}]'
+// A drag moves from the centre of `drag` to the point (toX, toY) of `to`, in fractions of its box.
 //
 // Output: docs/media/<name>.gif, or <name>.webp with `--format webp`: an animated WebP is
 // several times smaller than a GIF when most of the picture moves (a 3D camera, say), and
@@ -84,6 +86,7 @@ try {
     if (action.key) await page.keyboard.press(action.key);
     // Forced: aircraft tags move every frame, so they never look "stable" to Playwright.
     if (action.click) await page.locator(action.click).first().click({ force: true });
+    if (action.drag) await drag(page, action);
   }
   await page.waitForTimeout(Math.max(0, seconds * 1000 + 700 - (Date.now() - startedAt)));
   const video = page.video();
@@ -122,4 +125,18 @@ try {
   await browser.close();
   await new Promise((resolve) => server.httpServer.close(resolve));
   await rm(videoDir, { recursive: true, force: true });
+}
+
+/** Drags the centre of one element to a point of another, the way a person would. */
+async function drag(page, action) {
+  const from = await page.locator(action.drag).first().boundingBox();
+  const to = await page.locator(action.to).first().boundingBox();
+  if (!from || !to) throw new Error(`Cannot drag ${action.drag} to ${action.to}`);
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  const x = to.x + to.width * (action.toX ?? 0.5);
+  const y = to.y + to.height * (action.toY ?? 0.5);
+  await page.mouse.move(x, y, { steps: action.steps ?? 40 });
+  await page.waitForTimeout(action.holdMs ?? 500);
+  await page.mouse.up();
 }

@@ -1,7 +1,7 @@
 import { Grid, Line } from '@react-three/drei';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import type { Material, Mesh } from 'three';
-import { RADAR_RANGE_KM, RING_STEP_KM } from './sceneConstants';
+import { DEFENDED_RADIUS_KM, RADAR_RANGE_KM, RING_STEP_KM } from './sceneConstants';
 
 function circlePoints(radius: number, segments = 128): [number, number, number][] {
   return Array.from({ length: segments + 1 }, (_, i) => {
@@ -31,6 +31,7 @@ export function GroundAndRings() {
       }),
     [],
   );
+  const defended = useMemo(() => circlePoints(DEFENDED_RADIUS_KM, 96), []);
 
   return (
     <group>
@@ -65,6 +66,18 @@ export function GroundAndRings() {
           opacity={radius === RADAR_RANGE_KM ? 0.55 : 0.25}
         />
       ))}
+      {/* The defended area: hostiles whose course passes inside it are threats. */}
+      <Line
+        points={defended}
+        color="#fbbf24"
+        lineWidth={1.4}
+        dashed
+        dashSize={0.5}
+        gapSize={0.4}
+        transparent
+        depthWrite={false}
+        opacity={0.6}
+      />
     </group>
   );
 }

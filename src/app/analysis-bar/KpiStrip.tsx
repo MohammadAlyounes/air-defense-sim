@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import { Tooltip } from '../components/Tooltip';
-import { roadmapStep } from '../data/roadmap';
+import { CURRENT_STEP, roadmapStep } from '../data/roadmap';
 import { formatCountdown } from '../lib/format';
 import {
   KPI_ARRIVES_IN_STEP,
@@ -38,14 +38,19 @@ export function KpiStrip({ situation: s }: { situation: SituationSummary }) {
 function KpiGroup({ situation: s }: { situation: SituationSummary }) {
   return (
     <>
-      <Kpi label="Threats" arrivesInStep={s.threats ? undefined : KPI_ARRIVES_IN_STEP.threats}>
+      <Kpi
+        label="Threats"
+        hint="Hostile tracks now, threats the radar confirmed destroyed, and threats that reached the battery."
+        arrivesInStep={KPI_ARRIVES_IN_STEP.threats}
+      >
         <Num value={s.threats?.active} unit="active" />
         <Num value={s.threats?.down} unit="down" tone="ok" />
         <Num value={s.threats?.leaked} unit="leaked" tone="alert" />
       </Kpi>
       <Kpi
         label="Interceptors"
-        arrivesInStep={s.interceptors ? undefined : KPI_ARRIVES_IN_STEP.interceptors}
+        hint="Rounds ready on the launcher (one is reloaded every 30 s), in flight, and fired so far."
+        arrivesInStep={KPI_ARRIVES_IN_STEP.interceptors}
       >
         <Num value={s.interceptors?.ready} unit="ready" />
         <Num value={s.interceptors?.flying} unit="flying" />
@@ -54,14 +59,14 @@ function KpiGroup({ situation: s }: { situation: SituationSummary }) {
       <Kpi
         label="Fire channels"
         hint="Each tracking-radar channel can guide one engagement at a time. When every channel is busy, new threats have to wait: that is saturation."
-        arrivesInStep={s.channels ? undefined : KPI_ARRIVES_IN_STEP.channels}
+        arrivesInStep={KPI_ARRIVES_IN_STEP.channels}
       >
         <ChannelMeter channels={s.channels} />
       </Kpi>
       <Kpi
         label="Next impact"
-        hint="Time until the most urgent threat reaches a defended asset."
-        arrivesInStep={s.nextImpact ? undefined : KPI_ARRIVES_IN_STEP.nextImpact}
+        hint="Time until the most urgent threat reaches its closest point to the battery. Defended assets such as towns arrive in Step 7."
+        arrivesInStep={KPI_ARRIVES_IN_STEP.nextImpact}
       >
         <span className="font-mono tabular-nums text-ink-100">
           {formatCountdown(s.nextImpact?.inSeconds ?? null)}
@@ -94,11 +99,14 @@ function Kpi({
 }: {
   label: string;
   hint?: string;
-  /** Set while the number is not built yet; adds "Arrives in Step N" to the tooltip. */
+  /** The roadmap step that builds this number; before it, the tooltip says "Arrives in Step N". */
   arrivesInStep?: number;
   children: ReactNode;
 }) {
-  const arrives = arrivesInStep === undefined ? undefined : roadmapStep(arrivesInStep);
+  const arrives =
+    arrivesInStep === undefined || arrivesInStep <= CURRENT_STEP
+      ? undefined
+      : roadmapStep(arrivesInStep);
   const tooltip =
     hint || arrives ? (
       <>

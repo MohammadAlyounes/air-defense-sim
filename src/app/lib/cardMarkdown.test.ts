@@ -3,6 +3,8 @@ import fixedTimeStep from '../../../docs/concepts/01-1-fixed-time-step.md?raw';
 import antennaRotation from '../../../docs/concepts/01-2-antenna-rotation.md?raw';
 import localCoordinates from '../../../docs/concepts/02-1-local-coordinates.md?raw';
 import seeingScale from '../../../docs/concepts/02-2-seeing-scale.md?raw';
+import detectionRange from '../../../docs/concepts/03-1-detection-range.md?raw';
+import proportionalNavigation from '../../../docs/concepts/03-2-proportional-navigation.md?raw';
 import { parseConceptCard, parseInline } from './cardMarkdown';
 
 describe('parseConceptCard', () => {
@@ -34,7 +36,14 @@ describe('parseConceptCard', () => {
   });
 
   it('parses every concept card in docs/concepts', () => {
-    for (const markdown of [fixedTimeStep, antennaRotation, localCoordinates, seeingScale]) {
+    for (const markdown of [
+      fixedTimeStep,
+      antennaRotation,
+      localCoordinates,
+      seeingScale,
+      detectionRange,
+      proportionalNavigation,
+    ]) {
       const card = parseConceptCard(markdown);
       expect(card.title.length).toBeGreaterThan(3);
       expect(card.hook.length).toBeGreaterThan(3);

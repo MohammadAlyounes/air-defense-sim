@@ -11,6 +11,17 @@ export type AircraftType = Exclude<TrafficTypeId, 'swarm'>;
 export type Affiliation = 'hostile' | 'friend' | 'neutral';
 /** How big the object looks to radar (its radar cross section, in broad classes). */
 export type RadarSize = 'tiny' | 'small' | 'medium' | 'large';
+
+/**
+ * Radar cross section assumed for each size class, m²: how much radar energy the object sends
+ * back, compared with a 1 m² reference. Illustrative round numbers, one per decade or so.
+ */
+export const RADAR_CROSS_SECTION_M2: Readonly<Record<RadarSize, number>> = {
+  tiny: 0.01,
+  small: 0.1,
+  medium: 2,
+  large: 40,
+};
 /** AGL = above ground level, MSL = above mean sea level. */
 export type AltitudeReference = 'AGL' | 'MSL';
 

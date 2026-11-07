@@ -52,7 +52,7 @@ test('the radar paints contacts and logs them', async ({ page }) => {
   const detect = page.locator('[data-stage="detect"]');
   await expect.poll(async () => Number(await detect.getAttribute('data-count'))).toBeGreaterThan(0);
   await expect(page.getByTestId('event-log')).toContainText('RADAR');
-  await expect(page.getByTestId('event-log')).toContainText('New contact at bearing');
+  await expect(page.getByTestId('event-log')).toContainText(/New contact T\d+ at bearing/);
   await expect(page.getByTestId('now-line')).toContainText('Paused at T+00:20.0');
 });
 
@@ -67,7 +67,7 @@ test('restarting with the same seed replays the run exactly', async ({ page }) =
   await expect(page.getByTestId('sim-clock')).toHaveAttribute('data-tick', '0');
   for (let i = 0; i < 8; i++) await page.keyboard.press('Shift+Period');
   await expect.poll(() => tick(page)).toBe(400);
-  expect(firstRun).toContain('New contact at bearing');
+  expect(firstRun).toMatch(/New contact T\d+ at bearing/);
   expect(await log.innerText()).toBe(firstRun);
 
   await page.getByRole('button', { name: 'New seed' }).click();
