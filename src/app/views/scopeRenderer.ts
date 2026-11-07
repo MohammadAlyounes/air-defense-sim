@@ -2,6 +2,7 @@ import {
   coverageAt,
   DEFAULT_DEFENSE,
   TICK_S,
+  trackEllipseAt,
   trackPositionAt,
   TRAFFIC,
   type CoverageMap,
@@ -351,6 +352,8 @@ export function drawScope(
   selectedId: number | null = null,
   /** Blind-zone shading from `createCoverageLayer`, or null. */
   coverage: HTMLCanvasElement | null = null,
+  /** Truth vs. perception: mark where aircraft really are, and each track's error. */
+  compareTruth = false,
 ) {
   const { size, dpr, radiusPx } = layout;
   const c = size / 2;
@@ -410,6 +413,7 @@ export function drawScope(
   drawEffects(ctx, layout, current.effects, timeS);
   drawEngagements(ctx, layout, frame);
   for (const track of current.tracks) drawTrack(ctx, layout, track, tick);
+  if (compareTruth) drawTruth(ctx, layout, frame, tick);
 
   // The selected aircraft: a box around its track symbol.
   const selected =
@@ -432,6 +436,28 @@ function drawTrack(ctx: CanvasRenderingContext2D, layout: ScopeLayout, track: Tr
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
   ctx.lineWidth = 1.5;
+
+  // The 2-sigma uncertainty ellipse: the tracker is about 86% sure the target is inside.
+  const ellipse = trackEllipseAt(track, tick);
+  const major = 2 * ellipse.majorM * scale;
+  if (major >= 2.5) {
+    ctx.save();
+    ctx.globalAlpha *= 0.45;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    // Canvas angles run clockwise from east; a compass bearing runs clockwise from north.
+    ctx.ellipse(
+      x,
+      y,
+      major,
+      Math.max(1, 2 * ellipse.minorM * scale),
+      ellipse.bearingRad - Math.PI / 2,
+      0,
+      TWO_PI,
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
 
   if (track.velocity) {
     ctx.globalAlpha *= 0.6;
@@ -470,6 +496,49 @@ function drawTrack(ctx: CanvasRenderingContext2D, layout: ScopeLayout, track: Tr
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText(`T${track.id}`, x + 7, y - 7);
+  ctx.restore();
+}
+
+/**
+ * Truth vs. perception: a grey cross where every aircraft really is (including those the radar
+ * has not seen), and a thin line from each track to the aircraft behind it: the tracking error.
+ */
+function drawTruth(
+  ctx: CanvasRenderingContext2D,
+  layout: ScopeLayout,
+  frame: RenderFrame,
+  tick: number,
+) {
+  const { previous, current, alpha } = frame;
+  const before = new Map(previous.aircraft.map((a) => [a.id, a.position]));
+  const truth = new Map<number, { x: number; y: number }>();
+  ctx.save();
+  ctx.strokeStyle = 'rgba(203, 213, 225, 0.85)';
+  ctx.lineWidth = 1.2;
+  for (const aircraft of current.aircraft) {
+    const old = before.get(aircraft.id);
+    const at = old ? lerp(old, aircraft.position, alpha) : aircraft.position;
+    const p = scopePoint(layout, at.x, at.y);
+    truth.set(aircraft.id, p);
+    ctx.beginPath();
+    ctx.moveTo(p.x - 3, p.y);
+    ctx.lineTo(p.x + 3, p.y);
+    ctx.moveTo(p.x, p.y - 3);
+    ctx.lineTo(p.x, p.y + 3);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(203, 213, 225, 0.5)';
+  ctx.setLineDash([2, 2]);
+  for (const track of current.tracks) {
+    const real = track.truthId === null ? undefined : truth.get(track.truthId);
+    if (!real) continue;
+    const at = trackPositionAt(track, tick);
+    const p = scopePoint(layout, at.x, at.y);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(real.x, real.y);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

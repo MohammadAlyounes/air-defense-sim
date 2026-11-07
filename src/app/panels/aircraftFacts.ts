@@ -13,10 +13,12 @@ import {
   planIntercept,
   RADAR_CROSS_SECTION_M2,
   TICK_S,
+  trackEllipseAt,
   trackPositionAt,
   type Affiliation,
   type AircraftType,
   type Snapshot,
+  type Track,
   type Vec3,
 } from '../../sim';
 import { formatSpeed } from '../lib/format';
@@ -52,6 +54,9 @@ export interface AircraftFacts {
   /** The battery's track of it, if the radar has seen it. */
   track: string;
   trackDetail: string;
+  /** Truth vs. perception: how far the track is from the aircraft, and how far the filter expects. */
+  trackError: string | null;
+  trackErrorDetail: string;
   /** What the defense is doing about it. */
   defense: string;
   defenseDetail: string;
@@ -105,9 +110,29 @@ export function aircraftFacts(snapshot: Snapshot, id: number): AircraftFacts | n
       : `seen on half the looks from ${formatKm(
           detectionRangeM(RADAR_CROSS_SECTION_M2[aircraft.radarSize], DEFAULT_SEARCH_RADAR),
         )}`,
+    ...trackError(snapshot, track, position),
     ...defenseStatus(snapshot, id, aircraft.leaked),
   };
 }
+
+/** The gap between the track and the truth, next to the filter's own estimate of it. */
+function trackError(
+  snapshot: Snapshot,
+  track: Track | undefined,
+  position: Vec3,
+): Pick<AircraftFacts, 'trackError' | 'trackErrorDetail'> {
+  if (!track) return { trackError: null, trackErrorDetail: '' };
+  const at = trackPositionAt(track, snapshot.tick);
+  const errorM = Math.hypot(at.x - position.x, at.y - position.y);
+  const sigmaM = trackEllipseAt(track, snapshot.tick).majorM;
+  return {
+    trackError: `${formatMetres(errorM)} off`,
+    trackErrorDetail: `the filter expects ±${formatMetres(sigmaM)} (1σ) · ${track.paints} echoes so far`,
+  };
+}
+
+const formatMetres = (m: number) =>
+  m < 1000 ? `${grouped.format(Math.round(m))} m` : `${(m / 1000).toFixed(1)} km`;
 
 /** Whether the search radar has a clear line of sight to it, and its chance of being seen. */
 function radarView(

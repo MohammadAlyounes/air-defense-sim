@@ -14,7 +14,8 @@ The physics and decision-making engine. The app imports it only through `index.t
 | `atmosphere.ts`  | Air density with height.                                                |
 | `interceptor.ts` | Interceptor point mass: boost, drag, proportional navigation, fuze.     |
 | `c2.ts`          | Command node: identification, threats, intercept planning.              |
-| `tracker.ts`     | Where a track is now.                                                   |
+| `kalman.ts`      | Constant-velocity Kalman filter.                                        |
+| `tracker.ts`     | Tracker: gating, association, track estimates.                          |
 | `scenario.ts`    | Scenario traffic: entry points, courses and arrival times.              |
 | `simulation.ts`  | `Simulation`: commands, ticks, events, snapshots, state hash, replay.   |
 | `types.ts`       | Shared types: aircraft, plots, events, commands, snapshots.             |

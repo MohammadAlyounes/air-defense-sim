@@ -180,6 +180,14 @@ function Details({ id }: { id: number }) {
           tone={TONE[facts.radarViewTone]}
           wide
         />
+        {facts.trackError !== null && (
+          <Fact
+            label="Track vs truth"
+            value={facts.trackError}
+            detail={facts.trackErrorDetail}
+            wide
+          />
+        )}
       </dl>
     </div>
   );

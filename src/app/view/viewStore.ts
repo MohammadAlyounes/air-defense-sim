@@ -30,11 +30,17 @@ export interface ViewState {
    * ground (null: off).
    */
   coverageAltM: CoverageAltitude | null;
+  /**
+   * Truth vs. perception: show where aircraft really are next to the battery's tracks, with the
+   * error between them (scope, 3D view and inspector).
+   */
+  compareTruth: boolean;
   select: (id: number | null) => void;
   setCameraMode: (mode: CameraMode) => void;
   setHeightScale: (scale: HeightScale) => void;
   setShowLabels: (show: boolean) => void;
   setCoverageAlt: (altitudeM: CoverageAltitude | null) => void;
+  setCompareTruth: (compare: boolean) => void;
 }
 
 export const useViewStore = create<ViewState>()((set) => ({
@@ -44,6 +50,7 @@ export const useViewStore = create<ViewState>()((set) => ({
   heightScale: 2,
   showLabels: true,
   coverageAltM: null,
+  compareTruth: false,
   select: (selectedId) =>
     set((state) => {
       if (selectedId === state.selectedId) return state;
@@ -62,4 +69,5 @@ export const useViewStore = create<ViewState>()((set) => ({
   setHeightScale: (heightScale) => set({ heightScale }),
   setShowLabels: (showLabels) => set({ showLabels }),
   setCoverageAlt: (coverageAltM) => set({ coverageAltM }),
+  setCompareTruth: (compareTruth) => set({ compareTruth }),
 }));

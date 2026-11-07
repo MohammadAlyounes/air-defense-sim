@@ -2,7 +2,38 @@
 
 One short entry per step, newest first: what was built, the decisions behind it, and what comes next.
 
-> **Roadmap compressed (2026-11-08).** The eleven remaining steps were merged into six, so v1.0 is now Step 9 instead of Step 14 ([PROJECT_PLAN.md](PROJECT_PLAN.md), Section 16). Entries written before then keep their old numbering: old Steps 4 + 5 are now Step 4, 6 + 7 are Step 5, 8 + 9 are Step 6, 10 + 12 are Step 7, 11 is Step 8, and 13 + 14 are Step 9.
+> **Roadmap compressed (2026-11-08).** The eleven remaining steps were merged into six, so v1.0 is now Step 9 instead of Step 14 ([PROJECT_PLAN.md](PROJECT_PLAN.md), Section 16). Older entries may still name steps by their old numbers: old Steps 4 + 5 are now Step 4, 6 + 7 are Step 5, 8 + 9 are Step 6, 10 + 12 are Step 7, 11 is Step 8, and 13 + 14 are Step 9.
+
+## Step 5 · Track & identify, part 1: tracking (2026-11-07)
+
+Built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08, in the new numbering. Identification and threat evaluation arrive with the next entry.
+
+**Built**
+
+- **Kalman filter (`src/sim/kalman.ts`):** a 6-state constant-velocity filter (position and velocity in 3D) with white-noise-acceleration process noise and a Joseph-form update. The radar's range, bearing and elevation errors become a measurement covariance in metres through the Jacobian. Includes the innovation and its normalized square (NIS) for gating, and the horizontal uncertainty ellipse.
+- **Tracker (`src/sim/tracker.ts`):**
+  - Gating at `d² ≤ 16.27` (chi-square, 3 degrees of freedom, 99.9%) and global nearest-neighbour association, with every track predicted to each plot's own tick.
+  - At most one plot per track per antenna pass.
+  - The truth link is gone from association: a track's `truthId` now only records which aircraft made its last echo, for the overlay, tests and physics.
+- **Batched association:** plots are matched in 0.2 s (18°) batches and committed 0.2 s late, and kill assessment looks at the same lagged arc.
+- **Views:**
+  - A 2σ uncertainty ellipse around every track on the scope.
+  - A ±1σ column in the track table.
+  - A truth vs. perception toggle: the "truth" button under the scope, the T key or `?truth=1`. It shows grey true positions and dashed error lines on the scope, the battery's tracks as identity-coloured rings with error lines in 3D, and a "Track vs truth" row in the inspector with the real error next to the filter's own estimate.
+- **Concept cards:** the Kalman filter, and gating and association (also opened from the track table).
+- **Tests:** 16 new unit tests and 2 new browser tests, 168 unit and 25 browser tests in all.
+  - The filter is checked against hand-worked values: prediction and process noise, the halfway update, velocity from two plots, measurement geometry, ellipse axes and a 3 × 3 inverse. A consistency test checks that the NIS averages 3 over 390 updates.
+  - Association tests cover crossing tracks, the gate and the once-per-pass rule.
+  - Simulation tests check that tracks beat raw echoes, that velocities settle within a few m/s, and that a swarm ends with one track per drone.
+
+**Decisions**
+
+- **Batches to stop track theft.** Matching each echo as it arrived let the first echo of a swarm grab the wide gate of a neighbour's brand-new track, and the swarm's tracks never settled. Matching 18° of sweep together, and committing late, fixes it at a cost of 0.2 s.
+- **Truth still guides interceptors in view.** The fire-control picture stays perfect while the target is visible. Kill probability, and so misses, arrives in Step 6. Guiding by the 4-second search track would turn every shot into a near miss for reasons that have nothing to do with the lesson.
+- **A filter that tests its own honesty.** The NIS consistency test fails if the filter claims to be surer (or less sure) than it really is, which catches wrong Q or R much better than a single error threshold.
+- **σ, not Σ.** CSS upper-casing turned the column header's σ into Σ; that header opts out.
+
+**Next:** identification mistakes, defended assets and a "Why?" for every decision (the rest of Step 5), with the first engagement rules from Step 6.
 
 ## Step 4 · Environment & radar, part 1: terrain and radar (2026-11-07)
 

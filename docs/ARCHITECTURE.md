@@ -57,7 +57,7 @@ User actions (play, step, restart, drop a threat) call controller methods. Anyth
 1. **Commands** (for example `spawnTraffic` from a drop) and scenario arrivals.
 2. **Interceptors fly** first, in ten 2 ms sub-steps against the targets' start-of-tick motion, with the analytic closest-approach fuze.
 3. **Aircraft move** (following the terrain), then the **search radar sweeps**: line of sight over curved Earth and terrain, a random draw against the detection probability, noisy measurements, and the odd false alarm.
-4. **Tracks** update from the new plots: new contacts, confirmations, kill assessments, lost tracks.
+4. **Tracks** update from the plots of the last 0.2 s of sweep (gating, nearest-neighbour association and a Kalman filter per track): new contacts, confirmations, kill assessments, lost tracks.
 5. The **command node** identifies, evaluates threats, assigns launch slots and launches.
 6. **Reloads, leaks** and departures; old plots and effects are pruned.
 
@@ -82,7 +82,7 @@ A URL can preset the view (`?select=3&camera=follow&heights=4`), next to the sim
 
 The landscape is generated once from its own seed (`src/sim/terrain.ts`), independent of the run's seed, so every run shares the same map. The app builds it on first use (`src/app/world/world.ts`) and hands the same object to every `Simulation`, the scope's relief layer, the 3D terrain mesh and the placement readout. The radar's coverage map (`src/sim/propagation.ts`) is computed from it once, on first use, for the blind-zone overlay and the placement readout's "first seen" estimate.
 
-## Current state (Step 4)
+## Current state (Step 5)
 
 | Path                     | Contents                                                                                        |
 | ------------------------ | ----------------------------------------------------------------------------------------------- |
@@ -92,7 +92,8 @@ The landscape is generated once from its own seed (`src/sim/terrain.ts`), indepe
 | `src/sim/terrain.ts`     | Procedural, fictional terrain: a seeded height grid with bilinear sampling.                     |
 | `src/sim/propagation.ts` | Earth curvature (4/3 model), line of sight, radar horizon, coverage map.                        |
 | `src/sim/atmosphere.ts`  | Air density with height (exponential atmosphere), behind a small interface.                     |
-| `src/sim/tracker.ts`     | Track estimate: where a track is now, from its last echo and velocity.                          |
+| `src/sim/kalman.ts`      | Constant-velocity Kalman filter, measurement covariance, uncertainty ellipse.                   |
+| `src/sim/tracker.ts`     | Tracker: gating, global nearest-neighbour association, track estimates.                         |
 | `src/sim/c2.ts`          | Command node: identification, threat evaluation, predicted intercept point, firing solution.    |
 | `src/sim/interceptor.ts` | Interceptor point mass: boost and coast with drag, proportional navigation, fuze.               |
 | `src/sim/scenario.ts`    | Scenario traffic: entry points, straight courses, arrival times.                                |
