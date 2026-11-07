@@ -3,8 +3,11 @@ import type { ReactNode } from 'react';
 import { Tooltip } from '../components/Tooltip';
 import { CURRENT_STEP, roadmapStep } from '../data/roadmap';
 import { formatCountdown } from '../lib/format';
+import { useSimController } from '../sim/simContext';
 import {
   KPI_ARRIVES_IN_STEP,
+  NEXT_OPERATOR_MODE,
+  NEXT_WEAPONS_CONTROL,
   OPERATOR_MODE_HELP,
   OPERATOR_MODE_LABEL,
   WEAPONS_CONTROL_HELP,
@@ -36,16 +39,20 @@ export function KpiStrip({ situation: s }: { situation: SituationSummary }) {
 }
 
 function KpiGroup({ situation: s }: { situation: SituationSummary }) {
+  const controller = useSimController();
   return (
     <>
       <Kpi
         label="Threats"
-        hint="Hostile tracks now, threats the radar confirmed destroyed, and threats that reached the battery."
+        hint="Hostile tracks now, threats the radar confirmed destroyed, threats that reached a defended asset, and identification errors: friendly or civil aircraft shot down."
         arrivesInStep={KPI_ARRIVES_IN_STEP.threats}
       >
         <Num value={s.threats?.active} unit="active" />
         <Num value={s.threats?.down} unit="down" tone="ok" />
         <Num value={s.threats?.leaked} unit="leaked" tone="alert" />
+        {s.threats && s.threats.idErrors > 0 && (
+          <Num value={s.threats.idErrors} unit="ID errors" tone="alert" />
+        )}
       </Kpi>
       <Kpi
         label="Interceptors"
@@ -65,7 +72,7 @@ function KpiGroup({ situation: s }: { situation: SituationSummary }) {
       </Kpi>
       <Kpi
         label="Next impact"
-        hint="Time until the most urgent threat reaches its closest point to the battery. Defended assets such as towns arrive in Step 6."
+        hint="Time until the most urgent threat reaches its closest point to the defended asset it is heading for: the battery, the town or the power plant."
         arrivesInStep={KPI_ARRIVES_IN_STEP.nextImpact}
       >
         <span className="font-mono tabular-nums text-ink-100">
@@ -79,12 +86,30 @@ function KpiGroup({ situation: s }: { situation: SituationSummary }) {
       </Kpi>
       <div className="flex items-center gap-1.5">
         <DoctrineBadge
+          testId="wcs"
           label={`WCS ${s.weaponsControl}`}
           hint={WEAPONS_CONTROL_HELP[s.weaponsControl]}
+          tone={
+            s.weaponsControl === 'FREE' ? 'warn' : s.weaponsControl === 'HOLD' ? 'muted' : 'plain'
+          }
+          onClick={() =>
+            controller.dispatch({
+              kind: 'setRules',
+              rules: { weaponsControl: NEXT_WEAPONS_CONTROL[s.weaponsControl] },
+            })
+          }
         />
         <DoctrineBadge
+          testId="operator-mode"
           label={OPERATOR_MODE_LABEL[s.operatorMode]}
           hint={OPERATOR_MODE_HELP[s.operatorMode]}
+          tone={s.operatorMode === 'SEMI' ? 'accent' : 'plain'}
+          onClick={() =>
+            controller.dispatch({
+              kind: 'setRules',
+              rules: { operatorMode: NEXT_OPERATOR_MODE[s.operatorMode] },
+            })
+          }
         />
       </div>
     </>
@@ -179,15 +204,43 @@ function ChannelMeter({ channels }: { channels: SituationSummary['channels'] }) 
   );
 }
 
-function DoctrineBadge({ label, hint }: { label: string; hint: string }) {
+/** A rule of engagement: click to cycle it (the change is a recorded command, so it replays). */
+function DoctrineBadge({
+  label,
+  hint,
+  tone,
+  onClick,
+  testId,
+}: {
+  label: string;
+  hint: string;
+  tone: 'plain' | 'warn' | 'accent' | 'muted';
+  onClick: () => void;
+  testId: string;
+}) {
   return (
-    <Tooltip content={hint}>
-      <span
-        tabIndex={0}
-        className="cursor-help rounded-md border border-ink-700 bg-ink-850 px-1.5 py-0.5 font-mono text-[10.5px] text-ink-200"
+    <Tooltip
+      content={
+        <>
+          {hint}
+          <span className="mt-1.5 block text-ink-300">Click to change.</span>
+        </>
+      }
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        data-testid={testId}
+        className={clsx(
+          'rounded-md border px-1.5 py-0.5 font-mono text-[10.5px] transition-colors hover:border-accent/60',
+          tone === 'plain' && 'border-ink-700 bg-ink-850 text-ink-200',
+          tone === 'warn' && 'border-warn/60 bg-warn/10 text-warn',
+          tone === 'accent' && 'border-accent/60 bg-accent/10 text-accent',
+          tone === 'muted' && 'border-ink-600 bg-ink-900 text-ink-300',
+        )}
       >
         {label}
-      </span>
+      </button>
     </Tooltip>
   );
 }

@@ -35,12 +35,15 @@ export interface ViewState {
    * error between them (scope, 3D view and inspector).
    */
   compareTruth: boolean;
+  /** The engagement envelope: where the battery can reach, drawn as a dome in 3D. */
+  showEnvelope: boolean;
   select: (id: number | null) => void;
   setCameraMode: (mode: CameraMode) => void;
   setHeightScale: (scale: HeightScale) => void;
   setShowLabels: (show: boolean) => void;
   setCoverageAlt: (altitudeM: CoverageAltitude | null) => void;
   setCompareTruth: (compare: boolean) => void;
+  setShowEnvelope: (show: boolean) => void;
 }
 
 export const useViewStore = create<ViewState>()((set) => ({
@@ -51,6 +54,7 @@ export const useViewStore = create<ViewState>()((set) => ({
   showLabels: true,
   coverageAltM: null,
   compareTruth: false,
+  showEnvelope: false,
   select: (selectedId) =>
     set((state) => {
       if (selectedId === state.selectedId) return state;
@@ -70,4 +74,5 @@ export const useViewStore = create<ViewState>()((set) => ({
   setShowLabels: (showLabels) => set({ showLabels }),
   setCoverageAlt: (coverageAltM) => set({ coverageAltM }),
   setCompareTruth: (compareTruth) => set({ compareTruth }),
+  setShowEnvelope: (showEnvelope) => set({ showEnvelope }),
 }));

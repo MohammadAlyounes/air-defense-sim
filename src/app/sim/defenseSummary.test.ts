@@ -8,6 +8,7 @@ function jetInbound() {
     autoTraffic: false,
     terrain: false,
     radar: IDEAL_SEARCH_RADAR,
+    interceptor: { certainKill: true },
   });
   sim.dispatch({
     kind: 'spawnTraffic',
@@ -29,23 +30,31 @@ describe('summarizeDefense', () => {
     //                       detect track identify evaluate assign engage assess
     expect(stagesAt(5)).toEqual([1, 0, 0, 0, 0, 0, 0]); // first echo at 4 s
     expect(stagesAt(9)).toEqual([1, 1, 0, 0, 0, 0, 0]); // confirmed at 8 s
-    expect(stagesAt(10.5)).toEqual([1, 1, 1, 1, 1, 0, 0]); // identified, threat, assigned
-    expect(stagesAt(20)).toEqual([1, 1, 1, 1, 1, 1, 0]); // interceptor in flight
-    expect(stagesAt(45)).toEqual([0, 0, 0, 0, 0, 0, 0]); // destroyed and assessed
+    // Unknown after the first silent identification check (10.2 s): evaluated, a threat.
+    expect(stagesAt(10.5)).toEqual([1, 1, 1, 1, 1, 0, 0]);
+    expect(stagesAt(20)).toEqual([1, 1, 1, 1, 1, 1, 0]); // hostile at 14.2 s, interceptor in flight
+    expect(stagesAt(50)).toEqual([0, 0, 0, 0, 0, 0, 0]); // destroyed at 45 s, assessed at 48 s
   });
 
   it('counts threats, interceptors and the next impact', () => {
     const sim = jetInbound();
     sim.run(50 * 20);
     const summary = summarizeDefense(sim.snapshot());
-    expect(summary.threats).toEqual({ active: 1, down: 0, leaked: 0 });
+    expect(summary.threats).toEqual({ active: 1, down: 0, leaked: 0, idErrors: 0 });
+    expect(summary.channels).toEqual({ used: 1, total: 3 });
+    expect(summary.nextImpact?.asset).toBe('battery');
     expect(summary.interceptors).toEqual({ ready: 11, flying: 1, used: 1 });
     expect(summary.nextImpact?.threat).toBe('T1');
     // 30 km out at 340 m/s, 20 s later: (30,000 − 6,800) / 340 = 68.2 s to go.
     expect(summary.nextImpact?.inSeconds).toBeCloseTo((30_000 - 340 * 20) / 340, 1);
 
     sim.run(50 * 30);
-    expect(summarizeDefense(sim.snapshot()).threats).toEqual({ active: 0, down: 1, leaked: 0 });
+    expect(summarizeDefense(sim.snapshot()).threats).toEqual({
+      active: 0,
+      down: 1,
+      leaked: 0,
+      idErrors: 0,
+    });
   });
 
   it('lists tracks for the track table, threats first', () => {
@@ -54,6 +63,7 @@ describe('summarizeDefense', () => {
       autoTraffic: false,
       terrain: false,
       radar: IDEAL_SEARCH_RADAR,
+      interceptor: { certainKill: true },
     });
     sim.dispatch({
       kind: 'spawnTraffic',
@@ -69,7 +79,7 @@ describe('summarizeDefense', () => {
       northM: 30_000,
       headingRad: Math.PI,
     });
-    sim.run(50 * 11);
+    sim.run(50 * 15);
     const rows = summarizeDefense(sim.snapshot()).tracks;
     expect(rows.map((r) => [r.id, r.identity, r.stage])).toEqual([
       [2, 'hostile', 'assign'], // the jet: a threat, first

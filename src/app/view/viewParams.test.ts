@@ -13,6 +13,10 @@ describe('parseViewOptions', () => {
     });
   });
 
+  it('reads the engagement envelope', () => {
+    expect(parseViewOptions('?envelope=1').state).toEqual({ showEnvelope: true });
+  });
+
   it('reads the truth comparison', () => {
     expect(parseViewOptions('?truth=1').state).toEqual({ compareTruth: true });
     expect(parseViewOptions('?truth=0').state).toEqual({ compareTruth: false });

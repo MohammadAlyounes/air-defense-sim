@@ -2,6 +2,43 @@
 
 One short entry per step, newest first: what was built, the decisions behind it, and what comes next.
 
+## Step 6 · Decide & engage (2026-11-07)
+
+**Built**
+
+- **Defended assets (`src/sim/assets.ts`):** the battery, a town and a power plant, each with a threat ring and a leak radius. Scenario hostiles head for one of them; leaks name the asset reached.
+- **Threat evaluation:** the closest point of approach to every asset, from the filtered track. A threat is assigned to the asset it reaches soonest, for hostile and unknown tracks alike.
+- **Identification with mistakes:**
+  - Up to two IFF checks, 4 s apart. Friendly transponders answer 90% of checks and civil codes are received 98% of the time.
+  - Silence on the first check makes a track **unknown**, on both **hostile**.
+  - A friendly aircraft destroyed is an identification error: counted in the stats, shown in the header and on a result card.
+- **Rules of engagement:**
+  - Weapons control HOLD, TIGHT or FREE, and operator mode AUTO or SEMI-AUTO, set with a recorded `setRules` command.
+  - In SEMI-AUTO each shot is proposed and waits for `approveEngagement` or `holdFire`; proposals lapse when the shot becomes impossible.
+  - The header badges are clickable, and A and H answer from the keyboard.
+- **Fire channels:** at most three engagements at once (proposed, waiting or flying). The header meter is live, and the NOW line reports saturation.
+- **Kill probability:** a fuze within the lethal radius kills with `Pk = Pk_target × clamp(v / 600, 0.5, 1)`. It is predicted at assignment and drawn at the fuze (miss reason "survived"). `certainKill` keeps exact tests exact.
+- **Engagement envelope:** `envelopeRangeM(h)` from the planner's reach, drawn as a dome in 3D (umbrella button, `?envelope=1`).
+- **Views:**
+  - An approval card with the evidence (identity, threatened asset, intercept point, chance of a kill).
+  - A "Why?" section in the inspector, one sentence per step: identity, threat, rules, shot or reason for waiting.
+  - Assets on the scope and in 3D (threat rings that follow the ground, markers, labels).
+  - The narrator learns every new event: unknown and hostile identifications, the threatened asset, proposals, approvals, holds, rule changes, "burst … but survived", ID errors.
+- **Concept cards:** closest point of approach, engagement envelope, kill probability, rules of engagement.
+- **Tests:** 19 new unit tests and 3 new browser tests, 187 unit and 28 browser tests in all.
+  - Unit tests cover IFF answers, the rules, Pk values, the envelope, CPA to any point and the asset ranking.
+  - Simulation tests cover approval, holding fire and switching back to AUTO, HOLD, FREE engaging one check sooner, a friendly with a dead transponder shot down and counted, fire-channel limits, leaks at the power plant, survivals under Pk, and replay of rule changes.
+  - Browser tests cycle the rule badges, approve a shot in SEMI-AUTO, and read the inspector's "Why?" and the envelope toggle.
+
+**Decisions**
+
+- **Silence is evidence, not proof.** "Unknown" between the two checks gives weapons control something real to decide. FREE fires one check (4 s) sooner, at ten times the risk to a friend with a faulty transponder. The lesson is the trade-off, so neither setting is "right".
+- **Rules as recorded commands.** Clicking a header badge dispatches `setRules`, so a run where a friendly was shot down replays exactly.
+- **A generic kill probability.** Two textbook trends (agile targets are harder, slow interceptors steer worse) and nothing about real seekers or warheads. Jets now survive a first shot a third of the time or more, which makes shoot-look-shoot visible.
+- **Drops still aim at the battery.** Scenario hostiles spread over the three assets; dropped threats keep flying at the battery, so the placement readout stays simple.
+
+**Next: Step 7 · Scenarios & lessons.** A built-in scenario library with share-by-link, a few short guided lessons, an after-action review, telemetry graphs and the timeline.
+
 ## Step 5 · Tracking (2026-11-07)
 
 **Built**

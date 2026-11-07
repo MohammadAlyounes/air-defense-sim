@@ -1,11 +1,17 @@
 import { EXPONENTIAL_ATMOSPHERE } from './atmosphere';
+import { DEFAULT_ASSETS, type DefendedAsset } from './assets';
 import {
-  closestApproachToOrigin,
   DEFAULT_DEFENSE,
+  DEFAULT_RULES,
+  engageable,
+  evaluateThreat,
   iffAnswer,
+  killProbability,
   LAUNCHER_POSITION,
   planIntercept,
   type DefenseConfig,
+  type Identity,
+  type Rules,
 } from './c2';
 import { TICK_S } from './core/clock';
 import { fnv1a } from './core/hash';
@@ -89,6 +95,10 @@ export interface SimConfig {
   defense?: Partial<DefenseConfig>;
   interceptor?: Partial<InterceptorConfig>;
   tracker?: Partial<TrackerConfig>;
+  /** What the battery defends; the battery itself should be one of them. */
+  assets?: readonly DefendedAsset[];
+  /** Rules of engagement at the start (they can change with `setRules` commands). */
+  rules?: Partial<Rules>;
 }
 
 /** Radar plots kept for the fading phosphor trail, in antenna turns. */
@@ -148,6 +158,8 @@ export class Simulation {
   private readonly defense: DefenseConfig;
   private readonly interceptorConfig: InterceptorConfig;
   private readonly tracker: TrackerConfig;
+  private readonly assets: readonly DefendedAsset[];
+  private rules: Rules;
   private readonly areaRadiusM: number;
   private readonly traffic: AutoTrafficConfig | null;
   private tickCount = 0;
@@ -167,6 +179,7 @@ export class Simulation {
   private effects: Effect[] = [];
   private stats: DefenseStats = {
     threatsDown: 0,
+    idErrors: 0,
     threatsLeaked: 0,
     interceptorsFired: 0,
     hits: 0,
@@ -190,6 +203,8 @@ export class Simulation {
     this.defense = { ...DEFAULT_DEFENSE, ...config.defense };
     this.interceptorConfig = { ...DEFAULT_INTERCEPTOR, ...config.interceptor };
     this.tracker = { ...DEFAULT_TRACKER, ...config.tracker };
+    this.assets = config.assets ?? DEFAULT_ASSETS;
+    this.rules = { ...DEFAULT_RULES, ...config.rules };
     this.areaRadiusM = config.areaRadiusM ?? this.radar.rangeM + 2_000;
     this.traffic =
       config.autoTraffic === false ? null : { ...DEFAULT_AUTO_TRAFFIC, ...config.autoTraffic };
@@ -202,7 +217,7 @@ export class Simulation {
 
     if (this.traffic) {
       for (let i = 0; i < this.traffic.initialCount; i++) {
-        const flight = planFlight(this.rng, this.traffic, true);
+        const flight = planFlight(this.rng, this.traffic, true, this.assets);
         this.addAircraft(
           flight.type,
           flight.position,
@@ -301,6 +316,9 @@ export class Simulation {
       interceptors: [...this.interceptors],
       engagements: [...this.engagements],
       launcher: { ...this.launcher },
+      channels: { used: this.channelsInUse(), total: this.defense.fireChannels },
+      rules: { ...this.rules },
+      assets: this.assets,
       effects: [...this.effects],
       stats: { ...this.stats },
     };
@@ -324,6 +342,7 @@ export class Simulation {
         interceptors: this.interceptors,
         engagements: this.engagements,
         launcher: this.launcher,
+        rules: this.rules,
         effects: this.effects,
         stats: this.stats,
       }),
@@ -365,13 +384,22 @@ export class Simulation {
       case 'removeAircraft':
         this.aircraft = this.aircraft.filter((a) => a.id !== command.id);
         break;
+      case 'setRules':
+        this.setRules(command.rules, events);
+        break;
+      case 'approveEngagement':
+        this.approve(command.engagementId, events);
+        break;
+      case 'holdFire':
+        this.holdFire(command.engagementId, events);
+        break;
     }
   }
 
   private scenarioArrivals(tick: number, events: SimEvent[]): void {
     if (!this.traffic || this.nextArrival === null || tick < this.nextArrival) return;
     if (this.aircraft.length < this.traffic.maxAircraft) {
-      const flight = planFlight(this.rng, this.traffic, false);
+      const flight = planFlight(this.rng, this.traffic, false, this.assets);
       this.addAircraft(flight.type, flight.position, flight.velocity, events, flight.position.z);
     }
     this.nextArrival = nextArrivalTick(this.rng, this.traffic, tick);
@@ -422,13 +450,26 @@ export class Simulation {
     return ref === 'AGL' ? ground + altitudeM : Math.max(altitudeM, ground + MSL_CLEARANCE_M);
   }
 
+  /** A hostile that gets inside any defended asset's leak radius has got through. */
   private checkLeaks(tick: number, events: SimEvent[]): void {
     this.aircraft = this.aircraft.map((a) => {
       if (a.leaked || a.affiliation !== 'hostile') return a;
-      if (groundRange(a.position) >= this.defense.leakRadiusM) return a;
+      const reached = this.assets.find(
+        (asset) =>
+          Math.hypot(a.position.x - asset.position.x, a.position.y - asset.position.y) <
+          asset.leakRadiusM,
+      );
+      if (!reached) return a;
       this.stats.threatsLeaked += 1;
       this.effects.push({ kind: 'leak', tick, position: a.position });
-      events.push({ kind: 'threatLeaked', tick, timeS: tick * TICK_S, id: a.id, type: a.type });
+      events.push({
+        kind: 'threatLeaked',
+        tick,
+        timeS: tick * TICK_S,
+        id: a.id,
+        type: a.type,
+        assetId: reached.id,
+      });
       return { ...a, leaked: true };
     });
   }
@@ -610,7 +651,10 @@ export class Simulation {
           estimate,
           confirmedTick: null,
           identity: 'pending',
+          iffChecks: 0,
+          nextIffTick: null,
           threat: null,
+          holdFireUntilTick: null,
           engagementId: null,
           interceptorsFired: 0,
         };
@@ -722,15 +766,27 @@ export class Simulation {
 
   // ── Identify and evaluate ───────────────────────────────────────────────────────────────
 
+  /**
+   * Identification checks: the first 2 s after a track is confirmed, then every 4 s while it
+   * stays silent. An answer settles it (friend or civil); silence makes it 'unknown', and
+   * silence on every check makes it 'hostile'. A friendly aircraft whose transponder fails
+   * every time is declared hostile: an identification mistake waiting to happen.
+   */
   private identify(tick: number, events: SimEvent[]): void {
-    const delay = ticks(this.defense.iffDelayS);
+    const firstDelay = ticks(this.defense.iffDelayS);
     this.tracks = this.tracks.map((track) => {
-      if (track.identity !== 'pending' || track.confirmedTick === null) return track;
-      if (tick - track.confirmedTick < delay) return track;
-      // The identification check gets an answer from the real aircraft, if there is one.
+      if (track.confirmedTick === null) return track;
+      if (track.identity !== 'pending' && track.identity !== 'unknown') return track;
+      if (tick < (track.nextIffTick ?? track.confirmedTick + firstDelay)) return track;
+      // The check is answered by the real aircraft behind the track, if there is one: a false
+      // track has nothing to answer.
       const aircraft = this.aircraft.find((a) => a.id === track.truthId);
-      if (!aircraft) return track;
-      const identity = iffAnswer(aircraft.affiliation);
+      const answer = aircraft
+        ? iffAnswer(aircraft.affiliation, this.rng.next(), this.defense)
+        : null;
+      const checks = track.iffChecks + 1;
+      const identity: Exclude<Identity, 'pending'> =
+        answer ?? (checks >= this.defense.iffChecks ? 'hostile' : 'unknown');
       events.push({
         kind: 'identified',
         tick,
@@ -738,42 +794,71 @@ export class Simulation {
         id: track.truthId,
         trackId: track.id,
         identity,
+        evidence:
+          answer === 'friend' ? 'friendReply' : answer === 'neutral' ? 'civilCode' : 'noReply',
+        checks,
       });
-      return { ...track, identity };
+      return {
+        ...track,
+        identity,
+        iffChecks: checks,
+        nextIffTick: identity === 'unknown' ? tick + ticks(this.defense.iffRecheckS) : null,
+      };
     });
   }
 
-  /** A hostile track whose course passes within the threat radius, still approaching, is a threat. */
+  /**
+   * Threat evaluation: a hostile or unknown track whose course passes inside a defended asset's
+   * threat radius, still approaching, is a threat to the asset it reaches soonest.
+   */
   private evaluateThreats(tick: number, events: SimEvent[]): void {
     this.tracks = this.tracks.map((track) => {
-      if (track.identity !== 'hostile' || !track.velocity) return track;
-      const pass = closestApproachToOrigin(trackPositionAt(track, tick), track.velocity);
-      const isThreat = pass.distanceM < this.defense.threatRadiusM && pass.timeS > 0;
-      if (!isThreat) return track.threat ? { ...track, threat: null } : track;
-      if (!track.threat) {
+      const suspect = track.identity === 'hostile' || track.identity === 'unknown';
+      const threat =
+        suspect && track.velocity
+          ? evaluateThreat(trackPositionAt(track, tick), track.velocity, this.assets)
+          : null;
+      if (!threat) return track.threat ? { ...track, threat: null } : track;
+      if (!track.threat || track.threat.assetId !== threat.assetId) {
         events.push({
           kind: 'threatEvaluated',
           tick,
           timeS: tick * TICK_S,
           id: track.truthId,
           trackId: track.id,
-          closestApproachM: pass.distanceM,
-          timeToClosestS: pass.timeS,
+          assetId: threat.assetId,
+          closestApproachM: threat.closestApproachM,
+          timeToClosestS: threat.timeToClosestS,
         });
       }
-      return {
-        ...track,
-        threat: { closestApproachM: pass.distanceM, timeToClosestS: pass.timeS },
-      };
+      return { ...track, threat };
     });
   }
 
   // ── Assign and engage ───────────────────────────────────────────────────────────────────
 
+  /** Engagements holding a fire channel: proposed, waiting to launch, or guiding an interceptor. */
+  private channelsInUse(): number {
+    return this.engagements.filter(
+      (e) => e.state === 'proposed' || e.state === 'assigned' || e.state === 'flying',
+    ).length;
+  }
+
+  /** The next free launch slot, if a shot were assigned at `tick`. */
+  private nextSlot(tick: number): number {
+    const queued = this.engagements.filter((e) => e.state === 'assigned');
+    return Math.max(
+      tick + ticks(this.defense.launchPrepS),
+      this.launcher.nextLaunchTick,
+      ...queued.map((e) => e.launchTick + ticks(this.defense.launchIntervalS)),
+    );
+  }
+
   /**
-   * Assign: the most urgent unengaged threat that an interceptor could reach gets the next
-   * launch slot (at most one new assignment per tick). Engage: each assigned shot launches
-   * when its slot comes, after the launch preparation time and the launch interval.
+   * Assign: the most urgent unengaged threat that the rules allow and an interceptor could
+   * reach gets a fire channel and the next launch slot (at most one per tick). In SEMI mode it
+   * is proposed to the operator instead, and waits for approval. Engage: each assigned shot
+   * launches when its slot comes.
    */
   private assignAndLaunch(tick: number, events: SimEvent[]): void {
     for (const engagement of this.engagements) {
@@ -781,17 +866,33 @@ export class Simulation {
         this.launch(engagement, tick, events);
       }
     }
+    // A proposal lapses if the shot is no longer possible or no longer allowed.
+    for (const engagement of this.engagements) {
+      if (engagement.state !== 'proposed') continue;
+      const track = this.tracks.find((t) => t.id === engagement.trackId);
+      const stillValid =
+        track &&
+        engageable(track.identity, this.rules.weaponsControl) &&
+        planIntercept(track, this.nextSlot(tick), this.defense, this.interceptorConfig);
+      if (!stillValid) this.cancel(engagement, tick, events);
+    }
 
-    const queued = this.engagements.filter((e) => e.state === 'assigned');
-    if (this.launcher.ready - queued.length <= 0) return;
-    const slot = Math.max(
-      tick + ticks(this.defense.launchPrepS),
-      this.launcher.nextLaunchTick,
-      ...queued.map((e) => e.launchTick + ticks(this.defense.launchIntervalS)),
+    if (this.channelsInUse() >= this.defense.fireChannels) return;
+    const committed = this.engagements.filter(
+      (e) => e.state === 'assigned' || e.state === 'proposed',
     );
+    if (this.launcher.ready - committed.length <= 0) return;
+    const slot = this.nextSlot(tick);
     const fresh = ticks(ENGAGE_FRESH_TURNS * this.radar.periodS);
     const candidates = this.tracks
-      .filter((t) => t.threat && t.engagementId === null && tick - t.lastPaintTick <= fresh)
+      .filter(
+        (t) =>
+          t.threat &&
+          t.engagementId === null &&
+          engageable(t.identity, this.rules.weaponsControl) &&
+          tick - t.lastPaintTick <= fresh &&
+          (t.holdFireUntilTick === null || tick >= t.holdFireUntilTick),
+      )
       .sort(
         (a, b) =>
           (a.threat?.timeToClosestS ?? Infinity) - (b.threat?.timeToClosestS ?? Infinity) ||
@@ -802,15 +903,18 @@ export class Simulation {
       const plan = planIntercept(track, slot, this.defense, this.interceptorConfig);
       if (!target || !plan) continue;
       const id = this.nextEngagementId++;
+      const proposed = this.rules.operatorMode === 'SEMI';
+      const pk = plan.pk ?? 0;
       this.engagements.push({
         id,
         trackId: track.id,
         targetId: target.id,
         targetType: target.type,
         assignedTick: tick,
-        launchTick: slot,
+        launchTick: proposed ? 0 : slot,
         interceptorId: null,
-        state: 'assigned',
+        state: proposed ? 'proposed' : 'assigned',
+        pk,
         predictedPoint: plan.point,
         predictedTimeS: plan.timeS,
         endTick: null,
@@ -818,37 +922,107 @@ export class Simulation {
         missReason: null,
       });
       this.tracks = this.tracks.map((t) => (t.id === track.id ? { ...t, engagementId: id } : t));
-      events.push({
-        kind: 'engagementAssigned',
-        tick,
-        timeS: tick * TICK_S,
-        id: target.id,
-        trackId: track.id,
-        launchInS: (slot - tick) * TICK_S,
-        predictedTimeS: plan.timeS,
-        predictedRangeM: groundRange(plan.point),
-      });
+      const base = { tick, timeS: tick * TICK_S, id: target.id, trackId: track.id };
+      events.push(
+        proposed
+          ? {
+              ...base,
+              kind: 'engagementProposed',
+              engagementId: id,
+              predictedTimeS: plan.timeS,
+              predictedRangeM: groundRange(plan.point),
+              pk,
+            }
+          : {
+              ...base,
+              kind: 'engagementAssigned',
+              launchInS: (slot - tick) * TICK_S,
+              predictedTimeS: plan.timeS,
+              predictedRangeM: groundRange(plan.point),
+              pk,
+            },
+      );
       return;
     }
+  }
+
+  /** SEMI mode: the operator approves a proposal; it gets the next launch slot. */
+  private approve(engagementId: number, events: SimEvent[]): void {
+    const engagement = this.findEngagement(engagementId);
+    if (engagement?.state !== 'proposed') return;
+    const tick = this.tickCount;
+    const slot = this.nextSlot(tick);
+    this.engagements = this.engagements.map((e) =>
+      e.id === engagementId ? { ...e, state: 'assigned', launchTick: slot } : e,
+    );
+    events.push({
+      kind: 'engagementApproved',
+      tick,
+      timeS: tick * TICK_S,
+      id: engagement.targetId,
+      trackId: engagement.trackId,
+      engagementId,
+    });
+  }
+
+  /** SEMI mode: the operator holds fire; the track is not proposed again for a while. */
+  private holdFire(engagementId: number, events: SimEvent[]): void {
+    const engagement = this.findEngagement(engagementId);
+    if (engagement?.state !== 'proposed') return;
+    const tick = this.tickCount;
+    this.engagements = this.engagements.filter((e) => e.id !== engagementId);
+    this.tracks = this.tracks.map((t) =>
+      t.id === engagement.trackId
+        ? { ...t, engagementId: null, holdFireUntilTick: tick + ticks(this.defense.holdFireS) }
+        : t,
+    );
+    events.push({
+      kind: 'holdFire',
+      tick,
+      timeS: tick * TICK_S,
+      id: engagement.targetId,
+      trackId: engagement.trackId,
+      engagementId,
+    });
+  }
+
+  /** New rules of engagement. Switching to AUTO approves every waiting proposal. */
+  private setRules(rules: Partial<Rules>, events: SimEvent[]): void {
+    this.rules = { ...this.rules, ...rules };
+    events.push({
+      kind: 'rulesChanged',
+      tick: this.tickCount,
+      timeS: this.tickCount * TICK_S,
+      id: null,
+      rules: { ...this.rules },
+    });
+    if (this.rules.operatorMode === 'AUTO') {
+      for (const e of this.engagements) if (e.state === 'proposed') this.approve(e.id, events);
+    }
+  }
+
+  /** Drops a shot that can no longer be fired, so the track can be assigned again. */
+  private cancel(engagement: Engagement, tick: number, events: SimEvent[]): void {
+    this.engagements = this.engagements.filter((e) => e.id !== engagement.id);
+    this.tracks = this.tracks.map((t) =>
+      t.id === engagement.trackId ? { ...t, engagementId: null } : t,
+    );
+    events.push({
+      kind: 'engagementCancelled',
+      tick,
+      timeS: tick * TICK_S,
+      id: engagement.targetId,
+      trackId: engagement.trackId,
+    });
   }
 
   private launch(engagement: Engagement, tick: number, events: SimEvent[]): void {
     const track = this.tracks.find((t) => t.id === engagement.trackId);
     const target = this.aircraft.find((a) => a.id === engagement.targetId);
     const plan = track && planIntercept(track, tick, this.defense, this.interceptorConfig);
-    if (!track || !target || !plan) {
-      // The shot is no longer possible: cancel it, so the track can be assigned again.
-      this.engagements = this.engagements.filter((e) => e.id !== engagement.id);
-      this.tracks = this.tracks.map((t) =>
-        t.id === engagement.trackId ? { ...t, engagementId: null } : t,
-      );
-      events.push({
-        kind: 'engagementCancelled',
-        tick,
-        timeS: tick * TICK_S,
-        id: engagement.targetId,
-        trackId: engagement.trackId,
-      });
+    if (!track || !target || !plan || !engageable(track.identity, this.rules.weaponsControl)) {
+      // The shot is no longer possible, or no longer allowed.
+      this.cancel(engagement, tick, events);
       return;
     }
 
@@ -873,6 +1047,7 @@ export class Simulation {
             interceptorId: id,
             predictedPoint: plan.point,
             predictedTimeS: plan.timeS,
+            pk: plan.pk ?? e.pk,
           }
         : e,
     );
@@ -937,9 +1112,10 @@ export class Simulation {
         missM: number | null;
         reason: MissReason | null;
         at: Vec3;
+        pk: number | null;
       } | null = target
         ? null
-        : { hit: false, missM: null, reason: 'targetGone', at: state.position };
+        : { hit: false, missM: null, reason: 'targetGone', at: state.position, pk: null };
 
       for (let k = 0; target && !outcome && k < SUBSTEPS; k++) {
         const flightS = (tick - 1 - missile.launchTick) * TICK_S + k * dt;
@@ -954,12 +1130,20 @@ export class Simulation {
             sub(targetEnd, next.position),
           );
           if (pass.fraction < 1) {
-            const hit = pass.distanceM <= config.lethalRadiusM;
             const at = add(
               state.position,
               scale(sub(next.position, state.position), pass.fraction),
             );
-            outcome = { hit, missM: pass.distanceM, reason: hit ? null : 'passed', at };
+            if (pass.distanceM > config.lethalRadiusM) {
+              outcome = { hit: false, missM: pass.distanceM, reason: 'passed', at, pk: null };
+            } else {
+              // Close enough: the kill probability decides (one random draw).
+              const pk = config.certainKill
+                ? 1
+                : killProbability(length(target.velocity), length(next.velocity));
+              const hit = this.rng.next() < pk;
+              outcome = { hit, missM: pass.distanceM, reason: hit ? null : 'survived', at, pk };
+            }
           }
         }
         state = next;
@@ -972,6 +1156,7 @@ export class Simulation {
             missM: distance(state.position, targetEnd),
             reason: 'ground',
             at: state.position,
+            pk: null,
           };
         } else if (!outcome && flightS + dt >= config.maxFlightS) {
           outcome = {
@@ -979,6 +1164,7 @@ export class Simulation {
             missM: distance(state.position, targetEnd),
             reason: 'outOfTime',
             at: state.position,
+            pk: null,
           };
         }
       }
@@ -1008,8 +1194,11 @@ export class Simulation {
             }
           : e,
       );
+      const affiliation = target?.affiliation ?? 'hostile';
       if (outcome.hit) {
         this.stats.hits += 1;
+        // Shooting down a friendly or civil aircraft is a failure of identification.
+        if (affiliation !== 'hostile') this.stats.idErrors += 1;
         this.aircraft = this.aircraft.filter((a) => a.id !== missile.targetId);
       } else {
         this.stats.misses += 1;
@@ -1025,6 +1214,8 @@ export class Simulation {
         hit: outcome.hit,
         missDistanceM: outcome.missM,
         reason: outcome.reason,
+        pk: outcome.pk,
+        targetAffiliation: affiliation,
       });
     }
     this.interceptors = flying;

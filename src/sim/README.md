@@ -13,7 +13,8 @@ The physics and decision-making engine. The app imports it only through `index.t
 | `propagation.ts` | Earth curvature, line of sight, radar horizon and coverage map.         |
 | `atmosphere.ts`  | Air density with height.                                                |
 | `interceptor.ts` | Interceptor point mass: boost, drag, proportional navigation, fuze.     |
-| `c2.ts`          | Command node: identification, threats, intercept planning.              |
+| `c2.ts`          | Command node: IFF, rules, threats, intercept planning, Pk.              |
+| `assets.ts`      | Defended assets.                                                        |
 | `kalman.ts`      | Constant-velocity Kalman filter.                                        |
 | `tracker.ts`     | Tracker: gating, association, track estimates.                          |
 | `scenario.ts`    | Scenario traffic: entry points, courses and arrival times.              |

@@ -1,10 +1,8 @@
+import type { OperatorMode, WeaponsControl } from '../../sim';
 import type { StageId } from '../data/stages';
 import type { DefenseSummary } from '../sim/defenseSummary';
 
-/** Weapons control status: when the battery is allowed to fire. */
-export type WeaponsControl = 'HOLD' | 'TIGHT' | 'FREE';
-/** Who pulls the trigger: the operator, the system with confirmation, or the system alone. */
-export type OperatorMode = 'MANUAL' | 'SEMI' | 'AUTO';
+export type { OperatorMode, WeaponsControl };
 
 /**
  * Everything the header analysis bar shows. A number whose feature is not built yet is null:
@@ -12,7 +10,7 @@ export type OperatorMode = 'MANUAL' | 'SEMI' | 'AUTO';
  */
 export interface SituationSummary {
   stageCounts: Readonly<Record<StageId, number | null>>;
-  threats: { active: number; down: number; leaked: number } | null;
+  threats: { active: number; down: number; leaked: number; idErrors: number } | null;
   interceptors: { ready: number; flying: number; used: number } | null;
   channels: { used: number; total: number } | null;
   /** Null when no threat is inbound. */
@@ -31,39 +29,45 @@ export const KPI_ARRIVES_IN_STEP = {
   nextImpact: 3,
 } as const;
 
-/**
- * The header as of Step 3: the whole loop runs in a first version. Fire channels arrive with
- * the tracking radar's limits in Step 6, together with operator approval (the battery fires on
- * its own until then: AUTO, at hostiles only: weapons TIGHT).
- */
+/** The header from the battery's summary: every number is live since Step 6. */
 export function liveSituation(input: { defense: DefenseSummary; now: string }): SituationSummary {
   const { defense } = input;
   return {
     stageCounts: defense.stages,
     threats: defense.threats,
     interceptors: defense.interceptors,
-    channels: null,
+    channels: defense.channels,
     nextImpact: defense.nextImpact,
-    weaponsControl: 'TIGHT',
-    operatorMode: 'AUTO',
+    weaponsControl: defense.rules.weaponsControl,
+    operatorMode: defense.rules.operatorMode,
     now: input.now,
   };
 }
 
 export const WEAPONS_CONTROL_HELP: Readonly<Record<WeaponsControl, string>> = {
-  HOLD: 'Weapons HOLD: fire only in self-defense.',
-  TIGHT: 'Weapons TIGHT: fire only at targets identified as hostile.',
-  FREE: 'Weapons FREE: fire at anything not identified as friendly.',
+  HOLD: 'Weapons HOLD: do not fire.',
+  TIGHT:
+    'Weapons TIGHT: fire only at targets identified as hostile (silent on every identification check).',
+  FREE: 'Weapons FREE: fire at anything not identified as friendly or civil, even after one silent check. Faster, but a friend with a faulty transponder can be shot down.',
 };
 
 export const OPERATOR_MODE_HELP: Readonly<Record<OperatorMode, string>> = {
-  MANUAL: 'Manual: you approve every shot.',
-  SEMI: 'Semi-auto: the system recommends, you confirm.',
-  AUTO: 'Auto: the system engages on its own, within the rules. Step 6 lets you approve each shot.',
+  SEMI: 'Semi-auto: the system proposes each shot and you approve it (A) or hold fire (H).',
+  AUTO: 'Auto: the system engages on its own, within the rules.',
 };
 
 export const OPERATOR_MODE_LABEL: Readonly<Record<OperatorMode, string>> = {
-  MANUAL: 'MANUAL',
   SEMI: 'SEMI-AUTO',
   AUTO: 'AUTO',
+};
+
+/** The order the header badges cycle through when clicked. */
+export const NEXT_WEAPONS_CONTROL: Readonly<Record<WeaponsControl, WeaponsControl>> = {
+  TIGHT: 'FREE',
+  FREE: 'HOLD',
+  HOLD: 'TIGHT',
+};
+export const NEXT_OPERATOR_MODE: Readonly<Record<OperatorMode, OperatorMode>> = {
+  AUTO: 'SEMI',
+  SEMI: 'AUTO',
 };

@@ -1,11 +1,12 @@
 import {
   coverageAt,
-  DEFAULT_DEFENSE,
+  DEFAULT_ASSETS,
   TICK_S,
   trackEllipseAt,
   trackPositionAt,
   TRAFFIC,
   type CoverageMap,
+  type DefendedAsset,
   type Effect,
   type Identity,
   type RadarSize,
@@ -56,6 +57,7 @@ const LEADER_S = 30;
 /** Track symbol colours: the same colour language as the rest of the console. */
 export const IDENTITY_COLOR: Readonly<Record<Identity, string>> = {
   pending: '#facc15',
+  unknown: '#fb923c',
   hostile: '#f87171',
   friend: '#60a5fa',
   neutral: '#4ade80',
@@ -72,8 +74,8 @@ export function createScopeLayout(
   size: number,
   dpr: number,
   rangeM: number,
-  /** Courses passing inside this ring are threats (shown dashed). */
-  defendedRadiusM = DEFAULT_DEFENSE.threatRadiusM,
+  /** Defended assets: each drawn with its threat radius (dashed); courses passing inside are threats. */
+  assets: readonly DefendedAsset[] = DEFAULT_ASSETS,
   /** Drawn as a faint relief map under the rings. */
   terrain: Terrain | null = null,
 ): ScopeLayout {
@@ -84,7 +86,7 @@ export function createScopeLayout(
   const ctx = staticLayer.getContext('2d');
   if (ctx) {
     ctx.scale(dpr, dpr);
-    drawStatic(ctx, size, radiusPx, rangeM, defendedRadiusM, terrain);
+    drawStatic(ctx, size, radiusPx, rangeM, assets, terrain);
   }
   return { size, dpr, radiusPx, rangeM, staticLayer };
 }
@@ -243,7 +245,7 @@ function drawStatic(
   size: number,
   radius: number,
   rangeM: number,
-  defendedRadiusM: number,
+  assets: readonly DefendedAsset[],
   terrain: Terrain | null,
 ) {
   const c = size / 2;
@@ -319,13 +321,27 @@ function drawStatic(
     ctx.fillText(label, p.x, p.y);
   }
 
-  // The defended area: hostiles whose course passes inside it are threats.
+  // Defended assets: hostiles whose course passes inside a dashed ring are threats to it.
+  const scale = radius / rangeM;
   ctx.save();
-  ctx.setLineDash([3, 4]);
-  ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
-  ctx.beginPath();
-  ctx.arc(c, c, (defendedRadiusM / rangeM) * radius, 0, TWO_PI);
-  ctx.stroke();
+  ctx.font = '600 9px Inter Variable, system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  for (const asset of assets) {
+    const x = c + asset.position.x * scale;
+    const y = c - asset.position.y * scale;
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+    ctx.beginPath();
+    ctx.arc(x, y, asset.threatRadiusM * scale, 0, TWO_PI);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (asset.id === 0) continue; // the battery has its own symbol
+    ctx.fillStyle = 'rgba(251, 191, 36, 0.9)';
+    ctx.fillRect(x - 3, y - 3, 6, 6);
+    ctx.fillStyle = 'rgba(253, 230, 138, 0.85)';
+    ctx.fillText(asset.name, x + 6, y - 6);
+  }
   ctx.restore();
 
   // The battery at the centre.

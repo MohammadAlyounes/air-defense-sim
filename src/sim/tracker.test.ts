@@ -26,7 +26,10 @@ function track(id: number, position: Vec3, velocity: Vec3): Track {
     },
     confirmedTick: 0,
     identity: 'pending',
+    iffChecks: 0,
+    nextIffTick: null,
     threat: null,
+    holdFireUntilTick: null,
     engagementId: null,
     interceptorsFired: 0,
   };

@@ -1,13 +1,23 @@
 /** Public API of the simulation core. The app imports from here, never from deeper files. */
+export { DEFAULT_ASSETS, nearestAsset, type DefendedAsset } from './assets';
 export {
+  closestApproachTo,
   closestApproachToOrigin,
   DEFAULT_DEFENSE,
+  DEFAULT_RULES,
+  engageable,
+  envelopeRangeM,
+  evaluateThreat,
+  killProbability,
   LAUNCHER_POSITION,
   planIntercept,
   predictIntercept,
   type DefenseConfig,
   type Identity,
   type Intercept,
+  type OperatorMode,
+  type Rules,
+  type WeaponsControl,
 } from './c2';
 export {
   EXPONENTIAL_ATMOSPHERE,

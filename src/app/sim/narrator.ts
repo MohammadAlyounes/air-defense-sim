@@ -1,4 +1,4 @@
-import { TICK_S, type AircraftType, type SimEvent, type Snapshot } from '../../sim';
+import { DEFAULT_ASSETS, TICK_S, type AircraftType, type SimEvent, type Snapshot } from '../../sim';
 import { formatSimClock } from '../lib/format';
 
 /**
@@ -77,11 +77,26 @@ export interface LogLine {
   text: string;
 }
 
-const IDENTITY_LINE = {
-  hostile: 'identified as hostile: no reply to the identification check.',
-  friend: 'identified as friendly: it answered the identification check.',
-  neutral: 'identified as civil: it broadcasts a civil transponder code.',
-} as const;
+/** "the town", "the battery". */
+export function assetPhrase(assetId: number): string {
+  const name = DEFAULT_ASSETS.find((asset) => asset.id === assetId)?.name ?? 'Battery';
+  return `the ${name.toLowerCase()}`;
+}
+
+const percent = (p: number) => `${Math.round(p * 100)}%`;
+
+function describeIdentified(event: Extract<SimEvent, { kind: 'identified' }>): string {
+  const t = trackName(event.trackId);
+  if (event.evidence === 'friendReply') {
+    return `${t} identified as friendly: it answered the identification check.`;
+  }
+  if (event.evidence === 'civilCode') {
+    return `${t} identified as civil: it broadcasts a civil transponder code.`;
+  }
+  return event.identity === 'unknown'
+    ? `${t} is unknown: no answer to identification check ${event.checks}. Checking again in 4 s.`
+    : `${t} identified as hostile: no answer to ${event.checks} identification checks.`;
+}
 
 export function describeEvent(event: SimEvent): LogLine {
   switch (event.kind) {
@@ -98,7 +113,7 @@ export function describeEvent(event: SimEvent): LogLine {
     case 'threatLeaked':
       return {
         source: 'scenario',
-        text: `${capitalize(withArticle(TRAFFIC_NOUN[event.type]))} reached the battery: it got through.`,
+        text: `${capitalize(withArticle(TRAFFIC_NOUN[event.type]))} reached ${assetPhrase(event.assetId)}: it got through.`,
       };
     case 'contactNew':
       return {
@@ -121,22 +136,41 @@ export function describeEvent(event: SimEvent): LogLine {
         text: `${trackName(event.trackId)} confirmed as a track: ${grouped.format(event.speedMps)} m/s at ${grouped.format(event.altitudeM)} m.`,
       };
     case 'identified':
-      return {
-        source: 'command',
-        text: `${trackName(event.trackId)} ${IDENTITY_LINE[event.identity]}`,
-      };
-    case 'threatEvaluated':
+      return { source: 'command', text: describeIdentified(event) };
+    case 'threatEvaluated': {
+      const asset = assetPhrase(event.assetId);
       return {
         source: 'command',
         text:
           event.closestApproachM < 500
-            ? `${trackName(event.trackId)} is flying straight at the battery: closest approach in ${formatIn(event.timeToClosestS)}.`
-            : `${trackName(event.trackId)} is heading for the battery: it passes ${formatKm(event.closestApproachM)} away in ${formatIn(event.timeToClosestS)}.`,
+            ? `${trackName(event.trackId)} is flying straight at ${asset}: closest approach in ${formatIn(event.timeToClosestS)}.`
+            : `${trackName(event.trackId)} is heading for ${asset}: it passes ${formatKm(event.closestApproachM)} away in ${formatIn(event.timeToClosestS)}.`,
       };
+    }
     case 'engagementAssigned':
       return {
         source: 'command',
-        text: `${trackName(event.trackId)} assigned to the launcher: launch in ${event.launchInS.toFixed(1)} s, intercept ${formatKm(event.predictedRangeM)} out.`,
+        text: `${trackName(event.trackId)} assigned to the launcher: launch in ${event.launchInS.toFixed(1)} s, intercept ${formatKm(event.predictedRangeM)} out, chance of a kill ${percent(event.pk)}.`,
+      };
+    case 'engagementProposed':
+      return {
+        source: 'command',
+        text: `Proposed: fire at ${trackName(event.trackId)}, intercept ${formatKm(event.predictedRangeM)} out in ${formatIn(event.predictedTimeS)}, chance of a kill ${percent(event.pk)}. Waiting for the operator.`,
+      };
+    case 'engagementApproved':
+      return {
+        source: 'command',
+        text: `Operator approved the shot at ${trackName(event.trackId)}.`,
+      };
+    case 'holdFire':
+      return {
+        source: 'command',
+        text: `Operator held fire on ${trackName(event.trackId)}: no new proposal for 20 s.`,
+      };
+    case 'rulesChanged':
+      return {
+        source: 'command',
+        text: `Rules changed: weapons ${event.rules.weaponsControl}, ${event.rules.operatorMode === 'AUTO' ? 'automatic engagement' : 'operator approves each shot'}.`,
       };
     case 'engagementCancelled':
       return {
@@ -167,8 +201,16 @@ function describeResult(event: Extract<SimEvent, { kind: 'interceptResult' }>): 
   const i = interceptorName(event.interceptorId);
   const t = trackName(event.trackId);
   const miss = event.missDistanceM === null ? '' : formatMiss(event.missDistanceM);
-  if (event.hit) return `${i} hit ${t} (closest approach ${miss}).`;
+  if (event.hit) {
+    const mistake =
+      event.targetAffiliation === 'hostile'
+        ? ''
+        : ` It was ${event.targetAffiliation === 'friend' ? 'a friendly aircraft' : 'a civil aircraft'}: an identification failure.`;
+    return `${i} hit ${t} (closest approach ${miss}).${mistake}`;
+  }
   switch (event.reason) {
+    case 'survived':
+      return `${i} burst ${miss} from ${t}, but ${t} survived (chance of a kill was ${percent(event.pk ?? 0)}).`;
     case 'outOfTime':
       return `${i} ran out of flight time, ${miss} from ${t}.`;
     case 'ground':
@@ -218,9 +260,22 @@ function describeSituation(snapshot: Snapshot, recent: readonly SimEvent[]): str
       ? `${i} hit ${t}. The radar will look again to confirm the kill.`
       : `${i} missed ${t}. The radar will look again before firing another.`;
   }
-  if (latest('threatLeaked', RECENT_KILL_S)) {
-    return 'A hostile reached the battery: the defense was too late.';
+  const leak = latest('threatLeaked', RECENT_KILL_S);
+  if (leak) return `A hostile reached ${assetPhrase(leak.assetId)}: the defense was too late.`;
+
+  const proposal = snapshot.engagements.find((e) => e.state === 'proposed');
+  if (proposal) {
+    const track = snapshot.tracks.find((t) => t.id === proposal.trackId);
+    const heading = track?.threat ? `, heading for ${assetPhrase(track.threat.assetId)}` : '';
+    return `Your call: fire at ${trackName(proposal.trackId)}${heading}? Chance of a kill ${percent(proposal.pk)}. Press A to approve or H to hold fire.`;
   }
+  const waiting = snapshot.tracks.filter(
+    (t) => t.threat && t.engagementId === null && t.identity === 'hostile',
+  ).length;
+  const saturated =
+    snapshot.channels.used >= snapshot.channels.total && waiting > 0
+      ? ` Saturated: all ${snapshot.channels.total} fire channels busy, ${waiting} more ${waiting === 1 ? 'threat waits' : 'threats wait'}.`
+      : '';
 
   const flying = snapshot.engagements
     .filter((e) => e.state === 'flying')
@@ -229,7 +284,7 @@ function describeSituation(snapshot: Snapshot, recent: readonly SimEvent[]): str
   const first = flying[0];
   if (first) {
     const more = flying.length > 1 ? ` ${flying.length - 1} more in flight.` : '';
-    return `Engaging ${trackName(first.e.trackId)}: interceptor ${interceptorName(first.e.interceptorId ?? 0)} in flight, intercept in ${formatIn(first.inS)}.${more}`;
+    return `Engaging ${trackName(first.e.trackId)}: interceptor ${interceptorName(first.e.interceptorId ?? 0)} in flight, intercept in ${formatIn(first.inS)}.${more}${saturated}`;
   }
   const assigned = snapshot.engagements.find((e) => e.state === 'assigned');
   if (assigned) {
@@ -239,7 +294,14 @@ function describeSituation(snapshot: Snapshot, recent: readonly SimEvent[]): str
     .filter((t) => t.threat && t.engagementId === null)
     .sort((a, b) => (a.threat?.timeToClosestS ?? 0) - (b.threat?.timeToClosestS ?? 0))[0];
   if (threat?.threat) {
-    const head = `${trackName(threat.id)} is heading for the battery (closest approach in ${formatIn(threat.threat.timeToClosestS)})`;
+    const who =
+      threat.identity === 'unknown' ? `Unknown ${trackName(threat.id)}` : trackName(threat.id);
+    const head = `${who} is heading for ${assetPhrase(threat.threat.assetId)} (closest approach in ${formatIn(threat.threat.timeToClosestS)})`;
+    if (snapshot.rules.weaponsControl === 'HOLD') return `${head}, but weapons are on HOLD.`;
+    if (threat.identity === 'unknown' && snapshot.rules.weaponsControl === 'TIGHT') {
+      return `${head}: weapons TIGHT, so the battery waits for the next identification check.`;
+    }
+    if (saturated) return `${head}.${saturated}`;
     return snapshot.launcher.ready === 0
       ? `${head}, but no interceptors are ready.`
       : `${head}: waiting until an interceptor can reach it.`;
@@ -257,6 +319,7 @@ function describePicture(snapshot: Snapshot): string {
   const unconfirmed = tracks.filter((t) => t.confirmedTick === null).length;
   const parts = [
     [count('hostile'), 'hostile'],
+    [count('unknown'), 'unknown'],
     [count('friend'), 'friendly'],
     [count('neutral'), 'civil'],
     [count('pending'), 'being identified'],

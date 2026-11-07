@@ -28,11 +28,11 @@ The Earth curves away, so a radar cannot see targets below its horizon. Radio wa
 
 Cards are added as their steps land. File names are `NN-M-slug.md`: step `NN`, order `M` within the step.
 
-| Step | Concepts                                                                                                                                                                    |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | [Fixed time step and determinism](01-1-fixed-time-step.md) · [Antenna rotation](01-2-antenna-rotation.md)                                                                   |
-| 2    | [Local coordinates](02-1-local-coordinates.md) · [Seeing scale](02-2-seeing-scale.md)                                                                                       |
-| 3    | [Detection range](03-1-detection-range.md) · [Proportional navigation](03-2-proportional-navigation.md)                                                                     |
-| 4    | [Radar horizon](04-1-radar-horizon.md) · [Terrain masking](04-2-terrain-masking.md) · [Detection probability](04-3-detection-probability.md) · [Air drag](04-4-air-drag.md) |
-| 5    | [Kalman filter](05-1-kalman-filter.md) · [Gating and association](05-2-gating-association.md)                                                                               |
-| 6    | Closest point of approach · engagement envelope · kill probability                                                                                                          |
+| Step | Concepts                                                                                                                                                                                                                |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | [Fixed time step and determinism](01-1-fixed-time-step.md) · [Antenna rotation](01-2-antenna-rotation.md)                                                                                                               |
+| 2    | [Local coordinates](02-1-local-coordinates.md) · [Seeing scale](02-2-seeing-scale.md)                                                                                                                                   |
+| 3    | [Detection range](03-1-detection-range.md) · [Proportional navigation](03-2-proportional-navigation.md)                                                                                                                 |
+| 4    | [Radar horizon](04-1-radar-horizon.md) · [Terrain masking](04-2-terrain-masking.md) · [Detection probability](04-3-detection-probability.md) · [Air drag](04-4-air-drag.md)                                             |
+| 5    | [Kalman filter](05-1-kalman-filter.md) · [Gating and association](05-2-gating-association.md)                                                                                                                           |
+| 6    | [Closest point of approach](06-1-closest-point-of-approach.md) · [Engagement envelope](06-2-engagement-envelope.md) · [Kill probability](06-3-kill-probability.md) · [Rules of engagement](06-4-rules-of-engagement.md) |

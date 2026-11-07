@@ -278,7 +278,7 @@ export function ScopeLegend() {
         <svg viewBox="0 0 16 12" className="h-3 w-4" aria-hidden="true">
           <path d="M1 6h14" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="2.5 2" />
         </svg>
-        defended area (5 km)
+        defended assets
       </li>
       <li className="flex items-center gap-1">
         <svg viewBox="0 0 16 12" className="h-3 w-4" aria-hidden="true">

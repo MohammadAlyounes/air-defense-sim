@@ -6,17 +6,21 @@ import type { LogSource } from './narrator';
 export interface LogEntry {
   id: number;
   timeS: number;
-  /** The aircraft the line is about (ground-truth id), so the line can select it. */
-  /** The aircraft the line is about, or null (a false alarm has no aircraft behind it). */
+  /** The aircraft the line is about, so the line can select it (null: a false alarm). */
   aircraftId: number | null;
   source: LogSource;
   text: string;
 }
 
-/** A short summary after an engagement ends: a confirmed kill, or a threat that got through. */
+/**
+ * A short summary after an engagement ends: a confirmed kill, a threat that got through, or a
+ * friendly or civil aircraft shot down (an identification failure).
+ */
 export interface ResultCard {
   id: number;
-  kind: 'kill' | 'leak';
+  kind: 'kill' | 'leak' | 'idError';
+  /** The defended asset a leak reached. */
+  asset: string | null;
   timeS: number;
   trackId: number | null;
   /** What it really was: revealed after the fact. */

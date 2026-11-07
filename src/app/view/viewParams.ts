@@ -10,7 +10,13 @@ export interface ViewOptions {
   state: Partial<
     Pick<
       ViewState,
-      'cameraMode' | 'heightScale' | 'selectedId' | 'showLabels' | 'coverageAltM' | 'compareTruth'
+      | 'cameraMode'
+      | 'heightScale'
+      | 'selectedId'
+      | 'showLabels'
+      | 'coverageAltM'
+      | 'compareTruth'
+      | 'showEnvelope'
     >
   >;
   /** `welcome=0` hides the first-visit welcome card (screenshots, embeds). */
@@ -38,6 +44,9 @@ export function parseViewOptions(search: string): ViewOptions {
 
   const labels = params.get('labels');
   if (labels !== null) state.showLabels = !OFF.includes(labels);
+
+  const envelope = params.get('envelope');
+  if (envelope !== null) state.showEnvelope = !OFF.includes(envelope);
 
   const truth = params.get('truth');
   if (truth !== null) state.compareTruth = !OFF.includes(truth);

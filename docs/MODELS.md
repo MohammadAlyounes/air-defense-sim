@@ -124,23 +124,57 @@ Aim points use `r = R·√u` (with `u` uniform), which spreads them evenly over 
 
 **Limitations:** constant-velocity model only (no turn models or interacting multiple models); nearest-neighbour association can swap tracks between targets closer than the gate, most visibly when a drone swarm first appears.
 
-## Identification and threat evaluation (Step 3)
+## Defended assets (Step 6)
 
-- **Identification:** 2 s after a track is confirmed, the identification check answers: friendly aircraft reply (friend), civil aircraft broadcast a civil transponder code (civil), anything else is treated as hostile. Step 6 adds mistakes.
-- **Threat:** a hostile track whose straight course passes within 5 km of the battery, still approaching. With the track's ground position `p` and velocity `v`:
+| Asset       | Position (east, north) | Threat ring | Leak radius |
+| ----------- | ---------------------- | ----------- | ----------- |
+| Battery     | 0, 0                   | 5 km        | 2 km        |
+| Town        | −6.5 km, 4 km          | 2.5 km      | 1.5 km      |
+| Power plant | 5 km, −4.5 km          | 1.5 km      | 0.8 km      |
+
+Scenario hostiles aim within 800 m of one of the three, picked at random. A hostile inside any asset's leak radius has got through (counted once per aircraft).
+
+## Identification (Steps 3 and 6)
+
+- **Checks (IFF):** the first 2 s after a track is confirmed, then every 4 s while it stays silent, at most two.
+- **Answers:** a friendly aircraft answers each check with probability 0.9 (its transponder can fail); a civil aircraft's code is received with probability 0.98; a hostile never answers. One random draw per check.
+- **Identity:** an answer settles it (friend or civil). Silence on the first check makes the track **unknown**; silence on both makes it **hostile**. A friendly aircraft silent on both checks (probability 0.1² = 1%) is declared hostile: the identification mistake the rules must guard against. A false track has nothing behind it to answer.
+
+## Threat evaluation (Steps 3 and 6)
+
+- **Closest point of approach** to each asset, from the track's ground position relative to the asset `r` and velocity `v`:
 
   ```
-  t_cpa = −(p · v) / |v|²        d_cpa = |p + v · t_cpa|
+  t_cpa = −(r · v) / |v|²        d_cpa = |r + v · t_cpa|
   ```
 
-  It is a threat if `d_cpa < 5 km` and `t_cpa > 0`. Threats are ranked by `t_cpa`, which is also the header's "next impact".
+- A hostile or unknown track is a threat to an asset if `d_cpa` is inside the asset's threat ring and `t_cpa > 0`. It is assigned to the asset it reaches soonest, and threats are ranked by `t_cpa` (the header's "next impact").
 
-## Weapon assignment (Step 3)
+## Rules of engagement (Step 6)
+
+- **Weapons control status:** HOLD (never fire), TIGHT (hostile tracks only; the default), FREE (hostile and unknown tracks).
+- **Operator mode:** AUTO (the command node fires on its own) or SEMI-AUTO (each shot is proposed and waits for the operator's approval; a proposal lapses when the shot becomes impossible or no longer allowed; holding fire blocks new proposals for that track for 20 s). Switching to AUTO approves waiting proposals.
+- **Commands:** `setRules`, `approveEngagement` and `holdFire` are recorded like every other command, so runs with rule changes replay exactly.
+- **Identification errors:** a friendly or civil aircraft destroyed by an interceptor is counted in `idErrors` and reported as a failure.
+
+## Weapon assignment (Steps 3 and 6)
 
 - **Predicted intercept point:** the earliest flight time `t` at which the interceptor can be where the track will be: `0.9 · reach(t) ≥ |p + v · t|`. It is found by scanning in 0.25 s steps, then bisecting. The 0.9 keeps a margin for turns, climbs and the drag during the boost. Since Step 4, `reach` includes drag at the air density halfway up to the target.
-- **Rules:** assign only if `t ≤ 34 s`, the point is at least 1.5 km from the launcher, and the track had a plot within the last 1.25 turns (the battery does not fire at a stale track). The most urgent unengaged threat gets the next launch slot: 1.5 s to prepare, at least 2 s between launches.
+- **Engagement envelope:** for a target at altitude `h`, the farthest ground range is `√(R² − h²)` with `R = 0.9 · reach(34 s, ρ(h/2))`: about 17 km at ground level, 17.1 km at 6 km, closing at 20 km up. The inner edge is the 1.5 km minimum range.
+- **Rules:** assign only if the rules allow the track's identity, a fire channel is free, `t ≤ 34 s`, the point is at least 1.5 km from the launcher, and the track had a plot within the last 1.25 turns. The most urgent threat gets the next launch slot: 1.5 s to prepare, at least 2 s between launches.
+- **Fire channels (Step 6):** the tracking radar guides at most 3 engagements at once (proposed, waiting to launch or in flight). More threats than channels means the rest wait: saturation.
 - **Launcher:** 12 ready rounds; while not full, one round is reloaded every 30 s.
 - **Shoot-look-shoot:** one interceptor per target at a time; after a shot, the battery waits for the radar's next look.
+
+## Kill probability (Step 6)
+
+When the fuze goes off within the 15 m lethal radius, one random draw against the single-shot kill probability decides:
+
+```
+Pk = Pk_target × clamp(v_interceptor / 600 m/s, 0.5, 1),   Pk_target = 0.95 (≤ 120 m/s), 0.85 (≤ 250 m/s), 0.75 (faster)
+```
+
+The planner predicts it with the track's speed and the interceptor's planned arrival speed (`speedAfterMps`); the fuze uses the true speeds. A failed draw is a miss with reason "survived". This is a generic teaching model: no seeker, fuze or warhead detail (SAFETY.md).
 
 ## Interceptor and guidance (Step 3)
 
@@ -189,11 +223,11 @@ A generic, fictional interceptor, modelled as a point mass (round numbers chosen
 
 **Limitations:** no guidance phases and, while it sees the target, a perfect tracking radar: the interceptor is guided to the real target. Against non-maneuvering targets in view, proportional navigation hits almost dead centre. The steering limit does not depend on air density.
 
-## Kill assessment and leaks (Step 3)
+## Kill assessment and leaks (Steps 3 and 6)
 
 - **Kill assessed:** after a hit, the next time the beam sweeps over the track's predicted position and finds no echo, the kill is confirmed and the track dropped (at most one turn, 4 s, later).
 - **Target survived:** if the beam finds the target again after a miss, the engagement closes and the track can be assigned again.
-- **Leak:** a hostile that comes within 2 km of the battery got through.
+- **Leak:** a hostile inside any defended asset's leak radius got through (2 km for the battery).
 
 ## Drawing the 3D view (Step 2)
 
