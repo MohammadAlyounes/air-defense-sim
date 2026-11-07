@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Simulation, type SimEvent } from '../../sim';
+import { Simulation, type SimEvent, IDEAL_SEARCH_RADAR } from '../../sim';
 import {
   compassPoint,
   describeEvent,
@@ -105,7 +105,12 @@ describe('describeEvent', () => {
 describe('describeNow', () => {
   /** A jet 30 km north, flying at the battery, with every event recorded. */
   function jetRun() {
-    const sim = new Simulation({ seed: 1, autoTraffic: false });
+    const sim = new Simulation({
+      seed: 1,
+      autoTraffic: false,
+      terrain: false,
+      radar: IDEAL_SEARCH_RADAR,
+    });
     sim.dispatch({
       kind: 'spawnTraffic',
       type: 'jet',
@@ -130,12 +135,14 @@ describe('describeNow', () => {
   it('narrates the loop, from the first echo to the confirmed kill', () => {
     const at = jetRun();
     expect(at(2)).toBe('Radar sweeping, one turn every 4 s. No contacts yet.');
-    expect(at(5)).toBe('Radar sweeping, one turn every 4 s. 1 track: 1 being identified.');
+    expect(at(5)).toBe('Radar sweeping, one turn every 4 s. 1 track: 1 unconfirmed.');
+    expect(at(9)).toBe('Radar sweeping, one turn every 4 s. 1 track: 1 being identified.');
     expect(at(10.5)).toBe('T1 assigned: launch in 1.0 s.');
     expect(at(20)).toMatch(/^Engaging T1: interceptor I1 in flight, intercept in \d+ s\.$/);
-    expect(at(39.2)).toBe('I1 hit T1. The radar will look again to confirm the kill.');
-    expect(at(41.6)).toMatch(
-      /^T1 destroyed, confirmed by the radar 35 s after it was first detected\.$/,
+    // Air drag slows the coasting interceptor: a 31 s flight.
+    expect(at(43)).toBe('I1 hit T1. The radar will look again to confirm the kill.');
+    expect(at(44.5)).toMatch(
+      /^T1 destroyed, confirmed by the radar 39 s after it was first detected\.$/,
     );
   });
 

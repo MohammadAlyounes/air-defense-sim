@@ -1,12 +1,15 @@
 import {
+  coverageAt,
   DEFAULT_DEFENSE,
   TICK_S,
   trackPositionAt,
   TRAFFIC,
+  type CoverageMap,
   type Effect,
   type Identity,
   type RadarSize,
   type Snapshot,
+  type Terrain,
   type Track,
   type TrafficTypeId,
   type Vec3,
@@ -70,6 +73,8 @@ export function createScopeLayout(
   rangeM: number,
   /** Courses passing inside this ring are threats (shown dashed). */
   defendedRadiusM = DEFAULT_DEFENSE.threatRadiusM,
+  /** Drawn as a faint relief map under the rings. */
+  terrain: Terrain | null = null,
 ): ScopeLayout {
   const radiusPx = size / 2 - 4;
   const staticLayer = document.createElement('canvas');
@@ -78,9 +83,103 @@ export function createScopeLayout(
   const ctx = staticLayer.getContext('2d');
   if (ctx) {
     ctx.scale(dpr, dpr);
-    drawStatic(ctx, size, radiusPx, rangeM, defendedRadiusM);
+    drawStatic(ctx, size, radiusPx, rangeM, defendedRadiusM, terrain);
   }
   return { size, dpr, radiusPx, rangeM, staticLayer };
+}
+
+/** Relief colours: contour lines every 100 m, slopes lit from the north-west. */
+const CONTOUR_M = 100;
+
+/**
+ * Paints the terrain inside the scope's circle, one pixel at a time: a little brighter with
+ * height, shaded by slope, with thin contour lines. It stays faint, so echoes stand out.
+ */
+function terrainImage(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  radius: number,
+  rangeM: number,
+  terrain: Terrain,
+): ImageData {
+  const px = ctx.canvas.width;
+  const scale = px / size;
+  const metresPerPx = rangeM / (radius * scale);
+  const c = px / 2;
+  const heights = new Float32Array(px * px);
+  for (let y = 0; y < px; y++) {
+    for (let x = 0; x < px; x++) {
+      heights[y * px + x] = terrain.heightAt((x - c) * metresPerPx, (c - y) * metresPerPx);
+    }
+  }
+  const image = ctx.createImageData(px, px);
+  const data = image.data;
+  const maxH = Math.max(1, terrain.maxHeightM);
+  const r2 = (radius * scale) ** 2;
+  for (let y = 1; y < px - 1; y++) {
+    for (let x = 1; x < px - 1; x++) {
+      if ((x - c) ** 2 + (y - c) ** 2 > r2) continue;
+      const i = y * px + x;
+      const h = heights[i] ?? 0;
+      const dx = ((heights[i + 1] ?? h) - (heights[i - 1] ?? h)) / (2 * metresPerPx);
+      const dy = ((heights[i + px] ?? h) - (heights[i - px] ?? h)) / (2 * metresPerPx);
+      // Light from the north-west: slopes facing it brighten, the others darken.
+      const light = Math.max(-1, Math.min(1, (-dx + dy) * 6));
+      const band = Math.floor(h / CONTOUR_M);
+      const contour =
+        h > 1 &&
+        (band !== Math.floor((heights[i + 1] ?? h) / CONTOUR_M) ||
+          band !== Math.floor((heights[i + px] ?? h) / CONTOUR_M));
+      const lift = (h / maxH) * 0.55;
+      const alpha = Math.max(
+        0,
+        Math.min(1, 0.08 + 0.55 * lift + 0.12 * light + (contour ? 0.22 : 0)),
+      );
+      const o = i * 4;
+      data[o] = 120;
+      data[o + 1] = 190;
+      data[o + 2] = 175;
+      data[o + 3] = Math.round(alpha * 120);
+    }
+  }
+  return image;
+}
+
+/**
+ * Where the radar cannot see a target flying `altitudeM` above the ground: a translucent
+ * orange shade over the scope, from the coverage map. Drawn once per altitude and size.
+ */
+export function createCoverageLayer(
+  layout: ScopeLayout,
+  map: CoverageMap,
+  altitudeM: number,
+): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  const px = layout.staticLayer.width;
+  canvas.width = px;
+  canvas.height = px;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  const scale = px / layout.size;
+  const metresPerPx = layout.rangeM / (layout.radiusPx * scale);
+  const c = px / 2;
+  const r2 = (layout.radiusPx * scale) ** 2;
+  const image = ctx.createImageData(px, px);
+  const data = image.data;
+  for (let y = 0; y < px; y++) {
+    for (let x = 0; x < px; x++) {
+      if ((x - c) ** 2 + (y - c) ** 2 > r2) continue;
+      const blind = coverageAt(map, (x - c) * metresPerPx, (c - y) * metresPerPx) > altitudeM;
+      if (!blind) continue;
+      const o = (y * px + x) * 4;
+      data[o] = 251;
+      data[o + 1] = 146;
+      data[o + 2] = 60;
+      data[o + 3] = 64;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
 }
 
 type ScopeGeometry = Pick<ScopeLayout, 'size' | 'radiusPx' | 'rangeM'>;
@@ -144,6 +243,7 @@ function drawStatic(
   radius: number,
   rangeM: number,
   defendedRadiusM: number,
+  terrain: Terrain | null,
 ) {
   const c = size / 2;
 
@@ -154,6 +254,18 @@ function drawStatic(
   ctx.beginPath();
   ctx.arc(c, c, radius, 0, TWO_PI);
   ctx.fill();
+
+  if (terrain && terrain.maxHeightM > 0) {
+    // putImageData ignores the transform, so the relief goes through a layer of its own.
+    const layer = document.createElement('canvas');
+    layer.width = ctx.canvas.width;
+    layer.height = ctx.canvas.height;
+    const layerCtx = layer.getContext('2d');
+    if (layerCtx) {
+      layerCtx.putImageData(terrainImage(layerCtx, size, radius, rangeM, terrain), 0, 0);
+      ctx.drawImage(layer, 0, 0, size, size);
+    }
+  }
 
   // Range rings every 10 km, labelled along the north-north-east radial.
   ctx.font = '9px "JetBrains Mono Variable", ui-monospace, monospace';
@@ -237,6 +349,8 @@ export function drawScope(
   frame: RenderFrame,
   /** Aircraft selected in the UI: its track gets a highlight box. */
   selectedId: number | null = null,
+  /** Blind-zone shading from `createCoverageLayer`, or null. */
+  coverage: HTMLCanvasElement | null = null,
 ) {
   const { size, dpr, radiusPx } = layout;
   const c = size / 2;
@@ -245,6 +359,7 @@ export function drawScope(
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.drawImage(layout.staticLayer, 0, 0);
+  if (coverage) ctx.drawImage(coverage, 0, 0);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const timeS = previous.timeS + (current.timeS - previous.timeS) * alpha;
@@ -297,7 +412,8 @@ export function drawScope(
   for (const track of current.tracks) drawTrack(ctx, layout, track, tick);
 
   // The selected aircraft: a box around its track symbol.
-  const selected = current.tracks.find((t) => t.truthId === selectedId);
+  const selected =
+    selectedId === null ? undefined : current.tracks.find((t) => t.truthId === selectedId);
   if (selected) {
     const at = trackPositionAt(selected, tick);
     drawSelectionBox(ctx, scopePoint(layout, at.x, at.y));

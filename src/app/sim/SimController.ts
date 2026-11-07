@@ -6,6 +6,7 @@ import {
   type SimEvent,
   type Snapshot,
 } from '../../sim';
+import { worldTerrain } from '../world/world';
 import { summarizeDefense } from './defenseSummary';
 import { describeEvent, describeNow } from './narrator';
 import { SPEED_PRESETS, type LaunchOptions } from './params';
@@ -59,7 +60,7 @@ export class SimController {
   constructor(options: LaunchOptions) {
     this.speed = options.speed;
     this.running = !options.paused;
-    this.sim = new Simulation({ seed: options.seed });
+    this.sim = new Simulation({ seed: options.seed, terrain: worldTerrain() });
     this.current = this.sim.snapshot();
     this.previous = this.current;
     if (options.startAtS > 0) {
@@ -137,7 +138,7 @@ export class SimController {
 
   /** Starts the run over. With the same seed, everything happens again exactly the same way. */
   restart(seed = this.sim.seed): void {
-    this.sim = new Simulation({ seed });
+    this.sim = new Simulation({ seed, terrain: worldTerrain() });
     this.clock.reset();
     this.log = [];
     this.logSeq = 0;

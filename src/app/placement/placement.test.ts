@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { coverageMap, flatTerrain } from '../../sim';
 import {
   headingToBattery,
   isValidDrop,
@@ -52,5 +53,31 @@ describe('placement', () => {
     const facts = placementFacts('drone', { eastM: 0, northM: 12_000 });
     expect(facts.timeToBatteryS).toBeCloseTo(300); // 12 km at 40 m/s
     expect(facts.detectedFromM).toBeCloseTo(9_487, 0); // a tiny radar size
+    // Over the generated terrain it is first seen no farther out than over open ground.
+    expect(facts.firstSeenM).not.toBeNull();
+    expect(facts.firstSeenM ?? Infinity).toBeLessThanOrEqual(facts.detectedFromM);
+  });
+});
+
+describe('first sighting on the route', () => {
+  const flat = flatTerrain();
+  const ridge = {
+    ...flat,
+    // A 400 m ridge 8 to 9 km north of the battery.
+    heightAt: (_east: number, north: number) => (north > 8_000 && north < 9_000 ? 400 : 0),
+  };
+  const world = (terrain: typeof flat) => ({ terrain, coverage: coverageMap(terrain, 12, 40_000) });
+
+  it('over open ground, is the 50% detection range', () => {
+    const facts = placementFacts('cruise', { eastM: 0, northM: 30_000 }, 50, world(flat));
+    expect(facts.firstSeenM).toBeCloseTo(facts.detectedFromM, -3);
+  });
+
+  it('behind a ridge, comes only once the target has crossed it', () => {
+    const facts = placementFacts('cruise', { eastM: 0, northM: 30_000 }, 50, world(ridge));
+    expect(facts.firstSeenM).toBeLessThanOrEqual(9_000);
+    // A jet high above the ridge is in view at once: it is dropped inside its detection range.
+    const jet = placementFacts('jet', { eastM: 0, northM: 30_000 }, 6_000, world(ridge));
+    expect(jet.firstSeenM).toBe(30_000);
   });
 });

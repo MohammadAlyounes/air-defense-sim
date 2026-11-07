@@ -36,6 +36,8 @@ export interface TrafficPerformance {
   radarSize: RadarSize;
   /** Number of aircraft one spawn creates (a swarm is several drones). */
   count: number;
+  /** Fastest climb or descent, used to follow the terrain, m/s. */
+  climbMps: number;
 }
 
 export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
@@ -47,6 +49,7 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     altitudeRef: 'AGL',
     radarSize: 'tiny',
     count: 1,
+    climbMps: 8,
   },
   swarm: {
     id: 'swarm',
@@ -56,6 +59,7 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     altitudeRef: 'AGL',
     radarSize: 'tiny',
     count: 6,
+    climbMps: 8,
   },
   cruise: {
     id: 'cruise',
@@ -65,6 +69,7 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     altitudeRef: 'AGL',
     radarSize: 'small',
     count: 1,
+    climbMps: 60,
   },
   jet: {
     id: 'jet',
@@ -74,6 +79,7 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     altitudeRef: 'MSL',
     radarSize: 'medium',
     count: 1,
+    climbMps: 150,
   },
   friendly: {
     id: 'friendly',
@@ -83,6 +89,7 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     altitudeRef: 'MSL',
     radarSize: 'medium',
     count: 1,
+    climbMps: 30,
   },
   airliner: {
     id: 'airliner',
@@ -92,6 +99,7 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     altitudeRef: 'MSL',
     radarSize: 'large',
     count: 1,
+    climbMps: 15,
   },
 };
 

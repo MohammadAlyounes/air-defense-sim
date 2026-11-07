@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { Simulation } from '../../sim';
+import { Simulation, IDEAL_SEARCH_RADAR } from '../../sim';
 import { summarizeDefense } from './defenseSummary';
 
 function jetInbound() {
-  const sim = new Simulation({ seed: 1, autoTraffic: false });
+  const sim = new Simulation({
+    seed: 1,
+    autoTraffic: false,
+    terrain: false,
+    radar: IDEAL_SEARCH_RADAR,
+  });
   sim.dispatch({
     kind: 'spawnTraffic',
     type: 'jet',
@@ -26,7 +31,7 @@ describe('summarizeDefense', () => {
     expect(stagesAt(9)).toEqual([1, 1, 0, 0, 0, 0, 0]); // confirmed at 8 s
     expect(stagesAt(10.5)).toEqual([1, 1, 1, 1, 1, 0, 0]); // identified, threat, assigned
     expect(stagesAt(20)).toEqual([1, 1, 1, 1, 1, 1, 0]); // interceptor in flight
-    expect(stagesAt(40)).toEqual([0, 0, 0, 0, 0, 0, 0]); // destroyed and assessed
+    expect(stagesAt(45)).toEqual([0, 0, 0, 0, 0, 0, 0]); // destroyed and assessed
   });
 
   it('counts threats, interceptors and the next impact', () => {
@@ -44,7 +49,12 @@ describe('summarizeDefense', () => {
   });
 
   it('lists tracks for the track table, threats first', () => {
-    const sim = new Simulation({ seed: 1, autoTraffic: false });
+    const sim = new Simulation({
+      seed: 1,
+      autoTraffic: false,
+      terrain: false,
+      radar: IDEAL_SEARCH_RADAR,
+    });
     sim.dispatch({
       kind: 'spawnTraffic',
       type: 'friendly',

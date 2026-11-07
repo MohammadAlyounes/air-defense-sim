@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { Simulation } from '../../sim';
+import { Simulation, IDEAL_SEARCH_RADAR } from '../../sim';
 import { aircraftFacts } from './aircraftFacts';
 
-function jetFlyingAt(sim = new Simulation({ seed: 1, autoTraffic: false })) {
+function jetFlyingAt(
+  sim = new Simulation({ seed: 1, autoTraffic: false, terrain: false, radar: IDEAL_SEARCH_RADAR }),
+) {
   sim.dispatch({ kind: 'spawnTraffic', type: 'jet', eastM: 0, northM: -30_000, headingRad: 0 });
   return sim;
 }
@@ -34,7 +36,7 @@ describe('aircraftFacts', () => {
     };
     // Before the beam reaches the south: not detected; a jet is seen from about 36 km.
     expect(at(1)).toEqual(['Not detected', 'Not engaged', 'not detected yet']);
-    expect(aircraftFacts(sim.snapshot(), 1)?.trackDetail).toBe('radar sees it from 36 km');
+    expect(aircraftFacts(sim.snapshot(), 1)?.trackDetail).toBe('seen on half the looks from 36 km');
     expect(at(3)).toEqual(['T1 · identifying', 'Waiting', 'identification check']);
     // First echo at 2 s (the beam reaches the south), confirmed at 6 s, identified and
     // assigned at 8 s, launch 1.5 s later.
@@ -43,7 +45,12 @@ describe('aircraftFacts', () => {
   });
 
   it('shows friendly aircraft as never engaged', () => {
-    const sim = new Simulation({ seed: 1, autoTraffic: false });
+    const sim = new Simulation({
+      seed: 1,
+      autoTraffic: false,
+      terrain: false,
+      radar: IDEAL_SEARCH_RADAR,
+    });
     sim.dispatch({
       kind: 'spawnTraffic',
       type: 'friendly',

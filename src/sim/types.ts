@@ -1,6 +1,12 @@
 import type { Identity } from './c2';
 import type { Vec3 } from './core/vec';
-import type { Affiliation, AircraftType, RadarSize, TrafficTypeId } from './traffic';
+import type {
+  Affiliation,
+  AircraftType,
+  AltitudeReference,
+  RadarSize,
+  TrafficTypeId,
+} from './traffic';
 
 export type EntityId = number;
 
@@ -21,6 +27,10 @@ export interface Aircraft {
   position: Vec3;
   /** Metres per second. */
   velocity: Vec3;
+  /** AGL: it follows the terrain at a set height above the ground; MSL: a set altitude. */
+  altitudeRef: AltitudeReference;
+  /** The height it flies at: above the ground (AGL) or above the datum (MSL), m. */
+  cruiseAltitudeM: number;
   spawnTick: number;
   /** The radar's last paint of it, if any. */
   lastPaint: PaintRecord | null;
@@ -34,14 +44,18 @@ export interface Aircraft {
 export interface Plot {
   tick: number;
   timeS: number;
-  /** Measured position. Perfect in Step 1; measurement noise arrives in Step 5. */
+  /** Measured position: the true one plus measurement noise. */
   position: Vec3;
+  /** Measured bearing and ground range. */
   bearingRad: number;
   rangeM: number;
   /** Echo strength class: bigger objects return stronger echoes. */
   radarSize: RadarSize;
-  /** Ground-truth link for tests and the truth overlay. The radar picture never shows it. */
-  truthId: EntityId;
+  /**
+   * Ground-truth link for tests and the truth overlay: the aircraft that made the echo, or null
+   * for a false alarm (noise that crossed the threshold). The radar picture never shows it.
+   */
+  truthId: EntityId | null;
 }
 
 /**
@@ -52,10 +66,11 @@ export interface Track {
   /** Track number, shown as T1, T2, … */
   id: EntityId;
   /**
-   * The aircraft whose echoes feed this track. Step 3 links each echo to its track by it
-   * (perfect association); Step 6 replaces that with gating and nearest-neighbour association.
+   * The aircraft whose echoes feed this track, or null for a track started by a false alarm.
+   * Until Step 5 each echo is linked to its track by it (perfect association); Step 5 replaces
+   * that with gating and nearest-neighbour association.
    */
-  truthId: EntityId;
+  truthId: EntityId | null;
   createdTick: number;
   /** Ground range at the first echo, m. */
   detectedRangeM: number;
@@ -93,6 +108,11 @@ export interface Interceptor {
   launchTick: number;
   position: Vec3;
   velocity: Vec3;
+  /**
+   * False while terrain or the horizon hides the target from the radar: the interceptor then
+   * steers toward where the track says the target should be.
+   */
+  targetInView: boolean;
   /** Recent positions, every 0.1 s, oldest first, last 6 s. */
   trail: readonly Vec3[];
 }
@@ -151,8 +171,8 @@ export interface DefenseStats {
 interface EventBase {
   tick: number;
   timeS: number;
-  /** The aircraft the event is about (ground truth), so the UI can select it. */
-  id: EntityId;
+  /** The aircraft the event is about (ground truth), so the UI can select it; null for a false alarm. */
+  id: EntityId | null;
 }
 
 interface TrackEventBase extends EventBase {
@@ -166,6 +186,8 @@ export type SimEvent =
   | (EventBase & { kind: 'threatLeaked'; type: AircraftType })
   | (TrackEventBase & { kind: 'contactNew'; bearingRad: number; rangeM: number })
   | (TrackEventBase & { kind: 'contactLost'; bearingRad: number; rangeM: number })
+  /** A tentative track whose second echo never came: most often a false alarm. */
+  | (TrackEventBase & { kind: 'contactDropped'; bearingRad: number; rangeM: number })
   | (TrackEventBase & { kind: 'trackConfirmed'; speedMps: number; altitudeM: number })
   | (TrackEventBase & { kind: 'identified'; identity: Exclude<Identity, 'pending'> })
   | (TrackEventBase & { kind: 'threatEvaluated'; closestApproachM: number; timeToClosestS: number })
@@ -210,6 +232,7 @@ export type Command =
       northM: number;
       /** Compass heading: 0 = north, clockwise. */
       headingRad: number;
+      /** Above the ground for terrain-following types (drones, cruise), above the datum otherwise. */
       altitudeM?: number;
     }
   | { kind: 'removeAircraft'; id: EntityId };
@@ -224,8 +247,10 @@ export interface RadarView {
   azimuthRad: number;
   periodS: number;
   rangeM: number;
-  /** Range at which a 1 m² target is just detected, m. */
+  /** Range at which a 1 m² target is detected on half of the scans, m. */
   referenceRangeM: number;
+  /** Antenna height above the ground, m. */
+  antennaHeightM: number;
 }
 
 /** A read-only picture of the simulation at one tick, for rendering. */

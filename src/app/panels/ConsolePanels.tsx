@@ -69,7 +69,7 @@ export function TrackTablePanel({ className }: { className?: string }) {
                   onClick={() => useViewStore.getState().select(row.truthId)}
                   className={clsx(
                     'cursor-pointer border-t border-ink-800/70 transition-colors hover:bg-ink-850',
-                    row.truthId === selectedId && 'bg-ink-800',
+                    row.truthId !== null && row.truthId === selectedId && 'bg-ink-800',
                   )}
                 >
                   <td className="py-1 pr-2 pl-3">
@@ -79,7 +79,9 @@ export function TrackTablePanel({ className }: { className?: string }) {
                         event.stopPropagation();
                         useViewStore.getState().select(row.truthId);
                       }}
-                      aria-current={row.truthId === selectedId ? 'true' : undefined}
+                      aria-current={
+                        row.truthId !== null && row.truthId === selectedId ? 'true' : undefined
+                      }
                       className="font-semibold text-ink-100 hover:text-accent"
                     >
                       T{row.id}
@@ -211,10 +213,13 @@ export function EventLogPanel() {
               <button
                 type="button"
                 onClick={() => useViewStore.getState().select(entry.aircraftId)}
-                aria-current={entry.aircraftId === selectedId ? 'true' : undefined}
+                aria-current={
+                  entry.aircraftId !== null && entry.aircraftId === selectedId ? 'true' : undefined
+                }
                 className={clsx(
                   'flex w-full gap-2 rounded px-1.5 py-1 text-left transition-colors hover:bg-ink-850',
-                  entry.aircraftId === selectedId &&
+                  entry.aircraftId !== null &&
+                    entry.aircraftId === selectedId &&
                     'bg-ink-800 shadow-[inset_2px_0_0_0_var(--color-accent)]',
                 )}
               >

@@ -9,18 +9,47 @@ export {
   type Identity,
   type Intercept,
 } from './c2';
+export {
+  EXPONENTIAL_ATMOSPHERE,
+  SCALE_HEIGHT_M,
+  SEA_LEVEL_DENSITY_KGM3,
+  type Atmosphere,
+} from './atmosphere';
 export { FixedStepClock, TICK_HZ, TICK_S } from './core/clock';
 export { Rng, type RngState } from './core/rng';
-export { bearing, groundRange, type Vec3 } from './core/vec';
-export { DEFAULT_INTERCEPTOR, reachM, type InterceptorConfig } from './interceptor';
+export { bearing, distance, groundRange, vec3, type Vec3 } from './core/vec';
+export { DEFAULT_INTERCEPTOR, reachM, speedAfterMps, type InterceptorConfig } from './interceptor';
+export {
+  coverageAt,
+  coverageMap,
+  curvatureDropM,
+  EFFECTIVE_EARTH_RADIUS_M,
+  lineOfSight,
+  radarHorizonM,
+  type CoverageMap,
+  type Visibility,
+} from './propagation';
 export {
   antennaAzimuth,
   DEFAULT_SEARCH_RADAR,
+  detectionProbability,
   detectionRangeM,
+  falseAlarmsPerTurn,
+  IDEAL_SEARCH_RADAR,
+  lookProbability,
+  signalToNoise,
+  type DetectionModel,
   type SearchRadarConfig,
 } from './radar';
 export { DEFAULT_AUTO_TRAFFIC, type AutoTrafficConfig } from './scenario';
 export { Simulation, type SimConfig } from './simulation';
+export {
+  createTerrain,
+  DEFAULT_TERRAIN,
+  flatTerrain,
+  type Terrain,
+  type TerrainConfig,
+} from './terrain';
 export { trackPositionAt } from './tracker';
 export {
   RADAR_CROSS_SECTION_M2,
