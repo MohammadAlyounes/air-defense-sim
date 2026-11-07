@@ -110,6 +110,11 @@ export function describeEvent(event: SimEvent): LogLine {
         source: 'radar',
         text: `Contact ${trackName(event.trackId)} lost at bearing ${formatBearing(event.bearingRad)}, ${formatKm(event.rangeM)}.`,
       };
+    case 'contactDropped':
+      return {
+        source: 'radar',
+        text: `Contact ${trackName(event.trackId)} dropped: no second echo (probably a false alarm or a weak echo).`,
+      };
     case 'trackConfirmed':
       return {
         source: 'radar',
@@ -246,12 +251,16 @@ function describePicture(snapshot: Snapshot): string {
   const sweep = `Radar sweeping, one turn every ${snapshot.radar.periodS} s.`;
   const { tracks } = snapshot;
   if (tracks.length === 0) return `${sweep} No contacts yet.`;
-  const count = (identity: string) => tracks.filter((t) => t.identity === identity).length;
+  const count = (identity: string) =>
+    tracks.filter((t) => t.identity === identity && t.confirmedTick !== null).length;
+  // A single echo is not yet a track: it may be a weak echo or a false alarm.
+  const unconfirmed = tracks.filter((t) => t.confirmedTick === null).length;
   const parts = [
     [count('hostile'), 'hostile'],
     [count('friend'), 'friendly'],
     [count('neutral'), 'civil'],
     [count('pending'), 'being identified'],
+    [unconfirmed, 'unconfirmed'],
   ] as const;
   const detail = parts
     .filter(([n]) => n > 0)

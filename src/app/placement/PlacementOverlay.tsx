@@ -92,7 +92,8 @@ function Readout({
   target: NonNullable<ReturnType<typeof usePlacementStore.getState>['target']>;
 }) {
   const info = TRAFFIC_BY_ID[type];
-  const facts = placementFacts(type, target.at);
+  const facts = placementFacts(type, target.at, altitudeM);
+  const masked = facts.firstSeenM === null || facts.firstSeenM < facts.detectedFromM - 1_000;
   const tooFar = facts.rangeM > MAX_DROP_RANGE_M;
   // Keep the card on screen: flip to the left or above near the edges.
   const left = x + 300 > window.innerWidth ? x - 296 : x + 22;
@@ -114,9 +115,19 @@ function Readout({
             {formatBearing(facts.bearingRad)} · {grouped.format(altitudeM)} m
           </p>
           <p className="mt-0.5">
-            Reaches the battery in {formatIn(facts.timeToBatteryS)} · the radar sees it from{' '}
-            {formatKm(facts.detectedFromM)}
+            Reaches the battery in {formatIn(facts.timeToBatteryS)} ·{' '}
+            {facts.firstSeenM === null ? (
+              'the radar never sees it on this route'
+            ) : (
+              <>the radar should see it from {formatKm(facts.firstSeenM)}</>
+            )}
           </p>
+          {masked && facts.firstSeenM !== null && (
+            <p className="mt-0.5 text-warn" data-testid="placement-masked">
+              Terrain hides it until then: over open ground it would be seen from{' '}
+              {formatKm(facts.detectedFromM)}.
+            </p>
+          )}
           <p className="mt-1 text-[10.5px] text-ink-300">
             Scroll: altitude · {mode === 'drag' ? 'release' : 'click'} to place
           </p>

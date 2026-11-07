@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SEARCH_RADAR, detectionRangeM } from './radar';
+import { DEFAULT_SEARCH_RADAR, detectionRangeM, IDEAL_SEARCH_RADAR } from './radar';
 import { Simulation } from './simulation';
 
-/** A simulation with an empty sky, for tests that place their own traffic. */
-const emptySky = (seed = 1) => new Simulation({ seed, autoTraffic: false });
+/**
+ * A simulation with an empty sky over flat ground and an ideal radar (no noise, no false
+ * alarms, sure detection inside the 50% range), for tests that place their own traffic.
+ */
+const emptySky = (seed = 1) =>
+  new Simulation({ seed, autoTraffic: false, terrain: false, radar: IDEAL_SEARCH_RADAR });
 
 describe('Simulation: determinism', () => {
   it('produces identical runs for the same seed', () => {
@@ -112,23 +116,44 @@ describe('Simulation: search radar', () => {
     plots.forEach((plot, turn) => expect(plot.timeS).toBeCloseTo(1 + 4 * turn, 0));
   });
 
-  it('reports a new contact, then loses it when the target flies out of range', () => {
+  it('reports a new contact, then drops it when no second echo comes', () => {
     const sim = emptySky();
-    // A jet is detected out to about 35.7 km: painted once at 35.3 km, then out of reach.
+    // A jet is detected out to about 35.7 km (slant range, from the antenna): painted once at
+    // 34.9 km, then out of reach before the next look, so the tentative track is dropped.
     sim.dispatch({
       kind: 'spawnTraffic',
       type: 'jet',
-      eastM: 35_000,
+      eastM: 34_000,
+      northM: 0,
+      headingRad: Math.PI / 2,
+    });
+    const events = sim.run(1_400);
+    expect(events.map((e) => e.kind)).toEqual([
+      'trafficEntered',
+      'contactNew',
+      'contactDropped',
+      'trafficLeft',
+    ]);
+  });
+
+  it('loses a confirmed track after three silent antenna turns', () => {
+    const sim = emptySky();
+    // Painted at 33.0 and 34.4 km (confirmed), then out of reach.
+    sim.dispatch({
+      kind: 'spawnTraffic',
+      type: 'jet',
+      eastM: 32_700,
       northM: 0,
       headingRad: Math.PI / 2,
     });
     const events = sim.run(1_100);
-    expect(events.map((e) => e.kind)).toEqual([
-      'trafficEntered',
-      'contactNew',
-      'contactLost',
-      'trafficLeft',
-    ]);
+    const lost = events.find((e) => e.kind === 'contactLost');
+    const confirmed = events.find((e) => e.kind === 'trackConfirmed');
+    expect(confirmed).toBeDefined();
+    expect(lost).toBeDefined();
+    // Last echo at ~5 s; lost once more than 12 s have passed without one.
+    expect((lost?.timeS ?? 0) - (confirmed?.timeS ?? 0)).toBeGreaterThan(12);
+    expect((lost?.timeS ?? 0) - (confirmed?.timeS ?? 0)).toBeLessThanOrEqual(16);
   });
 
   it('counts only the contacts the radar has actually painted', () => {

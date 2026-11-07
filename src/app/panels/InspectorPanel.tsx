@@ -173,6 +173,13 @@ function Details({ id }: { id: number }) {
           detail={facts.defenseDetail}
           tone={TONE[facts.defenseTone]}
         />
+        <Fact
+          label="Radar view"
+          value={facts.radarView}
+          detail={facts.radarViewDetail}
+          tone={TONE[facts.radarViewTone]}
+          wide
+        />
       </dl>
     </div>
   );
@@ -183,14 +190,17 @@ function Fact({
   value,
   detail,
   tone = 'text-ink-100',
+  wide = false,
 }: {
   label: string;
   value: ReactNode;
   detail?: string;
   tone?: string;
+  /** Spans the whole row. */
+  wide?: boolean;
 }) {
   return (
-    <div className="min-w-0">
+    <div className={clsx('min-w-0', wide && 'col-span-3')} data-fact={label}>
       <dt className="truncate text-[9.5px] uppercase tracking-[0.1em] text-ink-300">{label}</dt>
       <dd className={clsx('truncate font-mono text-[12px] tabular-nums', tone)}>{value}</dd>
       {detail && <dd className="truncate text-[10.5px] text-ink-300">{detail}</dd>}

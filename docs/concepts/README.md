@@ -28,12 +28,12 @@ The Earth curves away, so a radar cannot see targets below its horizon. Radio wa
 
 Cards are added as their steps land. File names are `NN-M-slug.md`: step `NN`, order `M` within the step.
 
-| Step | Concepts                                                                                                  |
-| ---- | --------------------------------------------------------------------------------------------------------- |
-| 1    | [Fixed time step and determinism](01-1-fixed-time-step.md) · [Antenna rotation](01-2-antenna-rotation.md) |
-| 2    | [Local coordinates](02-1-local-coordinates.md) · [Seeing scale](02-2-seeing-scale.md)                     |
-| 3    | [Detection range](03-1-detection-range.md) · [Proportional navigation](03-2-proportional-navigation.md)   |
-| 4    | Air density · drag · turn radius · radar equation · radar horizon · terrain masking · clutter             |
-| 5    | Noise and the Kalman filter · identification friend-or-foe · closest point of approach                    |
-| 6    | Engagement envelope · missile energy · kill probability · kill assessment · saturation                    |
-| 7    | Monte Carlo and probability                                                                               |
+| Step | Concepts                                                                                                                                                                                                                                         |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | [Fixed time step and determinism](01-1-fixed-time-step.md) · [Antenna rotation](01-2-antenna-rotation.md)                                                                                                                                        |
+| 2    | [Local coordinates](02-1-local-coordinates.md) · [Seeing scale](02-2-seeing-scale.md)                                                                                                                                                            |
+| 3    | [Detection range](03-1-detection-range.md) · [Proportional navigation](03-2-proportional-navigation.md)                                                                                                                                          |
+| 4    | [Radar horizon](04-1-radar-horizon.md) · [Terrain masking](04-2-terrain-masking.md) · [Detection probability](04-3-detection-probability.md) · [Air drag](04-4-air-drag.md) · coming: turn radius · radar equation and RCS · clutter and Doppler |
+| 5    | Noise and the Kalman filter · identification friend-or-foe · closest point of approach                                                                                                                                                           |
+| 6    | Engagement envelope · missile energy · kill probability · kill assessment · saturation                                                                                                                                                           |
+| 7    | Monte Carlo and probability                                                                                                                                                                                                                      |

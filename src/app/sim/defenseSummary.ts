@@ -27,8 +27,8 @@ export interface DefenseSummary {
 /** One line of the track table: the battery's picture of one aircraft. */
 export interface TrackRow {
   id: number;
-  /** The aircraft behind the track, so a row can select it. */
-  truthId: number;
+  /** The aircraft behind the track, so a row can select it (null: a false alarm). */
+  truthId: number | null;
   identity: Identity;
   rangeM: number;
   altitudeM: number;

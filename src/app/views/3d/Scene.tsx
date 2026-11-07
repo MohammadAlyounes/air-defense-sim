@@ -1,60 +1,46 @@
-import { Grid, Line } from '@react-three/drei';
-import { useLayoutEffect, useMemo, useRef } from 'react';
-import type { Material, Mesh } from 'three';
+import { Line } from '@react-three/drei';
+import { useMemo } from 'react';
+import { useViewStore } from '../../view/viewStore';
 import { DEFENDED_RADIUS_KM, RADAR_RANGE_KM, RING_STEP_KM } from './sceneConstants';
+import { TerrainLayer } from './Terrain';
+import { groundSceneY } from './terrainGeometry';
 
-function circlePoints(radius: number, segments = 128): [number, number, number][] {
-  return Array.from({ length: segments + 1 }, (_, i) => {
+/** Lines drawn over the terrain float this far above it, m, before the height stretch. */
+const DRAPE_LIFT_M = 25;
+
+/** A circle around the battery that follows the ground, in scene units. */
+function drapedCircle(radiusKm: number, heightScale: number, segments = 160) {
+  return Array.from({ length: segments + 1 }, (_, i): [number, number, number] => {
     const angle = (i / segments) * 2 * Math.PI;
-    return [radius * Math.sin(angle), 0.004, -radius * Math.cos(angle)];
+    const eastM = radiusKm * 1000 * Math.sin(angle);
+    const northM = radiusKm * 1000 * Math.cos(angle);
+    const y = groundSceneY(eastM, northM, heightScale) + (DRAPE_LIFT_M / 1000) * heightScale;
+    return [eastM / 1000, y, -northM / 1000];
   });
 }
 
 /**
- * Ground grid and range rings every 10 km, like the scope (their labels are in Labels.tsx).
+ * The ground: procedural terrain (with the radar sweep and blind zones drawn on it), and range
+ * rings every 10 km that follow the hills, like the scope (their labels are in Labels.tsx).
  *
- * The ground layers sit a few metres apart, which a depth buffer cannot separate from 100 km
- * away, so they skip depth writes and are drawn in a fixed order instead: ground, grid,
- * radar sweep, rings. Nothing is ever below the ground, so nothing needs hiding by it.
+ * The rings are drawn after the terrain without a depth test, so a ring a few metres above a
+ * slope never flickers in and out of it from 100 km away.
  */
 export function GroundAndRings() {
-  const grid = useRef<Mesh>(null);
-  useLayoutEffect(() => {
-    const material = grid.current?.material as Material | undefined;
-    if (material) material.depthWrite = false;
-  }, []);
+  const heightScale = useViewStore((state) => state.heightScale);
   const rings = useMemo(
     () =>
       Array.from({ length: RADAR_RANGE_KM / RING_STEP_KM }, (_, i) => {
         const radius = (i + 1) * RING_STEP_KM;
-        return { radius, points: circlePoints(radius) };
+        return { radius, points: drapedCircle(radius, heightScale) };
       }),
-    [],
+    [heightScale],
   );
-  const defended = useMemo(() => circlePoints(DEFENDED_RADIUS_KM, 96), []);
+  const defended = useMemo(() => drapedCircle(DEFENDED_RADIUS_KM, heightScale, 96), [heightScale]);
 
   return (
     <group>
-      {/* Solid ground under the grid, so drop lines have something to land on. */}
-      <mesh rotation-x={-Math.PI / 2} position-y={-0.01} renderOrder={-3}>
-        <circleGeometry args={[160, 96]} />
-        <meshStandardMaterial color="#07101d" roughness={1} metalness={0} depthWrite={false} />
-      </mesh>
-      <Grid
-        ref={grid}
-        renderOrder={-2}
-        position={[0, 0, 0]}
-        args={[320, 320]}
-        cellSize={1}
-        cellThickness={0.5}
-        cellColor="#0f2a3e"
-        sectionSize={10}
-        sectionThickness={1}
-        sectionColor="#16506a"
-        fadeDistance={150}
-        fadeStrength={1.4}
-        infiniteGrid
-      />
+      <TerrainLayer />
       {rings.map(({ radius, points }) => (
         <Line
           key={radius}
@@ -63,6 +49,8 @@ export function GroundAndRings() {
           lineWidth={radius === RADAR_RANGE_KM ? 1.6 : 1}
           transparent
           depthWrite={false}
+          depthTest={false}
+          renderOrder={1}
           opacity={radius === RADAR_RANGE_KM ? 0.55 : 0.25}
         />
       ))}
@@ -76,6 +64,8 @@ export function GroundAndRings() {
         gapSize={0.4}
         transparent
         depthWrite={false}
+        depthTest={false}
+        renderOrder={1}
         opacity={0.6}
       />
     </group>

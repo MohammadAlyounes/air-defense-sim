@@ -3,34 +3,40 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   MeshBasicMaterial,
-  Plane,
   Raycaster,
   Vector2,
-  Vector3,
   type Group,
   type Mesh,
   type PerspectiveCamera,
 } from 'three';
-import { TRAFFIC } from '../../../sim';
+import { TRAFFIC, type TrafficTypeId } from '../../../sim';
 import { headingToBattery } from '../../placement/placement';
 import { registerDropZone, usePlacementStore } from '../../placement/placementStore';
 import { useViewStore } from '../../view/viewStore';
 import { AFFILIATION_COLOR, aircraftGeometry } from './aircraftModels';
+import { worldTerrain } from '../../world/world';
 import { toScene, worldSizeForPixels, yawForHeading } from './coords';
+import { groundSceneY, rayTerrainHit } from './terrainGeometry';
 
 const GHOST_PX = 30;
 const RIPPLE_MS = 1_200;
 const INVALID_COLOR = '#8fa0bf';
 
-/** Lets traffic be dropped onto the 3D ground: a ray from the camera through the pointer. */
+/** Height of the ghost above the datum, m: what the simulation will fly it at. */
+function ghostAltitudeM(type: TrafficTypeId, eastM: number, northM: number, altitudeM: number) {
+  const ground = worldTerrain().heightAt(eastM, northM);
+  return TRAFFIC[type].altitudeRef === 'AGL'
+    ? ground + altitudeM
+    : Math.max(altitudeM, ground + 150);
+}
+
+/** Lets traffic be dropped onto the 3D terrain: a ray from the camera through the pointer. */
 export function PlacementZone() {
   const camera = useThree((state) => state.camera);
   const canvas = useThree((state) => state.gl.domElement);
   useEffect(() => {
     const raycaster = new Raycaster();
-    const ground = new Plane(new Vector3(0, 1, 0), 0);
     const pointer = new Vector2();
-    const hit = new Vector3();
     return registerDropZone('battlespace', (clientX, clientY) => {
       const box = canvas.getBoundingClientRect();
       pointer.set(
@@ -38,7 +44,8 @@ export function PlacementZone() {
         -((clientY - box.top) / box.height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
-      if (!raycaster.ray.intersectPlane(ground, hit)) return null;
+      const hit = rayTerrainHit(raycaster.ray, useViewStore.getState().heightScale);
+      if (!hit) return null;
       // Scene kilometres back to the simulation's metres east and north.
       return { eastM: hit.x * 1000, northM: -hit.z * 1000 };
     });
@@ -79,7 +86,12 @@ export function PlacementGhost() {
     const progress = lastDrop ? (performance.now() - lastDrop.atMs) / RIPPLE_MS : 1;
     mesh.visible = lastDrop !== null && progress < 1;
     if (!lastDrop || progress >= 1) return;
-    mesh.position.set(lastDrop.at.eastM / 1000, 0.02, -lastDrop.at.northM / 1000);
+    const groundY = groundSceneY(
+      lastDrop.at.eastM,
+      lastDrop.at.northM,
+      useViewStore.getState().heightScale,
+    );
+    mesh.position.set(lastDrop.at.eastM / 1000, groundY + 0.02, -lastDrop.at.northM / 1000);
     const distance = camera.position.distanceTo(mesh.position);
     mesh.scale.setScalar(
       worldSizeForPixels(distance, fov, size.height, 12 + 60 * progress, zoom) / 2,
@@ -89,7 +101,14 @@ export function PlacementGhost() {
   });
 
   const at = target?.at;
-  const position = at ? toScene({ x: at.eastM, y: at.northM, z: altitudeM }, heightScale) : null;
+  const position =
+    at && type
+      ? toScene(
+          { x: at.eastM, y: at.northM, z: ghostAltitudeM(type, at.eastM, at.northM, altitudeM) },
+          heightScale,
+        )
+      : null;
+  const dropTo = at && position ? groundSceneY(at.eastM, at.northM, heightScale) - position[1] : 0;
 
   return (
     <group>
@@ -119,7 +138,7 @@ export function PlacementGhost() {
           <Line
             points={[
               [0, 0, 0],
-              [0, -position[1], 0],
+              [0, dropTo, 0],
             ]}
             color={color}
             lineWidth={1.2}

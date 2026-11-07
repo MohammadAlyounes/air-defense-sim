@@ -1,3 +1,4 @@
+import { EXPONENTIAL_ATMOSPHERE, type Atmosphere } from './atmosphere';
 import { add, distance, dot, scale, vec3, type Vec3 } from './core/vec';
 import { reachM, type InterceptorConfig } from './interceptor';
 import { trackPositionAt } from './tracker';
@@ -123,20 +124,24 @@ export function predictIntercept(
 /**
  * The command node's firing solution for a track at `tick`, or null when no interceptor
  * launched now could reach it in time (or the meeting point is inside the minimum range).
- * Plans with the track's estimated position and velocity: perception, not truth.
+ * Plans with the track's estimated position and velocity: perception, not truth. Drag is
+ * taken at the air density halfway up to the target, the average the interceptor flies through.
  */
 export function planIntercept(
   track: Track,
   tick: number,
   defense: DefenseConfig,
   interceptor: InterceptorConfig,
+  atmosphere: Atmosphere = EXPONENTIAL_ATMOSPHERE,
 ): Intercept | null {
   if (!track.velocity) return null;
+  const position = trackPositionAt(track, tick);
+  const density = atmosphere.densityKgM3(Math.max(0, position.z) / 2);
   const plan = predictIntercept(
-    trackPositionAt(track, tick),
+    position,
     track.velocity,
     LAUNCHER_POSITION,
-    (t) => defense.planningReachFactor * reachM(t, interceptor),
+    (t) => defense.planningReachFactor * reachM(t, interceptor, density),
     defense.maxPlannedFlightS,
   );
   if (!plan || distance(plan.point, LAUNCHER_POSITION) < defense.minInterceptRangeM) return null;

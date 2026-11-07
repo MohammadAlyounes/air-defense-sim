@@ -13,8 +13,13 @@ describe('parseViewOptions', () => {
     });
   });
 
+  it('reads the coverage overlay height', () => {
+    expect(parseViewOptions('?coverage=50').state).toEqual({ coverageAltM: 50 });
+    expect(parseViewOptions('?coverage=1000').state).toEqual({ coverageAltM: 1000 });
+  });
+
   it('ignores invalid values', () => {
-    expect(parseViewOptions('?select=abc&camera=sideways&heights=3')).toEqual({
+    expect(parseViewOptions('?select=abc&camera=sideways&heights=3&coverage=77')).toEqual({
       state: {},
       welcome: true,
     });

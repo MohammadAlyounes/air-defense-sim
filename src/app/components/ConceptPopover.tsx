@@ -6,6 +6,10 @@ import localCoordinates from '../../../docs/concepts/02-1-local-coordinates.md?r
 import seeingScale from '../../../docs/concepts/02-2-seeing-scale.md?raw';
 import detectionRange from '../../../docs/concepts/03-1-detection-range.md?raw';
 import proportionalNavigation from '../../../docs/concepts/03-2-proportional-navigation.md?raw';
+import radarHorizon from '../../../docs/concepts/04-1-radar-horizon.md?raw';
+import terrainMasking from '../../../docs/concepts/04-2-terrain-masking.md?raw';
+import detectionProbability from '../../../docs/concepts/04-3-detection-probability.md?raw';
+import airDrag from '../../../docs/concepts/04-4-air-drag.md?raw';
 import { REPO_URL } from '../data/links';
 import { parseConceptCard, parseInline } from '../lib/cardMarkdown';
 
@@ -20,6 +24,10 @@ const CONCEPTS = {
     markdown: proportionalNavigation,
     file: '03-2-proportional-navigation.md',
   },
+  radarHorizon: { markdown: radarHorizon, file: '04-1-radar-horizon.md' },
+  terrainMasking: { markdown: terrainMasking, file: '04-2-terrain-masking.md' },
+  detectionProbability: { markdown: detectionProbability, file: '04-3-detection-probability.md' },
+  airDrag: { markdown: airDrag, file: '04-4-air-drag.md' },
 } as const;
 
 export type ConceptId = keyof typeof CONCEPTS;

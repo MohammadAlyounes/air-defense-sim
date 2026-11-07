@@ -1,10 +1,11 @@
+import { EXPONENTIAL_ATMOSPHERE, SEA_LEVEL_DENSITY_KGM3, type Atmosphere } from './atmosphere';
 import { add, cross, dot, length, normalize, scale, sub, vec3, type Vec3 } from './core/vec';
 
 /**
  * A generic, fictional interceptor: a point mass that boosts, then coasts, and steers with
- * proportional navigation. Every number is an illustrative round value chosen for teaching
- * (see SAFETY.md). Air drag arrives with the atmosphere in Step 4; until then the interceptor
- * only loses speed by climbing.
+ * proportional navigation. Air drag slows it as it coasts, more in the thick air near the
+ * ground than up high. Every number is an illustrative round value chosen for teaching
+ * (see SAFETY.md).
  */
 export interface InterceptorConfig {
   /** Speed as it leaves the launcher, m/s. */
@@ -25,6 +26,11 @@ export interface InterceptorConfig {
   armAfterS: number;
   /** Launch at least this far above the horizon, so it clears the ground, rad. */
   minLaunchElevationRad: number;
+  /**
+   * Ballistic coefficient β = m / (Cd · A), kg/m²: mass over drag area. The higher it is, the
+   * less the air slows it down. `Infinity` turns drag off.
+   */
+  ballisticCoefficientKgM2: number;
 }
 
 export const DEFAULT_INTERCEPTOR: InterceptorConfig = {
@@ -37,6 +43,7 @@ export const DEFAULT_INTERCEPTOR: InterceptorConfig = {
   lethalRadiusM: 15,
   armAfterS: 1,
   minLaunchElevationRad: (15 * Math.PI) / 180,
+  ballisticCoefficientKgM2: 20_000,
 };
 
 export const GRAVITY_MPS2 = 9.81;
@@ -99,8 +106,22 @@ export interface MissileState {
 }
 
 /**
- * Advances the interceptor by `dt` seconds: steering, motor thrust (during the boost) and
- * gravity, integrated with semi-implicit Euler (new velocity first, then position).
+ * Deceleration from air drag, as a vector against the motion:
+ *
+ *   a = −(ρ · |v| / (2β)) · v,   i.e. |a| = ρ v² / (2β)
+ */
+export function dragAcceleration(
+  velocity: Vec3,
+  densityKgM3: number,
+  ballisticCoefficientKgM2: number,
+): Vec3 {
+  if (!Number.isFinite(ballisticCoefficientKgM2)) return vec3(0, 0, 0);
+  return scale(velocity, (-densityKgM3 * length(velocity)) / (2 * ballisticCoefficientKgM2));
+}
+
+/**
+ * Advances the interceptor by `dt` seconds: steering, motor thrust (during the boost), air drag
+ * and gravity, integrated with semi-implicit Euler (new velocity first, then position).
  */
 export function stepMissile(
   missile: MissileState,
@@ -109,6 +130,7 @@ export function stepMissile(
   targetVel: Vec3,
   dt: number,
   config: InterceptorConfig,
+  atmosphere: Atmosphere = EXPONENTIAL_ATMOSPHERE,
 ): MissileState {
   const steer = guidanceAcceleration(
     missile.position,
@@ -121,20 +143,57 @@ export function stepMissile(
     flightS < config.boostS
       ? scale(normalize(missile.velocity), config.boostAccelMps2)
       : vec3(0, 0, 0);
-  const accel = add(add(steer, thrust), vec3(0, 0, -GRAVITY_MPS2));
+  const drag = dragAcceleration(
+    missile.velocity,
+    atmosphere.densityKgM3(missile.position.z),
+    config.ballisticCoefficientKgM2,
+  );
+  const accel = add(add(add(steer, thrust), drag), vec3(0, 0, -GRAVITY_MPS2));
   const velocity = add(missile.velocity, scale(accel, dt));
   return { velocity, position: add(missile.position, scale(velocity, dt)) };
 }
 
 /**
- * How far the interceptor can fly in `t` seconds along a straight line: speed builds up during
- * the boost, then stays constant. The command node uses it to plan intercepts.
+ * How far the interceptor can fly in `t` seconds along a straight line, through air of density
+ * `densityKgM3`: speed builds up during the boost (where drag is small next to the thrust and
+ * is left out), then drag slows the coast. With only drag acting, dv/dt = −k·v² with
+ * k = ρ / (2β), which integrates to
+ *
+ *   v(τ) = v₀ / (1 + k·v₀·τ),   s(τ) = ln(1 + k·v₀·τ) / k
+ *
+ * The command node uses it to plan intercepts.
  */
-export function reachM(t: number, config: InterceptorConfig): number {
+export function reachM(
+  t: number,
+  config: InterceptorConfig,
+  densityKgM3 = SEA_LEVEL_DENSITY_KGM3,
+): number {
   const { launchSpeedMps: v0, boostS, boostAccelMps2: a } = config;
   if (t <= boostS) return v0 * t + 0.5 * a * t * t;
   const burnout = v0 + a * boostS;
-  return v0 * boostS + 0.5 * a * boostS * boostS + burnout * (t - boostS);
+  const coastS = t - boostS;
+  const k = dragConstant(config, densityKgM3);
+  const coast = k > 0 ? Math.log1p(k * burnout * coastS) / k : burnout * coastS;
+  return v0 * boostS + 0.5 * a * boostS * boostS + coast;
+}
+
+/** Speed after `t` seconds of straight flight, with the same assumptions as `reachM`, m/s. */
+export function speedAfterMps(
+  t: number,
+  config: InterceptorConfig,
+  densityKgM3 = SEA_LEVEL_DENSITY_KGM3,
+): number {
+  const { launchSpeedMps: v0, boostS, boostAccelMps2: a } = config;
+  if (t <= boostS) return v0 + a * t;
+  const burnout = v0 + a * boostS;
+  return burnout / (1 + dragConstant(config, densityKgM3) * burnout * (t - boostS));
+}
+
+/** k = ρ / (2β), 1/m: the drag deceleration is k·v². */
+function dragConstant(config: InterceptorConfig, densityKgM3: number): number {
+  return Number.isFinite(config.ballisticCoefficientKgM2)
+    ? densityKgM3 / (2 * config.ballisticCoefficientKgM2)
+    : 0;
 }
 
 /**

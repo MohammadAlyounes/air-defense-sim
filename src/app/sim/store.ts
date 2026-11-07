@@ -7,7 +7,8 @@ export interface LogEntry {
   id: number;
   timeS: number;
   /** The aircraft the line is about (ground-truth id), so the line can select it. */
-  aircraftId: number;
+  /** The aircraft the line is about, or null (a false alarm has no aircraft behind it). */
+  aircraftId: number | null;
   source: LogSource;
   text: string;
 }

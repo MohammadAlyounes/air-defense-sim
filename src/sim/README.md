@@ -2,16 +2,22 @@
 
 The physics and decision-making engine. The app imports it only through `index.ts`.
 
-| File            | What it does                                                             |
-| --------------- | ------------------------------------------------------------------------ |
-| `core/clock.ts` | `FixedStepClock`: real time in, whole 20 ms ticks out.                   |
-| `core/rng.ts`   | `Rng`: seeded sfc32 random numbers, with save and restore.               |
-| `core/vec.ts`   | East-North-Up vectors, ground range and compass bearing.                 |
-| `traffic.ts`    | Flight performance of every traffic type.                                |
-| `radar.ts`      | Search radar sweep: antenna angle and "did the beam pass this bearing?". |
-| `scenario.ts`   | Scenario traffic: entry points, courses and arrival times.               |
-| `simulation.ts` | `Simulation`: commands, ticks, events, snapshots, state hash, replay.    |
-| `types.ts`      | Shared types: aircraft, plots, events, commands, snapshots.              |
+| File             | What it does                                                            |
+| ---------------- | ----------------------------------------------------------------------- |
+| `core/clock.ts`  | `FixedStepClock`: real time in, whole 20 ms ticks out.                  |
+| `core/rng.ts`    | `Rng`: seeded sfc32 random numbers, with save and restore.              |
+| `core/vec.ts`    | East-North-Up vectors, ground range and compass bearing.                |
+| `traffic.ts`     | Flight performance of every traffic type.                               |
+| `radar.ts`       | Search radar: sweep, detection probability, false alarms, noise levels. |
+| `terrain.ts`     | Procedural, fictional terrain: seeded height grid.                      |
+| `propagation.ts` | Earth curvature, line of sight, radar horizon and coverage map.         |
+| `atmosphere.ts`  | Air density with height.                                                |
+| `interceptor.ts` | Interceptor point mass: boost, drag, proportional navigation, fuze.     |
+| `c2.ts`          | Command node: identification, threats, intercept planning.              |
+| `tracker.ts`     | Where a track is now.                                                   |
+| `scenario.ts`    | Scenario traffic: entry points, courses and arrival times.              |
+| `simulation.ts`  | `Simulation`: commands, ticks, events, snapshots, state hash, replay.   |
+| `types.ts`       | Shared types: aircraft, plots, events, commands, snapshots.             |
 
 Rules (enforced by ESLint, see `eslint.config.js`):
 

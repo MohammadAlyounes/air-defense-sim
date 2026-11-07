@@ -29,7 +29,7 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 - **Drag threats onto the map.** Small drones, drone swarms, cruise-missile-like targets and fast jets, plus friendly and civil aircraft that must _not_ be engaged.
 - **Watch the whole defense loop.** A live analysis bar follows every track through **Detect → Track → Identify → Evaluate → Assign → Engage → Assess**, with a plain-language "Now" line.
 - **Ask "Why?"** Click any decision to see the reasoning: the evidence, the threat score, the intercept geometry and the chance of a hit.
-- **See the physics, not magic.** Radar horizon, terrain masking, Kalman filtering and proportional navigation, each explained in three sentences and one formula.
+- **See the physics, not magic.** Radar horizon, terrain masking, detection probability, air drag, Kalman filtering and proportional navigation, each explained in three sentences and one formula.
 - **Experiment.** Tune parameters, save and share scenarios, rewind and try a different decision, or run a scenario hundreds of times to see the odds.
 
 ## Quick start
@@ -139,13 +139,68 @@ An interceptor that always points at its target ends up in a long tail chase. In
 
 [Going deeper →](docs/concepts/03-2-proportional-navigation.md)
 
+### Radar horizon — why the Earth's curve hides low flyers
+
+Radar waves travel in almost straight lines, but the Earth curves away beneath them, so far enough out even open ground hides a low target. The air bends radio waves slightly back down, which the textbook "4/3 Earth" model handles by drawing the Earth a third larger than it is. The higher the antenna and the higher the target, the farther the horizon.
+
+- **Formula:** `d ≈ 4.12 km × (√h_radar + √h_target)`, heights in metres
+- **Example:** with the 12 m antenna, a target at 50 m is below the horizon beyond 4.12 × (3.5 + 7.1) ≈ 43 km; a jet at 6,000 m stays in view out to 330 km.
+- **See it:** select a low aircraft far out: the inspector's "Radar view" row says when it is below the horizon.
+
+[Going deeper →](docs/concepts/04-1-radar-horizon.md)
+
+### Terrain masking — why hills hide what flies low behind them
+
+A hill casts a "radar shadow", much like a shadow from a lamp at the radar's antenna. A target flying low behind the hill sits inside that shadow and cannot be seen, however strong the radar. The shadow is deeper the taller the hill, the closer it stands to the radar, and the farther the target is behind it.
+
+- **Formula:** behind a hill of height `H` at distance `d₁`, a target at distance `d₂` is seen only above `h ≈ H × d₂ / d₁` (antenna near the ground)
+- **Example:** a 400 m ridge 10 km out hides everything below about 1,200 m at 30 km, so a target flying 50 m above the ground stays hidden until it crosses the ridge.
+- **See it:** switch on "Blind zones" under the scope: orange shows where the radar cannot see a target at 50 m, 300 m or 1 km above the ground.
+
+[Going deeper →](docs/concepts/04-2-terrain-masking.md)
+
+### Detection probability — why the radar sometimes misses, and sometimes sees ghosts
+
+A radar decides "target or not" by checking whether the echo rises above a threshold set over the receiver's noise. A real target's echo flickers from scan to scan as it turns, so near its maximum range it is only seen on some looks. Set the threshold lower and you see more, but random noise also crosses it more often: those are false alarms.
+
+- **Formula:** `Pd = Pfa^(1 / (1 + SNR))` for a flickering (Swerling 1) target, with `SNR ∝ σ / R⁴`
+- **Example:** with a false-alarm chance Pfa = 10⁻⁶ per cell, a drone at its 9.5 km "50% range" is seen on half the looks, and on 85% of them at 6.6 km. Over 600,000 cells per turn, about 0.6 false alarms appear each turn.
+- **See it:** watch for lone blips that appear once and vanish: the log calls them "dropped", because a second echo never came to confirm them.
+
+[Going deeper →](docs/concepts/04-3-detection-probability.md)
+
+### Air drag — why an interceptor's reach depends on altitude
+
+Once its motor burns out, an interceptor coasts and the air slows it down. Drag grows with the square of speed and with air density, and the air thins out with height, halving about every 6 km. So the same interceptor reaches farther, and arrives faster, against a high target than against a low one.
+
+- **Formula:** `a_drag = ρ(h) · v² / (2β)`, with `ρ(h) = 1.225 kg/m³ × e^(−h / 8.5 km)` and ballistic coefficient `β = 20,000 kg/m²`
+- **Example:** at sea level and 760 m/s, drag slows it by 17.7 m/s² (almost 2 g); after 10 s of coasting it is down to 617 m/s and has flown 6.8 km instead of 7.6 km.
+- **See it:** drop a fast jet high and a cruise-missile-like target low at the same distance: the low one is intercepted closer in, after a slower flight.
+
+[Going deeper →](docs/concepts/04-4-air-drag.md)
+
 <!-- concepts:end -->
 
-**Coming next:** air density, drag, turn radius, the radar equation, the radar horizon and terrain masking (Step 4) · noise, the Kalman filter and identification (Step 5) · kill probability and saturation (Step 6).
+**Coming next:** wind, turn radius, the radar equation and RCS, clutter and Doppler (Step 4) · the Kalman filter and identification (Step 5) · kill probability and saturation (Step 6).
 
 ## Build log
 
 Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first.
+
+### Step 4 · Environment & radar (part 1: terrain and radar)
+
+The battlespace gets a landscape, and the radar becomes honest about what it can and cannot see.
+
+- **Procedural terrain:** fictional hills and ridges around a flat valley, generated from a seed, in 3D (with relief shading and contour lines) and as a faint relief on the scope. Drones and cruise-missile-like targets follow the ground; jets climb over it.
+- **Radar horizon and terrain masking:** the radar sees only along clear lines of sight over the curved Earth. Low flyers hide behind the ridges to the south and west until they are 7 to 10 km out.
+- **Blind zones:** one switch under the scope shades, on the scope and on the 3D terrain, where the radar cannot see a target at 50 m, 300 m or 1 km above the ground.
+- **Detection probability, noise and false alarms:** echoes flicker near the edge of range, every measurement is a little off, and noise sometimes makes a ghost blip. A single echo never becomes a track on its own, so ghosts are dropped and never engaged.
+- **Air drag:** interceptors slow down as they coast, more in the thick air near the ground, and the command node plans with it.
+- **Readouts that explain:** the placement card warns when the terrain will hide a threat, and the inspector says whether the radar can see the selected aircraft, and why not.
+
+> **Engineering note: one terrain, many readers.** The landscape is generated once from its own seed and shared by the simulation, the scope, the 3D mesh and the placement readout, so the blind zones you see are exactly the ones the radar uses. A radial sweep builds the whole coverage map in a few milliseconds.
+
+_Screenshots and a clip for this step come with the v1.0 media pass._
 
 ### Step 3 · First intercept
 
@@ -240,6 +295,8 @@ The foundation everything else builds on.
 - [x] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
 - [x] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
 - [ ] **Step 4 · Environment & radar:** terrain, atmosphere, wind and drag, threat routes; radar equation, noise, horizon, terrain masking, clutter and coverage maps
+  - In: terrain, terrain following, drag, detection probability, noise, false alarms, horizon, masking and the coverage map
+  - Still to come: wind, threat routes and evasive turns, the standard atmosphere, clutter and Doppler
 - [ ] **Step 5 · Track & identify:** Kalman tracking, uncertainty ellipses, truth vs. perception; identification, civil traffic, defended assets, threat ranking with "Why?"
 - [ ] **Step 6 · Engage & assess:** fire channels, engagement envelopes, kill probability, doctrine and operator approval; kill assessment, saturation, telemetry and the full analysis bar
 - [ ] **Step 7 · Scenarios & replay:** save, load and share, editor and raid generator; timeline scrubbing, rewind and branch, Monte Carlo, CSV export

@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { IDEAL_SEARCH_RADAR } from './radar';
 import { Simulation, type SimConfig } from './simulation';
 import type { SimEvent } from './types';
 
+/** Flat ground and an ideal radar, so the loop's order and timing are exact. */
 const emptySky = (extra: Partial<SimConfig> = {}) =>
-  new Simulation({ seed: 1, autoTraffic: false, ...extra });
+  new Simulation({
+    seed: 1,
+    autoTraffic: false,
+    terrain: false,
+    radar: IDEAL_SEARCH_RADAR,
+    ...extra,
+  });
 
 const kinds = (events: readonly SimEvent[]) => events.map((e) => e.kind);
 const ofKind = <K extends SimEvent['kind']>(events: readonly SimEvent[], kind: K) =>
@@ -71,8 +79,9 @@ describe('the defense loop', () => {
     const [launch] = ofKind(events, 'interceptorLaunched');
     const [result] = ofKind(events, 'interceptResult');
     const flightS = (result?.timeS ?? 0) - (launch?.timeS ?? 0);
-    // The plan keeps a 10% margin on reach, so the interceptor is a little early.
-    expect(flightS).toBeLessThanOrEqual(launch?.predictedTimeS ?? 0);
+    // The plan keeps a 10% margin on reach, which roughly pays for the climb and the drag
+    // during the boost that the straight-line reach leaves out.
+    expect(flightS).toBeLessThanOrEqual(1.05 * (launch?.predictedTimeS ?? 0));
     expect(flightS).toBeGreaterThan(0.8 * (launch?.predictedTimeS ?? 0));
   });
 

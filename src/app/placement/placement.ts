@@ -1,11 +1,15 @@
 import {
+  coverageAt,
   DEFAULT_SEARCH_RADAR,
   detectionRangeM,
   RADAR_CROSS_SECTION_M2,
   TRAFFIC,
   type Command,
+  type CoverageMap,
+  type Terrain,
   type TrafficTypeId,
 } from '../../sim';
+import { worldCoverage, worldTerrain } from '../world/world';
 
 /**
  * Placing traffic from the palette: where it may go, how high it flies and where it heads.
@@ -82,18 +86,60 @@ export function keyboardSpot(n: number): GroundPoint {
   return { eastM: 30_000 * Math.sin(bearing), northM: 30_000 * Math.cos(bearing) };
 }
 
+/** Route samples for the first-seen estimate, m. */
+const ROUTE_STEP_M = 200;
+
 /** Numbers for the placement readout. */
-export function placementFacts(type: TrafficTypeId, at: GroundPoint) {
+export function placementFacts(
+  type: TrafficTypeId,
+  at: GroundPoint,
+  altitudeM: number = TRAFFIC[type].altitudeM,
+  world: { terrain: Terrain; coverage: CoverageMap } = {
+    terrain: worldTerrain(),
+    coverage: worldCoverage(),
+  },
+) {
   const performance = TRAFFIC[type];
+  const detectedFromM = detectionRangeM(
+    RADAR_CROSS_SECTION_M2[performance.radarSize],
+    DEFAULT_SEARCH_RADAR,
+  );
   return {
     rangeM: groundRangeOf(at),
     bearingRad: bearingOf(at),
     /** Time to reach the battery flying straight at it, s. */
     timeToBatteryS: groundRangeOf(at) / performance.speedMps,
-    /** How far out the radar starts to see it (its radar size, the fourth-root law), m. */
-    detectedFromM: detectionRangeM(
-      RADAR_CROSS_SECTION_M2[performance.radarSize],
-      DEFAULT_SEARCH_RADAR,
-    ),
+    /** Range at which the radar sees it on half of its looks, over open ground (the fourth-root law), m. */
+    detectedFromM,
+    /**
+     * Range at which it first comes into view on its way to the battery: inside that range, and
+     * not hidden by the terrain or below the horizon, m. Null if it is never in view.
+     */
+    firstSeenM: firstSeenOnRoute(at, altitudeM, performance.altitudeRef, detectedFromM, world),
   };
+}
+
+/**
+ * Walks the straight route to the battery and returns the ground range of the first point
+ * where the radar could see it: within the 50% detection range, and above the lowest visible
+ * height from the coverage map. Terrain followers keep their height above the ground; the
+ * others keep their altitude (but stay above the hills).
+ */
+function firstSeenOnRoute(
+  at: GroundPoint,
+  altitudeM: number,
+  ref: 'AGL' | 'MSL',
+  detectedFromM: number,
+  { terrain, coverage }: { terrain: Terrain; coverage: CoverageMap },
+): number | null {
+  const range = groundRangeOf(at);
+  if (range === 0) return 0;
+  for (let r = Math.min(range, detectedFromM); r > 0; r -= ROUTE_STEP_M) {
+    const east = (at.eastM / range) * r;
+    const north = (at.northM / range) * r;
+    const ground = terrain.heightAt(east, north);
+    const agl = ref === 'AGL' ? altitudeM : Math.max(altitudeM, ground + 150) - ground;
+    if (agl >= coverageAt(coverage, east, north)) return r;
+  }
+  return null;
 }

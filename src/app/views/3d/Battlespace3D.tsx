@@ -93,8 +93,9 @@ function BottomBar() {
         content={
           <>
             <strong className="text-ink-100">Ground truth</strong>: this view shows where every
-            aircraft really is. The radar scope shows only what the radar has seen. Later steps add
-            noise, tracking and the gap between the two.
+            aircraft really is, even behind hills. The radar scope shows only what the radar has
+            seen: noisy echoes, the odd false alarm, nothing in the blind zones. Step 5 adds a
+            tracking filter and a toggle to compare the two.
           </>
         }
       >
