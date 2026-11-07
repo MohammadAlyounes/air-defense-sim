@@ -22,7 +22,7 @@ The Earth curves away, so a radar cannot see targets below its horizon. Radio wa
 
 - **Formula:** `d ≈ 4.12 × (√h_radar + √h_target)` km, heights in metres
 - **Example:** a radar mast of 12 m sees a target flying at 50 m only within ~43 km.
-- **See it:** Lesson 2, or the target-altitude slider on the coverage map (Step 5).
+- **See it:** Lesson 2, or the target-altitude slider on the coverage map (Step 4).
 
 ## Index
 

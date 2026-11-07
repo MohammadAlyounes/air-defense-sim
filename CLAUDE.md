@@ -88,7 +88,7 @@ The full concept texts live in `docs/concepts/NN-M-slug.md` (step `NN`, order `M
 
 Both media scripts accept `--query "seed=2026&t=75&paused=0"` for repeatable shots: simulation options from `src/app/sim/params.ts`, view options (`select`, `camera`, `heights`, `labels`, `welcome=0`) from `src/app/view/viewParams.ts`. `media:gif` can also script the clip with `--actions` (timed key presses and clicks).
 
-Planned: `npm run demo:record` (Step 14).
+Planned: `npm run demo:record` (Step 8, v1.0).
 
 ## Environment notes
 

@@ -1,6 +1,6 @@
 # Air Defense Simulator — Project Plan
 
-**Version 0.2 · 2026-11-06** · The build starts at Step 0 once the GitHub repository is ready.
+**Version 0.3 · 2026-11-07** · Steps 0–3 are built; v0.3 folds the remaining steps into a five-step core roadmap (section 16).
 
 v0.2 adds four things:
 
@@ -111,7 +111,7 @@ WCS TIGHT · SEMI-AUTO │ NOW: Engaging T3 (cruise missile) — intercept in 12
   - cost-exchange ratio;
   - false-track count.
 - **Mobile:** collapses to the pipeline and the Now line; tap to expand.
-- **Grows with the build:** the first version ships at Step 3 and is complete by Step 9.
+- **Grows with the build:** the first version ships at Step 3 and is complete by Step 6.
 
 ## 6. Toolkit (versions checked on npm, 2026-11-03)
 
@@ -241,6 +241,8 @@ scenarios/ tutorials · challenges · sandbox
 8. **Live equations:** formulas filled in with the selected object's real numbers.
 
 ### 9.2 Prioritized feature list
+
+> **v0.3 note:** the core roadmap in section 16 decides what ships in v1.0. Items below that it does not list (for example ten lessons, seven cameras, the scenario editor) move to its "Later" list.
 
 **Must have (v1.0)**
 
@@ -398,7 +400,7 @@ There will also be scored challenges and an open sandbox.
 - **Clone and run.**
   - Four commands (below), Node 22+, npm only.
   - _Open in GitHub Codespaces_ and _Open in StackBlitz_ buttons for running without installing anything.
-- **Follow the build.** Every step is a git tag (for example `step-05-radar`), so anyone can check out a step and watch the project grow. Each tag has a build-log entry with a screenshot.
+- **Follow the build.** Every step is a git tag (for example `step-04-terrain-radar`), so anyone can check out a step and watch the project grow. Each tag has a build-log entry with a screenshot.
 - **Signals for specialists.** CI badges, strict TypeScript, physics tests, the ARCHITECTURE and MODELS docs, and a clean commit history.
 - **LinkedIn post draft.** Written at release: hook, what it does, three things learned, tech stack, links, hashtags. The owner posts it.
 - **Built with Claude.** `CLAUDE.md` and `docs/DEVLOG.md` show how the project was built with Claude Code.
@@ -447,31 +449,38 @@ npm run dev
 
 ## 16. Build roadmap
 
-Each step ends with a working demo, passing tests, at least one README concept card (where there is new physics) and a git tag.
+**v0.3 (2026-11-07): the core roadmap.** After Step 3 the remaining eleven steps were folded into five, so v1.0 ships the core and everything else moves to the "Later" list below. Each step ends with a working demo, passing tests, at least one README concept card (where there is new physics) and a git tag.
 
-| Step | Tag                         | What you will see                                                                                     | Concepts added to the README                                                |
-| ---- | --------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 0    | `step-00-launchpad`         | Repo, tooling, CI, live demo URL (app shell), README skeleton, CLAUDE.md, Codespaces/StackBlitz       | —                                                                           |
-| 1    | `step-01-sim-core`          | Deterministic clock, play/pause/step/speed, a target moving on the 2D scope                           | Fixed time step and determinism                                             |
-| 2    | `step-02-3d-scene`          | 3D ground, models, trails, labels, cameras; 2D↔3D selection sync                                      | Local coordinates (ENU) and scale                                           |
-| 3    | `step-03-first-intercept`   | First full loop + **drag-and-drop palette v1** + **analysis bar v1**                                  | Detection range; proportional navigation                                    |
-| 4    | `step-04-environment`       | Terrain, atmosphere, wind, drag; 3 threat types with routes and terrain-following                     | Air density (ISA); drag; turn radius                                        |
-| 5    | `step-05-radar`             | Radar equation, false alarms, noise, horizon, masking, clutter; sweep; coverage maps                  | Radar equation and RCS; radar horizon; terrain masking; clutter and Doppler |
-| 6    | `step-06-tracking`          | Kalman tracking, uncertainty ellipses, track table, truth vs. perception                              | Noise and the Kalman filter                                                 |
-| 7    | `step-07-identify-evaluate` | Identification, classifier, corridors, friendly and civil traffic, assets, threat ranking with "Why?" | Identification friend-or-foe; closest point of approach                     |
-| 8    | `step-08-engage`            | Channels, envelopes, intercept point, kill probability, doctrine, operator approval, missile phases   | Engagement envelope; missile energy; kill probability and doctrine          |
-| 9    | `step-09-assess`            | Kill assessment, re-engagement, threats getting through; full analysis bar, log, telemetry, inspector | Kill assessment; saturation                                                 |
-| 10   | `step-10-scenarios`         | Save/load/share, editor, dragging defenders, raid generator, library                                  | —                                                                           |
-| 11   | `step-11-learning`          | Lesson engine + 10 lessons, live equations, skill levels, challenges, after-action review             | —                                                                           |
-| 12   | `step-12-analysis`          | Timeline scrubbing, rewind and branch, run comparison, Monte Carlo, CSV export                        | Monte Carlo and probability                                                 |
-| 13   | `step-13-polish`            | Cinematic intro and onboarding, effects, sound, themes, accessibility, mobile viewer                  | —                                                                           |
-| 14   | `v1.0.0`                    | Demo video, GIFs, preview images, final README, LinkedIn post draft, release                          | —                                                                           |
+| Step | Tag                         | What you will see                                                                                                                                       | Concepts added to the README                                       |
+| ---- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 0    | `step-00-launchpad`         | Repo, tooling, CI, live demo URL (app shell), README skeleton, CLAUDE.md, Codespaces/StackBlitz                                                         | —                                                                  |
+| 1    | `step-01-sim-core`          | Deterministic clock, play/pause/step/speed, a target moving on the 2D scope                                                                             | Fixed time step and determinism                                    |
+| 2    | `step-02-3d-scene`          | 3D ground, models, trails, labels, cameras; 2D↔3D selection sync                                                                                        | Local coordinates (ENU) and scale                                  |
+| 3    | `step-03-first-intercept`   | First full loop + **drag-and-drop palette v1** + **analysis bar v1**                                                                                    | Detection range; proportional navigation                           |
+| 4    | `step-04-terrain-radar`     | Procedural terrain, radar horizon and terrain masking, probabilistic detection, measurement noise, false alarms, air drag, coverage map                 | Radar horizon; terrain masking; detection probability; air density |
+| 5    | `step-05-tracking`          | Kalman filter, gating and nearest-neighbour association, uncertainty ellipses, track quality, truth vs. perception toggle                               | Noise and the Kalman filter                                        |
+| 6    | `step-06-decide-engage`     | Defended assets, identification mistakes, "Why?" on every decision, engagement envelope, kill probability, fire channels, operator approval, saturation | Closest point of approach; engagement envelope; kill probability   |
+| 7    | `step-07-scenarios-lessons` | Built-in scenario library, share-by-link, short guided lessons, after-action review, telemetry and timeline                                             | —                                                                  |
+| 8    | `v1.0.0`                    | Onboarding hints, accessibility basics, demo video, GIFs, preview images, final README, release                                                         | —                                                                  |
+
+### Later (v1.x and beyond)
+
+Kept from the original plan, but not needed for v1.0:
+
+- **Environment:** wind, the full standard-atmosphere model, terrain-following and evasive threat routes.
+- **Radar:** clutter and Doppler filtering, a separate tracking radar model.
+- **Identification:** a kinematic classifier and air corridors.
+- **Engage:** detailed missile phases, launcher channels, the full firing-doctrine menu.
+- **Scenarios:** scenario editor with route drawing, raid generator, dragging defenders, scored challenges, skill levels.
+- **Analysis:** rewind and branch, run comparison, Monte Carlo mode, CSV/JSON export, live equations.
+- **Polish:** cinematic intro, sound, light theme, command palette, layout presets, PWA.
+- **Stretch:** layered defense, jamming, the "Ask Claude" tutor, translations, WebXR.
 
 **Workflow for every step:**
 
 1. Build the feature.
 2. Run tests, lint and typecheck until they pass.
-3. Run the app in headless Chromium and capture screenshots or a GIF.
+3. Run the app in headless Chromium and capture screenshots or a GIF (from Step 4 on, screenshots and clips are captured by the owner once all v1.0 features are in).
 4. Update the README (concept cards, build log, progress) and `docs/DEVLOG.md`.
 5. Commit, push and tag.
 6. The owner reviews, then the next step starts.

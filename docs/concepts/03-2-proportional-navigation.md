@@ -16,4 +16,4 @@ An interceptor that always points at its target ends up in a long tail chase. In
 
 **Endgame accuracy.** At a closing speed near 1 km/s, one 20 ms tick is 20 m, far coarser than the 15 m lethal radius. So interceptors move in 2 ms sub-steps, and within each sub-step the closest approach between the two straight paths is found exactly: `s* = −(r₀ · Δr) / |Δr|²`. The fuze goes off at that point.
 
-**What later steps add.** Air drag slows the coasting interceptor (Step 4). Radar noise and a Kalman filter make the track, and so the guidance, imperfect (Steps 5 and 6). Fire channels, kill probability and engagement doctrine arrive in Step 8.
+**What later steps add.** Air drag slows the coasting interceptor (Step 4). Radar noise and a Kalman filter make the track, and so the guidance, imperfect (Steps 4 and 5). Fire channels, kill probability and engagement doctrine arrive in Step 6.

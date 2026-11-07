@@ -10,7 +10,7 @@ Every position is measured in metres from the battery: east (x), north (y) and u
 
 ## Going deeper
 
-**Why a flat local map is good enough.** Over 40 km the Earth's surface drops below a flat plane by `d² / (2R) = (40 km)² / (2 × 6371 km) ≈ 126 m`. That is small for plotting positions, but large for what a radar can see, so Step 5 adds Earth curvature to the line of sight while keeping the flat map for positions.
+**Why a flat local map is good enough.** Over 40 km the Earth's surface drops below a flat plane by `d² / (2R) = (40 km)² / (2 × 6371 km) ≈ 126 m`. That is small for plotting positions, but large for what a radar can see, so Step 4 adds Earth curvature to the line of sight while keeping the flat map for positions.
 
 **Compass bearings versus maths angles.** Bearings start at north and turn clockwise; the angles in maths textbooks start at east and turn anticlockwise. That swap is why east uses `sin` and north uses `cos`.
 

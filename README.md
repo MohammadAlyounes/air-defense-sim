@@ -13,7 +13,7 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 
 [![CI](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml)
 ![Status: building in public](https://img.shields.io/badge/status-building_in_public-fbbf24)
-![Progress: step 3 of 14](https://img.shields.io/badge/progress-step_3_of_14-22d3ee)
+![Progress: step 3 of 8](https://img.shields.io/badge/progress-step_3_of_8-22d3ee)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34d399)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
@@ -141,7 +141,7 @@ An interceptor that always points at its target ends up in a long tail chase. In
 
 <!-- concepts:end -->
 
-**Coming next:** air density, drag and turn radius (Step 4) · the radar equation, the radar horizon and terrain masking (Step 5) · noise and the Kalman filter (Step 6).
+**Coming next:** the radar horizon, terrain masking and detection probability (Step 4) · noise and the Kalman filter (Step 5) · engagement envelopes and kill probability (Step 6).
 
 ## Build log
 
@@ -239,17 +239,13 @@ The foundation everything else builds on.
 - [x] **Step 1 · Simulation core:** deterministic clock, play/pause/step/speed, live radar scope
 - [x] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
 - [x] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
-- [ ] **Step 4 · Environment:** terrain, atmosphere, wind and drag; three threat types with routes
-- [ ] **Step 5 · Radar realism:** radar equation, noise, horizon, terrain masking, clutter and coverage maps
-- [ ] **Step 6 · Tracking:** Kalman tracking, uncertainty ellipses, track quality, truth vs. perception
-- [ ] **Step 7 · Identify & evaluate:** identification, friendly and civil traffic, threat ranking with "Why?"
-- [ ] **Step 8 · Engage:** engagement envelopes, kill probability, doctrine and missile phases
-- [ ] **Step 9 · Assess:** kill assessment and re-engagement; full analysis bar, log, telemetry, inspector
-- [ ] **Step 10 · Scenarios:** save, load and share; editor and raid generator
-- [ ] **Step 11 · Learning layer:** ten guided lessons, live equations, challenges, after-action review
-- [ ] **Step 12 · Replay & analysis:** timeline scrubbing, rewind and branch, Monte Carlo, CSV export
-- [ ] **Step 13 · Polish:** cinematic intro, effects, sound, themes, accessibility
-- [ ] **Step 14 · Release v1.0:** demo video, final README and launch kit
+- [ ] **Step 4 · Terrain & radar:** procedural terrain, radar horizon and terrain masking, detection probability, noise, false alarms, drag, coverage map
+- [ ] **Step 5 · Tracking:** Kalman tracking, association, uncertainty ellipses, truth vs. perception
+- [ ] **Step 6 · Decide & engage:** defended assets, "Why?" on every decision, kill probability, fire channels, operator approval
+- [ ] **Step 7 · Scenarios & lessons:** scenario library, share-by-link, guided lessons, after-action review, timeline
+- [ ] **Step 8 · Release v1.0:** onboarding, accessibility, demo video, final README and launch kit
+
+Later (v1.x): wind, clutter, a scenario editor, rewind and branch, Monte Carlo runs, sound and more. See the "Later" list in the plan.
 
 The full specification is in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 

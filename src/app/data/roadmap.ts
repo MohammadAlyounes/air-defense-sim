@@ -1,5 +1,5 @@
 /**
- * The public build roadmap (docs/PROJECT_PLAN.md, section 16). The UI uses it for
+ * The public build roadmap (docs/PROJECT_PLAN.md, section 16: the v0.3 core roadmap). The UI uses it for
  * "arrives in Step N" badges and the build-progress pill in the header.
  */
 export interface RoadmapStep {
@@ -27,47 +27,30 @@ export const ROADMAP: readonly RoadmapStep[] = [
   },
   {
     step: 4,
-    title: 'Environment',
-    summary: 'Terrain, atmosphere, wind and drag; three threat types with routes.',
+    title: 'Terrain & radar',
+    summary:
+      'Terrain, radar horizon and masking, detection probability, noise, drag, coverage map.',
   },
   {
     step: 5,
-    title: 'Radar realism',
-    summary: 'Radar equation, noise, horizon, terrain masking, clutter and coverage maps.',
+    title: 'Tracking',
+    summary: 'Kalman tracking, association, uncertainty ellipses, truth vs. perception.',
   },
   {
     step: 6,
-    title: 'Tracking',
-    summary: 'Kalman tracking, uncertainty ellipses, track quality, truth vs. perception.',
+    title: 'Decide & engage',
+    summary: 'Defended assets, "Why?", kill probability, fire channels and operator approval.',
   },
   {
     step: 7,
-    title: 'Identify & evaluate',
-    summary: 'Identification, friendly and civil traffic, threat ranking with "Why?".',
+    title: 'Scenarios & lessons',
+    summary: 'Scenario library, share-by-link, guided lessons, after-action review, timeline.',
   },
   {
     step: 8,
-    title: 'Engage',
-    summary: 'Engagement envelopes, kill probability, doctrine and missile phases.',
+    title: 'Release v1.0',
+    summary: 'Onboarding, accessibility, demo video and the launch.',
   },
-  {
-    step: 9,
-    title: 'Assess',
-    summary: 'Kill assessment and re-engagement; full analysis bar, log, telemetry, inspector.',
-  },
-  { step: 10, title: 'Scenarios', summary: 'Save, load and share; editor and raid generator.' },
-  {
-    step: 11,
-    title: 'Learning layer',
-    summary: 'Ten guided lessons, live equations, challenges, after-action review.',
-  },
-  {
-    step: 12,
-    title: 'Replay & analysis',
-    summary: 'Timeline scrubbing, rewind and branch, Monte Carlo, CSV export.',
-  },
-  { step: 13, title: 'Polish', summary: 'Cinematic intro, effects, sound, themes, accessibility.' },
-  { step: 14, title: 'Release v1.0', summary: 'Demo video, final README and the launch kit.' },
 ];
 
 /** The step the repository is currently on. Bump this when a step ships. */
