@@ -7,7 +7,7 @@ import {
   type Snapshot,
 } from '../../sim';
 import { worldTerrain } from '../world/world';
-import { summarizeDefense } from './defenseSummary';
+import { assetName, summarizeDefense } from './defenseSummary';
 import { describeEvent, describeNow } from './narrator';
 import { SPEED_PRESETS, type LaunchOptions } from './params';
 import {
@@ -244,6 +244,7 @@ function resultCard(event: SimEvent, id: number): ResultCard | null {
     return {
       id,
       kind: 'kill',
+      asset: null,
       timeS: event.timeS,
       trackId: event.trackId,
       type: event.type,
@@ -256,9 +257,23 @@ function resultCard(event: SimEvent, id: number): ResultCard | null {
     return {
       id,
       kind: 'leak',
+      asset: assetName(event.assetId),
       timeS: event.timeS,
       trackId: null,
       type: event.type,
+      detectedRangeM: null,
+      detectionToKillS: null,
+      interceptorsFired: null,
+    };
+  }
+  if (event.kind === 'interceptResult' && event.hit && event.targetAffiliation !== 'hostile') {
+    return {
+      id,
+      kind: 'idError',
+      asset: null,
+      timeS: event.timeS,
+      trackId: event.trackId,
+      type: event.targetAffiliation === 'friend' ? 'friendly' : 'airliner',
       detectedRangeM: null,
       detectionToKillS: null,
       interceptorsFired: null,

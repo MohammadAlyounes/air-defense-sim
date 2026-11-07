@@ -4,7 +4,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AffiliationShape } from '../components/AffiliationShape';
 import { ConceptPopover } from '../components/ConceptPopover';
 import { Panel } from '../components/Panel';
-import { StepBadge } from '../components/StepBadge';
 import { Tooltip } from '../components/Tooltip';
 import { TrafficIcon } from '../components/TrafficIcon';
 import { AFFILIATION_STYLE } from '../data/affiliation';
@@ -44,13 +43,13 @@ function useAircraftFacts(id: number): AircraftFacts | null {
   return facts;
 }
 
-const LATER = [
+const WHY = [
   'Identity, and the evidence behind it',
-  'Threat score, factor by factor',
-  'Why this launcher, and the chance of a hit',
+  'Which defended asset it threatens, and when',
+  'What the rules allow, and the chance of a kill',
 ] as const;
 
-/** What the selected aircraft is and what it is doing; "why the system acts" comes in Step 6. */
+/** What the selected aircraft is, what it is doing, and why the battery acts as it does. */
 export function InspectorPanel() {
   const selectedId = useViewStore((state) => state.selectedId);
   return (
@@ -60,10 +59,20 @@ export function InspectorPanel() {
       panelId="inspector"
       bodyClassName="overflow-y-auto"
       actions={
-        <ConceptPopover
-          concept="proportionalNavigation"
-          label="How an interceptor steers to its target"
-        />
+        <>
+          <ConceptPopover
+            concept="closestApproach"
+            label="How the battery decides what is a threat"
+          />
+          <ConceptPopover
+            concept="killProbability"
+            label="Why one interceptor is not always enough"
+          />
+          <ConceptPopover
+            concept="proportionalNavigation"
+            label="How an interceptor steers to its target"
+          />
+        </>
       }
     >
       {selectedId === null ? <Empty /> : <Details key={selectedId} id={selectedId} />}
@@ -81,10 +90,9 @@ function Empty() {
       <div>
         <p className="flex items-center gap-2 text-[11px] text-ink-300">
           Then, <strong className="font-semibold text-ink-100">why</strong> the system acts:
-          <StepBadge step={6} />
         </p>
         <ul className="mt-1.5 space-y-1">
-          {LATER.map((point) => (
+          {WHY.map((point) => (
             <li key={point} className="flex items-center gap-1.5">
               <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-accent" />
               {point}
@@ -180,6 +188,24 @@ function Details({ id }: { id: number }) {
           tone={TONE[facts.radarViewTone]}
           wide
         />
+        {facts.why.length > 0 && (
+          <div className="col-span-3" data-testid="why">
+            <dt className="text-[9.5px] uppercase tracking-[0.1em] text-accent">Why?</dt>
+            <dd>
+              <ol className="mt-0.5 space-y-1 text-[11.5px] leading-snug text-ink-200">
+                {facts.why.map((line) => (
+                  <li key={line} className="flex gap-1.5">
+                    <ChevronRight
+                      aria-hidden="true"
+                      className="mt-0.5 size-3 shrink-0 text-accent"
+                    />
+                    {line}
+                  </li>
+                ))}
+              </ol>
+            </dd>
+          </div>
+        )}
         {facts.trackError !== null && (
           <Fact
             label="Track vs truth"

@@ -1,5 +1,6 @@
 import { TICK_S } from './core/clock';
 import type { Rng } from './core/rng';
+import { DEFAULT_ASSETS, type DefendedAsset } from './assets';
 import { vec3, type Vec3 } from './core/vec';
 import { TRAFFIC, type AircraftType } from './traffic';
 
@@ -14,7 +15,7 @@ export interface AutoTrafficConfig {
   entryRangeM: number;
   /** Each aircraft flies straight toward a random point this close to the battery. */
   aimRadiusM: number;
-  /** Hostile traffic heads for the battery itself: it aims this close to it. */
+  /** Hostile traffic heads for a defended asset (picked at random): it aims this close to it. */
   hostileAimRadiusM: number;
   mix: readonly { value: AircraftType; weight: number }[];
 }
@@ -25,7 +26,7 @@ export const DEFAULT_AUTO_TRAFFIC: AutoTrafficConfig = {
   arrivalEveryS: [14, 28],
   entryRangeM: 38_000,
   aimRadiusM: 14_000,
-  hostileAimRadiusM: 1_500,
+  hostileAimRadiusM: 800,
   mix: [
     { value: 'drone', weight: 3 },
     { value: 'cruise', weight: 2 },
@@ -44,10 +45,16 @@ export interface PlannedFlight {
 const TWO_PI = 2 * Math.PI;
 
 /**
- * Picks a type, an entry point on the edge of the area and a straight course across it.
- * Aircraft that are already flying when the run starts are placed part-way along their course.
+ * Picks a type, an entry point on the edge of the area and a straight course across it:
+ * hostiles head for a defended asset, other traffic for a point near the battery. Aircraft
+ * that are already flying when the run starts are placed part-way along their course.
  */
-export function planFlight(rng: Rng, config: AutoTrafficConfig, underway: boolean): PlannedFlight {
+export function planFlight(
+  rng: Rng,
+  config: AutoTrafficConfig,
+  underway: boolean,
+  assets: readonly DefendedAsset[] = DEFAULT_ASSETS,
+): PlannedFlight {
   const type = rng.weighted(config.mix);
   const performance = TRAFFIC[type];
 
@@ -55,13 +62,16 @@ export function planFlight(rng: Rng, config: AutoTrafficConfig, underway: boolea
   const entryX = config.entryRangeM * Math.sin(entryBearing);
   const entryY = config.entryRangeM * Math.cos(entryBearing);
 
+  const hostile = performance.affiliation === 'hostile';
+  const centre = hostile
+    ? (assets[rng.int(0, assets.length - 1)]?.position ?? vec3(0, 0, 0))
+    : vec3(0, 0, 0);
   // sqrt keeps aim points evenly spread over the disc instead of bunched in the middle.
-  const radius =
-    performance.affiliation === 'hostile' ? config.hostileAimRadiusM : config.aimRadiusM;
+  const radius = hostile ? config.hostileAimRadiusM : config.aimRadiusM;
   const aimRange = radius * Math.sqrt(rng.next());
   const aimBearing = rng.range(0, TWO_PI);
-  const dx = aimRange * Math.sin(aimBearing) - entryX;
-  const dy = aimRange * Math.cos(aimBearing) - entryY;
+  const dx = centre.x + aimRange * Math.sin(aimBearing) - entryX;
+  const dy = centre.y + aimRange * Math.cos(aimBearing) - entryY;
   const length = Math.hypot(dx, dy);
 
   const progress = underway ? rng.range(0.15, 0.65) : 0;

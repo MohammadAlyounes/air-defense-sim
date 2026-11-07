@@ -18,6 +18,7 @@ const COLUMN_HINT: Partial<Record<(typeof TRACK_COLUMNS)[number], string>> = {
 
 const IDENTITY_TEXT = {
   pending: { label: 'identifying', className: 'text-unknown' },
+  unknown: { label: 'unknown', className: 'text-suspect' },
   hostile: { label: 'hostile', className: 'text-hostile' },
   friend: { label: 'friendly', className: 'text-friend' },
   neutral: { label: 'civil', className: 'text-neutral' },

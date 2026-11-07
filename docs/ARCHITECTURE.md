@@ -58,7 +58,7 @@ User actions (play, step, restart, drop a threat) call controller methods. Anyth
 2. **Interceptors fly** first, in ten 2 ms sub-steps against the targets' start-of-tick motion, with the analytic closest-approach fuze.
 3. **Aircraft move** (following the terrain), then the **search radar sweeps**: line of sight over curved Earth and terrain, a random draw against the detection probability, noisy measurements, and the odd false alarm.
 4. **Tracks** update from the plots of the last 0.2 s of sweep (gating, nearest-neighbour association and a Kalman filter per track): new contacts, confirmations, kill assessments, lost tracks.
-5. The **command node** identifies, evaluates threats, assigns launch slots and launches.
+5. The **command node** identifies (IFF checks), evaluates threats against the defended assets, and, within the rules of engagement and the free fire channels, proposes or assigns shots and launches.
 6. **Reloads, leaks** and departures; old plots and effects are pruned.
 
 The command node works only from tracks (`src/sim/c2.ts`, `src/sim/tracker.ts`): it never reads an aircraft's true position. The truth is used only by the physics (interceptors meet the real target, the radar paints real positions) and to reveal what a target was after the engagement.
@@ -82,34 +82,35 @@ A URL can preset the view (`?select=3&camera=follow&heights=4`), next to the sim
 
 The landscape is generated once from its own seed (`src/sim/terrain.ts`), independent of the run's seed, so every run shares the same map. The app builds it on first use (`src/app/world/world.ts`) and hands the same object to every `Simulation`, the scope's relief layer, the 3D terrain mesh and the placement readout. The radar's coverage map (`src/sim/propagation.ts`) is computed from it once, on first use, for the blind-zone overlay and the placement readout's "first seen" estimate.
 
-## Current state (Step 5)
+## Current state (Steps 4 to 6 in progress)
 
-| Path                     | Contents                                                                                        |
-| ------------------------ | ----------------------------------------------------------------------------------------------- |
-| `src/sim/core`           | `FixedStepClock`, seeded `Rng` (sfc32), vectors, state hash.                                    |
-| `src/sim/traffic.ts`     | Flight performance of every traffic type (single source for the palette too).                   |
-| `src/sim/radar.ts`       | Search radar: sweep, SNR and detection probability (Swerling 1), false alarms, noise levels.    |
-| `src/sim/terrain.ts`     | Procedural, fictional terrain: a seeded height grid with bilinear sampling.                     |
-| `src/sim/propagation.ts` | Earth curvature (4/3 model), line of sight, radar horizon, coverage map.                        |
-| `src/sim/atmosphere.ts`  | Air density with height (exponential atmosphere), behind a small interface.                     |
-| `src/sim/kalman.ts`      | Constant-velocity Kalman filter, measurement covariance, uncertainty ellipse.                   |
-| `src/sim/tracker.ts`     | Tracker: gating, global nearest-neighbour association, track estimates.                         |
-| `src/sim/c2.ts`          | Command node: identification, threat evaluation, predicted intercept point, firing solution.    |
-| `src/sim/interceptor.ts` | Interceptor point mass: boost and coast with drag, proportional navigation, fuze.               |
-| `src/sim/scenario.ts`    | Scenario traffic: entry points, straight courses, arrival times.                                |
-| `src/sim/simulation.ts`  | The engine: commands, the defense loop each tick, events, snapshots, state hash, replay.        |
-| `src/app/sim`            | Driver, store, provider, URL options, narrator, defense summary, keyboard shortcuts.            |
-| `src/app/placement`      | Drag-and-drop: drop zones, placement store, card gestures, ghost readout.                       |
-| `src/app/views`          | Radar scope (tracks, interceptors, drops), result cards, welcome card, fallback.                |
-| `src/app/views/3d`       | 3D battlespace (on demand): terrain, aircraft, interceptors, effects, launcher, ghost, cameras. |
-| `src/app/world`          | The shared terrain and coverage map, built once; line-of-sight helpers for the UI.              |
-| `src/app/view`           | View state shared by every view: selection, camera, heights, labels, URL view options.          |
-| `src/app/analysis-bar`   | Header: pipeline chips, KPIs, NOW line. `null` values show "—" and the step that brings them.   |
-| `src/app/layout`         | Player bar (controls, seed, timeline) and footer.                                               |
-| `src/app/panels`         | Inspector (truth and defense status), live track table, event log, telemetry placeholder.       |
-| `src/app/components`     | Panel frame, tooltip, step badge, icons, concept-card popover.                                  |
-| `src/app/data`           | Plain, unit-tested data: stages, traffic text, roadmap, links.                                  |
-| `docs/concepts`          | Concept cards; copied into the README by `npm run docs:sync` and shown in the app.              |
+| Path                     | Contents                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `src/sim/core`           | `FixedStepClock`, seeded `Rng` (sfc32), vectors, state hash.                                     |
+| `src/sim/traffic.ts`     | Flight performance of every traffic type (single source for the palette too).                    |
+| `src/sim/radar.ts`       | Search radar: sweep, SNR and detection probability (Swerling 1), false alarms, noise levels.     |
+| `src/sim/terrain.ts`     | Procedural, fictional terrain: a seeded height grid with bilinear sampling.                      |
+| `src/sim/propagation.ts` | Earth curvature (4/3 model), line of sight, radar horizon, coverage map.                         |
+| `src/sim/atmosphere.ts`  | Air density with height (exponential atmosphere), behind a small interface.                      |
+| `src/sim/kalman.ts`      | Constant-velocity Kalman filter, measurement covariance, uncertainty ellipse.                    |
+| `src/sim/tracker.ts`     | Tracker: gating, global nearest-neighbour association, track estimates.                          |
+| `src/sim/c2.ts`          | Command node: IFF, rules of engagement, CPA threat evaluation, intercept planning, Pk, envelope. |
+| `src/sim/assets.ts`      | Defended assets: positions, threat rings and leak radii.                                         |
+| `src/sim/interceptor.ts` | Interceptor point mass: boost and coast with drag, proportional navigation, fuze.                |
+| `src/sim/scenario.ts`    | Scenario traffic: entry points, straight courses, arrival times.                                 |
+| `src/sim/simulation.ts`  | The engine: commands, the defense loop each tick, events, snapshots, state hash, replay.         |
+| `src/app/sim`            | Driver, store, provider, URL options, narrator, defense summary, keyboard shortcuts.             |
+| `src/app/placement`      | Drag-and-drop: drop zones, placement store, card gestures, ghost readout.                        |
+| `src/app/views`          | Radar scope (tracks, interceptors, drops), result cards, welcome card, fallback.                 |
+| `src/app/views/3d`       | 3D battlespace (on demand): terrain, aircraft, interceptors, effects, launcher, ghost, cameras.  |
+| `src/app/world`          | The shared terrain and coverage map, built once; line-of-sight helpers for the UI.               |
+| `src/app/view`           | View state shared by every view: selection, camera, heights, labels, URL view options.           |
+| `src/app/analysis-bar`   | Header: pipeline chips, KPIs, NOW line. `null` values show "—" and the step that brings them.    |
+| `src/app/layout`         | Player bar (controls, seed, timeline) and footer.                                                |
+| `src/app/panels`         | Inspector (truth and defense status), live track table, event log, telemetry placeholder.        |
+| `src/app/components`     | Panel frame, tooltip, step badge, icons, concept-card popover.                                   |
+| `src/app/data`           | Plain, unit-tested data: stages, traffic text, roadmap, links.                                   |
+| `docs/concepts`          | Concept cards; copied into the README by `npm run docs:sync` and shown in the app.               |
 
 The models and their equations are in [MODELS.md](MODELS.md).
 

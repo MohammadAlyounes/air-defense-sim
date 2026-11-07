@@ -199,13 +199,68 @@ With several targets, false alarms and noise, the tracker must decide which new 
 
 [Going deeper →](docs/concepts/05-2-gating-association.md)
 
+### Closest point of approach — how the battery decides what is a threat
+
+A hostile aircraft is only a threat if its course will bring it close to something the battery defends. Projecting its track straight ahead gives the moment it will be closest to each defended asset, and how close: the closest point of approach (CPA). If that distance falls inside an asset's threat ring, and the moment is still ahead, the track is a threat, and threats are ranked by how soon they arrive.
+
+- **Formula:** `t_cpa = −(r · v) / |v|²` and `d_cpa = |r + v · t_cpa|`, with `r` the track's position relative to the asset and `v` its velocity
+- **Example:** a target 20 km east and 10 km south of the town, flying north-west at 280 m/s, is closest to the town in about 75 s, at 7 km: outside the town's 2.5 km ring, so not a threat to it. Turn it 20° toward the town and it becomes one.
+- **See it:** select a hostile track: the inspector's "Why?" names the asset it threatens, how close it will pass and when. The header's "Next impact" counts down to the most urgent one.
+
+[Going deeper →](docs/concepts/05-3-closest-point-of-approach.md)
+
+### Engagement envelope — where the battery can reach
+
+An interceptor can only meet a target it can reach in time, before its motor's energy is spent and air drag has slowed it down. The set of places it can reach within its longest planned flight forms a dome over the battery: the engagement envelope. A threat outside it must wait until it flies in; a threat inside the 1.5 km minimum range is already too close.
+
+- **Formula:** `R_max(h) = √(reach(t_max, ρ(h/2))² − h²)`, where `reach` is the interceptor's straight-line reach with drag in air of density ρ, with a 10% margin
+- **Example:** with a 34 s planned flight, the dome reaches about 17 km at ground level and a little farther at 6 km up, where the thinner air saps less speed; it closes over the top at about 20 km.
+- **See it:** press the umbrella button in the 3D view to show the dome. Drop a jet 35 km out: the command node waits ("out of reach for now") until the jet enters it.
+
+[Going deeper →](docs/concepts/06-1-engagement-envelope.md)
+
+### Kill probability — why one interceptor is not always enough
+
+Even an interceptor that passes within its lethal radius does not always destroy its target. The chance that it does is the single-shot kill probability, Pk. It is lower against fast, agile targets and when the interceptor arrives slow after a long flight. So the battery looks after every shot and fires again if the target survived, until the threat is down or it is too late.
+
+- **Formula:** `Pk = Pk_target × clamp(v_interceptor / 600 m/s, 0.5, 1)`, with Pk_target = 0.95 (slow), 0.85 (medium) or 0.75 (above 250 m/s); two shots give `1 − (1 − Pk)²`
+- **Example:** a fast jet met by an interceptor slowed to 450 m/s: Pk = 0.75 × 0.75 = 0.56. A second shot raises the chance to 1 − 0.44² = 0.81.
+- **See it:** the approval card, the log and the inspector show the chance of a kill for each shot. Watch for "burst … but survived" in the event log, followed by a second launch.
+
+[Going deeper →](docs/concepts/06-2-kill-probability.md)
+
+### Rules of engagement — why speed and safety pull in opposite directions
+
+Before firing, the battery must decide what a track is. It interrogates it with an identification check (IFF): friendly aircraft answer, civil aircraft broadcast a transponder code, hostiles stay silent. But a friendly transponder can fail, so silence is evidence, not proof, and the rules decide how much evidence is enough.
+
+- **Formula:** chance a friend stays silent on `n` checks = `0.1ⁿ`; weapons TIGHT wait for 2 silent checks (1 in 100), weapons FREE fire after 1 (1 in 10)
+- **Example:** FREE engages a jet 4 s sooner than TIGHT, but out of every ten friendly aircraft with a faulty transponder heading for a defended asset, about one would be shot down. Under TIGHT, about one in a hundred.
+- **See it:** click "WCS TIGHT" in the header to switch to FREE or HOLD, and "AUTO" to SEMI-AUTO to approve every shot yourself (A to approve, H to hold fire).
+
+[Going deeper →](docs/concepts/06-3-rules-of-engagement.md)
+
 <!-- concepts:end -->
 
-**Coming next:** wind, turn radius, the radar equation and RCS, clutter and Doppler (Step 4) · identification friend-or-foe and the closest point of approach (Step 5) · kill probability and saturation (Step 6).
+**Coming next:** wind, turn radius, the radar equation and RCS, clutter and Doppler (Step 4) · identification friend-or-foe (Step 5) · missile energy, kill assessment and saturation (Step 6).
 
 ## Build log
 
 Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first.
+
+### Steps 5 and 6 · Decide & engage (the rest of Step 5, the start of Step 6)
+
+The command node gets things worth defending, rules to follow, limits to live with, and a reason for every decision.
+
+- **Defended assets:** a town and a power plant join the battery, each with a threat ring. Threats are ranked by the closest point of approach to the asset they will reach soonest, and leaks are counted where they happen.
+- **Identification that can go wrong:** friendly transponders fail one check in ten. A silent track is "unknown" after one check and "hostile" after two, so a friend with a dead transponder can be shot down: an identification error, counted as a failure.
+- **Rules of engagement:** click the header badges to switch weapons control (TIGHT, FREE, HOLD) and the operator mode (AUTO, SEMI-AUTO). In SEMI-AUTO the battery proposes each shot with its evidence; approve with A, hold fire with H.
+- **Kill probability:** a burst inside the lethal radius destroys the target only with the chance Pk, lower against fast, agile targets and with a tired interceptor. The battery looks again and fires again.
+- **Fire channels and saturation:** three engagements at a time. A swarm fills them, and the NOW line says when the defense is saturated.
+- **"Why?" for every decision:** the inspector explains the identity, the threatened asset, what the rules allow, and the shot and its chance of a kill. The engagement envelope can be shown as a dome in 3D.
+
+> **Engineering note: the rules are commands too.** Rule changes, approvals and holds are recorded like drops, so a run where a friendly was shot down under weapons FREE replays exactly, ready to be studied.
+
+_Screenshots and a clip for this step come with the v1.0 media pass._
 
 ### Step 5 · Track & identify (part 1: tracking)
 
@@ -331,9 +386,10 @@ The foundation everything else builds on.
   - In: terrain, terrain following, drag, detection probability, noise, false alarms, horizon, masking and the coverage map
   - Still to come: wind, threat routes and evasive turns, the standard atmosphere, clutter and Doppler
 - [ ] **Step 5 · Track & identify:** Kalman tracking, uncertainty ellipses, truth vs. perception; identification, civil traffic, defended assets, threat ranking with "Why?"
-  - In: Kalman tracking, gating and association, uncertainty ellipses, track quality, truth vs. perception
-  - Still to come: identification mistakes, the classifier, air corridors, defended assets and threat ranking with "Why?"
+  - In: Kalman tracking, gating and association, uncertainty ellipses, track quality, truth vs. perception, identification with transponder failures, defended assets, threat ranking with "Why?"
+  - Still to come: the kinematic classifier and air corridors
 - [ ] **Step 6 · Engage & assess:** fire channels, engagement envelopes, kill probability, doctrine and operator approval; kill assessment, saturation, telemetry and the full analysis bar
+  - In: fire channels, the engagement envelope, kill probability, rules of engagement and operator approval
 - [ ] **Step 7 · Scenarios & replay:** save, load and share, editor and raid generator; timeline scrubbing, rewind and branch, Monte Carlo, CSV export
 - [ ] **Step 8 · Learning layer:** ten guided lessons, live equations, challenges, after-action review
 - [ ] **Step 9 · Polish & release v1.0:** cinematic intro, effects, sound, themes, accessibility, demo video and the v1.0 release

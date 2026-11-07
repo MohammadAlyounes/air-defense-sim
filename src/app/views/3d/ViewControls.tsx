@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Crosshair, Eye, Map as MapIcon, Orbit, Tags } from 'lucide-react';
+import { Crosshair, Eye, Map as MapIcon, Orbit, Tags, Umbrella } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ConceptPopover } from '../../components/ConceptPopover';
 import { Tooltip } from '../../components/Tooltip';
@@ -19,6 +19,8 @@ export function ViewControls() {
   const hasSelection = useViewStore((state) => state.selectedId !== null);
   const heightScale = useViewStore((state) => state.heightScale);
   const showLabels = useViewStore((state) => state.showLabels);
+  const showEnvelope = useViewStore((state) => state.showEnvelope);
+  const setShowEnvelope = useViewStore((state) => state.setShowEnvelope);
   const { setCameraMode, setHeightScale, setShowLabels } = useViewStore.getState();
 
   return (
@@ -108,7 +110,25 @@ export function ViewControls() {
             <Tags aria-hidden="true" className="size-3.5" />
           </button>
         </Tooltip>
-        <div className="rounded-lg border border-ink-600 bg-ink-900/85 shadow-lg shadow-black/30 backdrop-blur">
+        <Tooltip content="Engagement envelope: the dome the interceptors can reach within their longest planned flight, wider high up where the air is thin.">
+          <button
+            type="button"
+            aria-pressed={showEnvelope}
+            aria-label="Engagement envelope"
+            data-envelope-toggle
+            onClick={() => setShowEnvelope(!showEnvelope)}
+            className={clsx(
+              'grid size-7 place-items-center rounded-lg border bg-ink-900/85 shadow-lg shadow-black/30 backdrop-blur transition-colors',
+              showEnvelope
+                ? 'border-accent/50 text-accent'
+                : 'border-ink-600 text-ink-300 hover:text-ink-100',
+            )}
+          >
+            <Umbrella aria-hidden="true" className="size-3.5" />
+          </button>
+        </Tooltip>
+        <div className="flex rounded-lg border border-ink-600 bg-ink-900/85 shadow-lg shadow-black/30 backdrop-blur">
+          <ConceptPopover concept="engagementEnvelope" label="Where the battery can reach" />
           <ConceptPopover concept="seeingScale" label="Why heights are stretched" />
         </div>
       </div>

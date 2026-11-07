@@ -1,6 +1,7 @@
 import {
   bearing,
   closestApproachToOrigin,
+  DEFAULT_ASSETS,
   coverageAt,
   DEFAULT_DEFENSE,
   DEFAULT_INTERCEPTOR,
@@ -57,6 +58,8 @@ export interface AircraftFacts {
   /** Truth vs. perception: how far the track is from the aircraft, and how far the filter expects. */
   trackError: string | null;
   trackErrorDetail: string;
+  /** "Why?": the battery's reasoning about it, one plain sentence per step of the loop. */
+  why: readonly string[];
   /** What the defense is doing about it. */
   defense: string;
   defenseDetail: string;
@@ -68,6 +71,7 @@ const seconds = (s: number) => `${s < 10 ? s.toFixed(1) : Math.round(s)} s`;
 
 const IDENTITY_WORD = {
   pending: 'identifying',
+  unknown: 'unknown',
   hostile: 'hostile',
   friend: 'friendly',
   neutral: 'civil',
@@ -111,8 +115,104 @@ export function aircraftFacts(snapshot: Snapshot, id: number): AircraftFacts | n
           detectionRangeM(RADAR_CROSS_SECTION_M2[aircraft.radarSize], DEFAULT_SEARCH_RADAR),
         )}`,
     ...trackError(snapshot, track, position),
+    why: track ? explain(snapshot, track) : [],
     ...defenseStatus(snapshot, id, aircraft.leaked),
   };
+}
+
+/**
+ * Why the battery acts as it does, from what it knows: its track, never the truth. One
+ * sentence each for identification, threat evaluation, the rules and the shot.
+ */
+export function explain(snapshot: Snapshot, track: Track): string[] {
+  const lines: string[] = [];
+  const checks = track.iffChecks;
+  const plural = (n: number) => (n === 1 ? 'check' : 'checks');
+  switch (track.identity) {
+    case 'pending':
+      lines.push(
+        track.confirmedTick === null
+          ? 'One echo so far: a second one must confirm the track before it is identified.'
+          : 'Confirmed: the identification check is due 2 s after confirmation.',
+      );
+      break;
+    case 'unknown':
+      lines.push(
+        `Unknown: no answer to ${checks} identification ${plural(checks)}. One more silent check and it is declared hostile.`,
+      );
+      break;
+    case 'hostile':
+      lines.push(
+        `Hostile: no answer to ${checks} identification ${plural(checks)}. A friendly aircraft answers 90% of checks; a civil one broadcasts its code.`,
+      );
+      break;
+    case 'friend':
+      lines.push('Friendly: it answered the identification check, so it is never engaged.');
+      return lines;
+    case 'neutral':
+      lines.push('Civil: it broadcasts a civil transponder code, so it is never engaged.');
+      return lines;
+  }
+  if (track.identity === 'pending') return lines;
+
+  const threat = track.threat;
+  if (threat) {
+    const asset = DEFAULT_ASSETS.find((a) => a.id === threat.assetId);
+    lines.push(
+      `Threat to the ${(asset?.name ?? 'battery').toLowerCase()}: its course passes ${formatKm(threat.closestApproachM)} from it, inside the ${formatKm(asset?.threatRadiusM ?? 0)} threat ring, in ${formatIn(threat.timeToClosestS)}.`,
+    );
+  } else if (track.velocity) {
+    lines.push('Not a threat: its course does not pass close to any defended asset.');
+    return lines;
+  } else {
+    return lines;
+  }
+
+  const { weaponsControl, operatorMode } = snapshot.rules;
+  if (weaponsControl === 'HOLD') {
+    lines.push('Rules: weapons are on HOLD, so the battery does not fire.');
+    return lines;
+  }
+  if (track.identity === 'unknown' && weaponsControl === 'TIGHT') {
+    lines.push(
+      'Rules: weapons TIGHT allow firing at hostile tracks only, so it waits for the next check.',
+    );
+    return lines;
+  }
+  lines.push(
+    weaponsControl === 'FREE'
+      ? 'Rules: weapons FREE allow firing at anything not identified as friendly or civil.'
+      : 'Rules: weapons TIGHT allow firing at hostile tracks.',
+  );
+
+  const engagement = snapshot.engagements.find((e) => e.id === track.engagementId);
+  if (engagement && engagement.state !== 'hit' && engagement.state !== 'missed') {
+    const step =
+      engagement.state === 'proposed'
+        ? `Proposed to the operator (${operatorMode === 'SEMI' ? 'SEMI-AUTO' : 'AUTO'})`
+        : 'Shot';
+    lines.push(
+      `${step}: intercept ${formatKm(groundRange(engagement.predictedPoint))} out after ${seconds(engagement.predictedTimeS)} of flight, chance of a kill ${Math.round(engagement.pk * 100)}%.`,
+    );
+    return lines;
+  }
+  if (snapshot.channels.used >= snapshot.channels.total) {
+    lines.push(
+      `Waiting: all ${snapshot.channels.total} fire channels are busy guiding other shots (saturation).`,
+    );
+    return lines;
+  }
+  if (snapshot.launcher.ready === 0) {
+    lines.push('Waiting: no interceptor is ready; one is reloaded every 30 s.');
+    return lines;
+  }
+  const plan = planIntercept(track, snapshot.tick, DEFAULT_DEFENSE, DEFAULT_INTERCEPTOR);
+  lines.push(
+    plan
+      ? `An interceptor could meet it ${formatKm(groundRange(plan.point))} out in ${seconds(plan.timeS)} (chance of a kill ${Math.round((plan.pk ?? 0) * 100)}%): it gets the next free slot.`
+      : 'Out of reach for now: an interceptor launched now could not meet it within 34 s, or only inside the 1.5 km minimum range.',
+  );
+  return lines;
 }
 
 /** The gap between the track and the truth, next to the filter's own estimate of it. */
@@ -185,7 +285,7 @@ function defenseStatus(
   if (track.identity === 'pending') {
     return { defense: 'Waiting', defenseDetail: 'identification check', defenseTone: 'plain' };
   }
-  if (track.identity !== 'hostile') {
+  if (track.identity === 'friend' || track.identity === 'neutral') {
     return {
       defense: 'Never engaged',
       defenseDetail: `identified ${IDENTITY_WORD[track.identity]}`,

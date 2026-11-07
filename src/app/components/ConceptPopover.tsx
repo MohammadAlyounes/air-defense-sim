@@ -12,6 +12,10 @@ import detectionProbability from '../../../docs/concepts/04-3-detection-probabil
 import airDrag from '../../../docs/concepts/04-4-air-drag.md?raw';
 import kalmanFilter from '../../../docs/concepts/05-1-kalman-filter.md?raw';
 import gatingAssociation from '../../../docs/concepts/05-2-gating-association.md?raw';
+import closestApproach from '../../../docs/concepts/05-3-closest-point-of-approach.md?raw';
+import engagementEnvelope from '../../../docs/concepts/06-1-engagement-envelope.md?raw';
+import killProbability from '../../../docs/concepts/06-2-kill-probability.md?raw';
+import rulesOfEngagement from '../../../docs/concepts/06-3-rules-of-engagement.md?raw';
 import { REPO_URL } from '../data/links';
 import { parseConceptCard, parseInline } from '../lib/cardMarkdown';
 
@@ -32,6 +36,10 @@ const CONCEPTS = {
   airDrag: { markdown: airDrag, file: '04-4-air-drag.md' },
   kalmanFilter: { markdown: kalmanFilter, file: '05-1-kalman-filter.md' },
   gatingAssociation: { markdown: gatingAssociation, file: '05-2-gating-association.md' },
+  closestApproach: { markdown: closestApproach, file: '05-3-closest-point-of-approach.md' },
+  engagementEnvelope: { markdown: engagementEnvelope, file: '06-1-engagement-envelope.md' },
+  killProbability: { markdown: killProbability, file: '06-2-kill-probability.md' },
+  rulesOfEngagement: { markdown: rulesOfEngagement, file: '06-3-rules-of-engagement.md' },
 } as const;
 
 export type ConceptId = keyof typeof CONCEPTS;

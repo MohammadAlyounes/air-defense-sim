@@ -4,6 +4,45 @@ One short entry per step, newest first: what was built, the decisions behind it,
 
 > **Roadmap compressed (2026-11-08).** The eleven remaining steps were merged into six, so v1.0 is now Step 9 instead of Step 14 ([PROJECT_PLAN.md](PROJECT_PLAN.md), Section 16). Older entries may still name steps by their old numbers: old Steps 4 + 5 are now Step 4, 6 + 7 are Step 5, 8 + 9 are Step 6, 10 + 12 are Step 7, 11 is Step 8, and 13 + 14 are Step 9.
 
+## Steps 5 and 6 · Decide & engage (2026-11-07)
+
+Built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08, in the new numbering. Identification, defended assets and threat evaluation complete most of Step 5; the rules of engagement, fire channels, kill probability and the envelope are the first part of Step 6.
+
+**Built**
+
+- **Defended assets (`src/sim/assets.ts`):** the battery, a town and a power plant, each with a threat ring and a leak radius. Scenario hostiles head for one of them; leaks name the asset reached.
+- **Threat evaluation:** the closest point of approach to every asset, from the filtered track. A threat is assigned to the asset it reaches soonest, for hostile and unknown tracks alike.
+- **Identification with mistakes:**
+  - Up to two IFF checks, 4 s apart. Friendly transponders answer 90% of checks and civil codes are received 98% of the time.
+  - Silence on the first check makes a track **unknown**, on both **hostile**.
+  - A friendly aircraft destroyed is an identification error: counted in the stats, shown in the header and on a result card.
+- **Rules of engagement:**
+  - Weapons control HOLD, TIGHT or FREE, and operator mode AUTO or SEMI-AUTO, set with a recorded `setRules` command.
+  - In SEMI-AUTO each shot is proposed and waits for `approveEngagement` or `holdFire`; proposals lapse when the shot becomes impossible.
+  - The header badges are clickable, and A and H answer from the keyboard.
+- **Fire channels:** at most three engagements at once (proposed, waiting or flying). The header meter is live, and the NOW line reports saturation.
+- **Kill probability:** a fuze within the lethal radius kills with `Pk = Pk_target × clamp(v / 600, 0.5, 1)`. It is predicted at assignment and drawn at the fuze (miss reason "survived"). `certainKill` keeps exact tests exact.
+- **Engagement envelope:** `envelopeRangeM(h)` from the planner's reach, drawn as a dome in 3D (umbrella button, `?envelope=1`).
+- **Views:**
+  - An approval card with the evidence (identity, threatened asset, intercept point, chance of a kill).
+  - A "Why?" section in the inspector, one sentence per step: identity, threat, rules, shot or reason for waiting.
+  - Assets on the scope and in 3D (threat rings that follow the ground, markers, labels).
+  - The narrator learns every new event: unknown and hostile identifications, the threatened asset, proposals, approvals, holds, rule changes, "burst … but survived", ID errors.
+- **Concept cards:** closest point of approach, engagement envelope, kill probability, rules of engagement.
+- **Tests:** 19 new unit tests and 3 new browser tests, 187 unit and 28 browser tests in all.
+  - Unit tests cover IFF answers, the rules, Pk values, the envelope, CPA to any point and the asset ranking.
+  - Simulation tests cover approval, holding fire and switching back to AUTO, HOLD, FREE engaging one check sooner, a friendly with a dead transponder shot down and counted, fire-channel limits, leaks at the power plant, survivals under Pk, and replay of rule changes.
+  - Browser tests cycle the rule badges, approve a shot in SEMI-AUTO, and read the inspector's "Why?" and the envelope toggle.
+
+**Decisions**
+
+- **Silence is evidence, not proof.** "Unknown" between the two checks gives weapons control something real to decide. FREE fires one check (4 s) sooner, at ten times the risk to a friend with a faulty transponder. The lesson is the trade-off, so neither setting is "right".
+- **Rules as recorded commands.** Clicking a header badge dispatches `setRules`, so a run where a friendly was shot down replays exactly.
+- **A generic kill probability.** Two textbook trends (agile targets are harder, slow interceptors steer worse) and nothing about real seekers or warheads. Jets now survive a first shot a third of the time or more, which makes shoot-look-shoot visible.
+- **Drops still aim at the battery.** Scenario hostiles spread over the three assets; dropped threats keep flying at the battery, so the placement readout stays simple.
+
+**Next: Step 4, part 2.** Wind, threat routes and evasive turns, the standard atmosphere, and clutter and Doppler. Then the kinematic classifier and air corridors finish Step 5.
+
 ## Step 5 · Track & identify, part 1: tracking (2026-11-07)
 
 Built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08, in the new numbering. Identification and threat evaluation arrive with the next entry.
@@ -70,7 +109,7 @@ Built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08, in t
 - **Kill assessment survives masking.** A hit target's track is kept until the beam comes round, even if the target was last seen several turns earlier. Without that, kills behind a ridge went unconfirmed.
 - **No screenshots for this step.** The owner will capture all media in one pass once the v1.0 features are in.
 
-**Next: Step 4, part 2.** Wind, threat routes and evasive turns, the standard atmosphere, and clutter and Doppler.
+**Next:** tracking with a Kalman filter, the first part of Step 5. Part 2 of Step 4 (wind, threat routes and evasive turns, the standard atmosphere, and clutter and Doppler) follows once this work is on `main`.
 
 ## Step 3 · First intercept (2026-11-07)
 

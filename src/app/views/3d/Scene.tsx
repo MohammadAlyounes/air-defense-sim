@@ -1,7 +1,7 @@
 import { Line } from '@react-three/drei';
 import { useMemo } from 'react';
 import { useViewStore } from '../../view/viewStore';
-import { DEFENDED_RADIUS_KM, RADAR_RANGE_KM, RING_STEP_KM } from './sceneConstants';
+import { RADAR_RANGE_KM, RING_STEP_KM } from './sceneConstants';
 import { TerrainLayer } from './Terrain';
 import { groundSceneY } from './terrainGeometry';
 
@@ -36,7 +36,6 @@ export function GroundAndRings() {
       }),
     [heightScale],
   );
-  const defended = useMemo(() => drapedCircle(DEFENDED_RADIUS_KM, heightScale, 96), [heightScale]);
 
   return (
     <group>
@@ -54,20 +53,6 @@ export function GroundAndRings() {
           opacity={radius === RADAR_RANGE_KM ? 0.55 : 0.25}
         />
       ))}
-      {/* The defended area: hostiles whose course passes inside it are threats. */}
-      <Line
-        points={defended}
-        color="#fbbf24"
-        lineWidth={1.4}
-        dashed
-        dashSize={0.5}
-        gapSize={0.4}
-        transparent
-        depthWrite={false}
-        depthTest={false}
-        renderOrder={1}
-        opacity={0.6}
-      />
     </group>
   );
 }

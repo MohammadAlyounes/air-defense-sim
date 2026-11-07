@@ -31,6 +31,11 @@ export interface InterceptorConfig {
    * less the air slows it down. `Infinity` turns drag off.
    */
   ballisticCoefficientKgM2: number;
+  /**
+   * When true, a fuze within the lethal radius always destroys the target (kill probability 1):
+   * for tests that need exact outcomes. The default uses the kill-probability model.
+   */
+  certainKill: boolean;
 }
 
 export const DEFAULT_INTERCEPTOR: InterceptorConfig = {
@@ -44,6 +49,7 @@ export const DEFAULT_INTERCEPTOR: InterceptorConfig = {
   armAfterS: 1,
   minLaunchElevationRad: (15 * Math.PI) / 180,
   ballisticCoefficientKgM2: 20_000,
+  certainKill: false,
 };
 
 export const GRAVITY_MPS2 = 9.81;
