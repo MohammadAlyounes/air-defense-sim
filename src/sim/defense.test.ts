@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import { IDEAL_SEARCH_RADAR } from './radar';
 import { Simulation, type SimConfig } from './simulation';
 import type { SimEvent } from './types';
 
+/**
+ * Flat ground, an ideal radar and interceptors that always kill within their lethal radius, so
+ * the loop's order and timing are exact.
+ */
 const emptySky = (extra: Partial<SimConfig> = {}) =>
-  new Simulation({ seed: 1, autoTraffic: false, ...extra });
+  new Simulation({
+    seed: 1,
+    autoTraffic: false,
+    terrain: false,
+    radar: IDEAL_SEARCH_RADAR,
+    ...extra,
+    interceptor: { certainKill: true, ...extra.interceptor },
+  });
 
 const kinds = (events: readonly SimEvent[]) => events.map((e) => e.kind);
 const ofKind = <K extends SimEvent['kind']>(events: readonly SimEvent[], kind: K) =>
@@ -30,16 +42,18 @@ describe('the defense loop', () => {
     expect(loop).toEqual([
       'contactNew',
       'trackConfirmed',
-      'identified',
+      'identified', // unknown: no answer to the first check
       'threatEvaluated',
+      'identified', // hostile: no answer to the second check either
       'engagementAssigned',
       'interceptorLaunched',
       'interceptResult',
       'killAssessed',
     ]);
 
-    const [identified] = ofKind(events, 'identified');
-    expect(identified?.identity).toBe('hostile');
+    const [first, second] = ofKind(events, 'identified');
+    expect(first).toMatchObject({ identity: 'unknown', evidence: 'noReply', checks: 1 });
+    expect(second).toMatchObject({ identity: 'hostile', evidence: 'noReply', checks: 2 });
     // Assigned, then launched once the launcher is ready: 1.5 s later.
     const [assigned] = ofKind(events, 'engagementAssigned');
     const [launched] = ofKind(events, 'interceptorLaunched');
@@ -71,8 +85,9 @@ describe('the defense loop', () => {
     const [launch] = ofKind(events, 'interceptorLaunched');
     const [result] = ofKind(events, 'interceptResult');
     const flightS = (result?.timeS ?? 0) - (launch?.timeS ?? 0);
-    // The plan keeps a 10% margin on reach, so the interceptor is a little early.
-    expect(flightS).toBeLessThanOrEqual(launch?.predictedTimeS ?? 0);
+    // The plan keeps a 10% margin on reach, which roughly pays for the climb and the drag
+    // during the boost that the straight-line reach leaves out.
+    expect(flightS).toBeLessThanOrEqual(1.05 * (launch?.predictedTimeS ?? 0));
     expect(flightS).toBeGreaterThan(0.8 * (launch?.predictedTimeS ?? 0));
   });
 
@@ -113,7 +128,7 @@ describe('the defense loop', () => {
       headingRad: 0,
     });
     const events = sim.run(50 * 120);
-    expect(ofKind(events, 'identified').map((e) => e.identity)).toEqual(['hostile']);
+    expect(ofKind(events, 'identified').map((e) => e.identity)).toEqual(['unknown', 'hostile']);
     expect(ofKind(events, 'interceptorLaunched')).toHaveLength(0);
   });
 

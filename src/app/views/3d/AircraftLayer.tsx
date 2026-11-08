@@ -9,6 +9,7 @@ import { AFFILIATION_COLOR, aircraftGeometry, aircraftMaterial } from './aircraf
 import { headingOf, toScene, worldSizeForPixels, yawForHeading } from './coords';
 import { interpolated, useAircraftRoster, type RosterEntry } from './frame';
 import { Polyline } from './polyline';
+import { groundSceneY } from './terrainGeometry';
 
 /** On-screen size of each model, in pixels: bigger aircraft look a little bigger. */
 const MODEL_PX: Readonly<Record<AircraftType, number>> = {
@@ -93,9 +94,11 @@ const AircraftMarker = memo(function AircraftMarker({
     const pixels = MODEL_PX[type] * (selected ? SELECTED_GROWTH : 1);
     const distance = camera.position.distanceTo(group.position);
     body.current?.scale.setScalar(worldSizeForPixels(distance, fov, size.height, pixels, zoom));
+    // The ground under the aircraft, a little above the terrain so the ring does not flicker.
+    const ground = groundSceneY(entry.position.x, entry.position.y, heightScale);
     if (foot.current) {
-      foot.current.position.y = -y + 0.002;
-      const footDistance = camera.position.distanceTo(scratch.set(x, 0, z));
+      foot.current.position.y = ground - y + 0.015 * heightScale;
+      const footDistance = camera.position.distanceTo(scratch.set(x, ground, z));
       foot.current.scale.setScalar(
         worldSizeForPixels(footDistance, fov, size.height, FOOT_PX, zoom),
       );
@@ -105,7 +108,7 @@ const AircraftMarker = memo(function AircraftMarker({
     const { drop, trail } = lines;
     const dropBrightness = selected ? 0.6 : 0.35;
     drop.begin();
-    drop.push(0, -y, 0, lineColor, dropBrightness);
+    drop.push(0, ground - y, 0, lineColor, dropBrightness);
     drop.push(0, 0, 0, lineColor, dropBrightness);
     drop.end(size.width, size.height);
     writeTrail(trail, lineColor, entry.aircraft.trail, [x, y, z], heightScale);

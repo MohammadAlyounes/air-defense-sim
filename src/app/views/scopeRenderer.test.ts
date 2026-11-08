@@ -4,7 +4,13 @@ import { echoGlow, interpolateAzimuth, pickEcho, scopePoint } from './scopeRende
 
 // A 400 px scope showing 40 km: 5 px per kilometre around the centre (200, 200).
 const layout = { size: 400, radiusPx: 200, rangeM: 40_000 };
-const radar = { azimuthRad: 0, periodS: 4, rangeM: 40_000, referenceRangeM: 30_000 };
+const radar = {
+  azimuthRad: 0,
+  periodS: 4,
+  rangeM: 40_000,
+  referenceRangeM: 30_000,
+  antennaHeightM: 12,
+};
 
 const plot = (truthId: number, eastM: number, northM: number, timeS: number): Plot => ({
   tick: Math.round(timeS * 50),

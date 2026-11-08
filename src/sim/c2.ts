@@ -1,24 +1,33 @@
+import { EXPONENTIAL_ATMOSPHERE, type Atmosphere } from './atmosphere';
 import { add, distance, dot, scale, vec3, type Vec3 } from './core/vec';
-import { reachM, type InterceptorConfig } from './interceptor';
+import { reachM, speedAfterMps, type InterceptorConfig } from './interceptor';
 import { trackPositionAt } from './tracker';
+import type { DefendedAsset } from './assets';
 import type { Affiliation } from './traffic';
-import type { Track } from './types';
+import type { Threat, Track } from './types';
 
 /** The launcher stands at the radar site, the origin. */
 export const LAUNCHER_POSITION: Vec3 = vec3(0, 0, 0);
 
 /**
- * The command node, Step 3 version: it identifies tracks, decides which ones threaten the
- * battery and when an interceptor can reach them. Identification becomes richer in Step 5,
- * and engagement rules (operator approval, doctrine, fire channels) arrive in Step 6.
+ * The command node: it identifies tracks, decides which ones threaten a defended asset, and
+ * when and whether an interceptor may be fired at them, within the rules of engagement.
  */
 export interface DefenseConfig {
   /** The identification check (IFF) answers this long after a track is confirmed, s. */
   iffDelayS: number;
-  /** A hostile whose course passes this close to the battery is a threat, m. */
-  threatRadiusM: number;
-  /** A hostile this close to the battery has got through the defense, m. */
-  leakRadiusM: number;
+  /** A track that does not answer is checked again this much later, s. */
+  iffRecheckS: number;
+  /** Checks without an answer before a track is declared hostile. */
+  iffChecks: number;
+  /** Chance that a friendly aircraft answers one check (its transponder can fail). */
+  friendReplyProbability: number;
+  /** Chance that a civil aircraft's transponder code is received on one check. */
+  civilSquawkProbability: number;
+  /** Engagements the tracking radar can guide at once: its fire channels. */
+  fireChannels: number;
+  /** After the operator holds fire on a track, it is not proposed again for this long, s. */
+  holdFireS: number;
   /** Interceptors cannot engage closer than this to the launcher, m. */
   minInterceptRangeM: number;
   /** From assignment to launch: the launcher turns and the interceptor is readied, s. */
@@ -37,8 +46,12 @@ export interface DefenseConfig {
 
 export const DEFAULT_DEFENSE: DefenseConfig = {
   iffDelayS: 2,
-  threatRadiusM: 5_000,
-  leakRadiusM: 2_000,
+  iffRecheckS: 4,
+  iffChecks: 2,
+  friendReplyProbability: 0.9,
+  civilSquawkProbability: 0.98,
+  fireChannels: 3,
+  holdFireS: 20,
   minInterceptRangeM: 1_500,
   launchPrepS: 1.5,
   launchIntervalS: 2,
@@ -48,28 +61,61 @@ export const DEFAULT_DEFENSE: DefenseConfig = {
   maxPlannedFlightS: 34,
 };
 
-/** What the battery believes a track is. 'pending' until the identification check answers. */
-export type Identity = 'pending' | 'friend' | 'neutral' | 'hostile';
-
 /**
- * The identification check, Step 3 version: friendly aircraft answer the IFF interrogation,
- * civil aircraft broadcast civil transponder codes, and anything that does neither is treated
- * as hostile. Step 5 adds mistakes, a kinematic classifier and air corridors.
+ * What the battery believes a track is. 'pending' until the identification check has been
+ * tried; 'unknown' while a track has not answered but has checks left; 'hostile' once it has
+ * failed every check.
  */
-export function iffAnswer(affiliation: Affiliation): Exclude<Identity, 'pending'> {
-  return affiliation;
+export type Identity = 'pending' | 'unknown' | 'friend' | 'neutral' | 'hostile';
+
+/** Weapons control status: HOLD (do not fire), TIGHT (hostile only), FREE (anything not friendly). */
+export type WeaponsControl = 'HOLD' | 'TIGHT' | 'FREE';
+/** AUTO: the battery fires on its own; SEMI: it proposes each shot and the operator approves. */
+export type OperatorMode = 'AUTO' | 'SEMI';
+
+export interface Rules {
+  weaponsControl: WeaponsControl;
+  operatorMode: OperatorMode;
+}
+
+export const DEFAULT_RULES: Rules = { weaponsControl: 'TIGHT', operatorMode: 'AUTO' };
+
+/** May the battery fire at a track with this identity under these rules? */
+export function engageable(identity: Identity, weaponsControl: WeaponsControl): boolean {
+  if (weaponsControl === 'HOLD') return false;
+  if (identity === 'hostile') return true;
+  return weaponsControl === 'FREE' && identity === 'unknown';
 }
 
 /**
- * Closest approach to the battery (the origin) along a straight course, on the ground:
- * how close the course passes and how long until it gets there. A negative time means the
- * closest point is behind it (it is flying away).
+ * One identification check (IFF: identification friend or foe). Friendly aircraft answer the
+ * interrogation, civil aircraft broadcast a civil transponder code, hostiles do neither. But
+ * transponders fail now and then, so a friendly aircraft can stay silent: that is how
+ * identification mistakes happen. Returns the answer, or null for silence.
  */
-export function closestApproachToOrigin(
+export function iffAnswer(
+  affiliation: Affiliation,
+  draw: number,
+  config: Pick<DefenseConfig, 'friendReplyProbability' | 'civilSquawkProbability'>,
+): 'friend' | 'neutral' | null {
+  if (affiliation === 'friend') return draw < config.friendReplyProbability ? 'friend' : null;
+  if (affiliation === 'neutral') return draw < config.civilSquawkProbability ? 'neutral' : null;
+  return null;
+}
+
+/**
+ * Closest point of approach (CPA) to a ground point along a straight course: how close the
+ * course passes and how long until it gets there. A negative time means the closest point is
+ * behind it (it is flying away).
+ *
+ *   t_cpa = −(r · v) / |v|²,   d_cpa = |r + v · t_cpa|,   with r the position relative to the point
+ */
+export function closestApproachTo(
+  point: Vec3,
   position: Vec3,
   velocity: Vec3,
 ): { distanceM: number; timeS: number } {
-  const p = vec3(position.x, position.y, 0);
+  const p = vec3(position.x - point.x, position.y - point.y, 0);
   const v = vec3(velocity.x, velocity.y, 0);
   const speedSq = dot(v, v);
   const timeS = speedSq > 1e-9 ? -dot(p, v) / speedSq : 0;
@@ -77,11 +123,50 @@ export function closestApproachToOrigin(
   return { distanceM: Math.hypot(closest.x, closest.y), timeS };
 }
 
+/** Closest approach to the battery (the origin). */
+export const closestApproachToOrigin = (position: Vec3, velocity: Vec3) =>
+  closestApproachTo(vec3(0, 0, 0), position, velocity);
+
+/**
+ * Threat evaluation: the defended asset this course threatens soonest, if any. A course is a
+ * threat to an asset if it passes inside the asset's threat radius and is still approaching.
+ */
+export function evaluateThreat(
+  position: Vec3,
+  velocity: Vec3,
+  assets: readonly DefendedAsset[],
+): Threat | null {
+  let best: Threat | null = null;
+  for (const asset of assets) {
+    const pass = closestApproachTo(asset.position, position, velocity);
+    if (pass.timeS <= 0 || pass.distanceM >= asset.threatRadiusM) continue;
+    if (!best || pass.timeS < best.timeToClosestS) {
+      best = { assetId: asset.id, closestApproachM: pass.distanceM, timeToClosestS: pass.timeS };
+    }
+  }
+  return best;
+}
+
+/**
+ * Single-shot kill probability (Pk): the chance that an interceptor whose fuze goes off within
+ * its lethal radius destroys the target. A generic teaching model: agile, fast targets are
+ * harder (0.95 for slow targets, 0.85 for medium, 0.75 above 250 m/s), and a slow, tired
+ * interceptor manoeuvres less well (scaled by its speed over 600 m/s, between 0.5 and 1).
+ *
+ *   Pk = Pk_target × clamp(v_interceptor / 600 m/s, 0.5, 1)
+ */
+export function killProbability(targetSpeedMps: number, interceptorSpeedMps: number): number {
+  const base = targetSpeedMps > 250 ? 0.75 : targetSpeedMps > 120 ? 0.85 : 0.95;
+  return base * Math.min(1, Math.max(0.5, interceptorSpeedMps / 600));
+}
+
 export interface Intercept {
   /** Interceptor flight time to the intercept, s. */
   timeS: number;
   /** Where the target will be then: the predicted intercept point. */
   point: Vec3;
+  /** Predicted single-shot kill probability (set by `planIntercept`). */
+  pk?: number;
 }
 
 /**
@@ -123,22 +208,48 @@ export function predictIntercept(
 /**
  * The command node's firing solution for a track at `tick`, or null when no interceptor
  * launched now could reach it in time (or the meeting point is inside the minimum range).
- * Plans with the track's estimated position and velocity: perception, not truth.
+ * Plans with the track's estimated position and velocity: perception, not truth. Drag is
+ * taken at the air density halfway up to the target, the average the interceptor flies through.
  */
 export function planIntercept(
   track: Track,
   tick: number,
   defense: DefenseConfig,
   interceptor: InterceptorConfig,
+  atmosphere: Atmosphere = EXPONENTIAL_ATMOSPHERE,
 ): Intercept | null {
   if (!track.velocity) return null;
+  const position = trackPositionAt(track, tick);
+  const density = atmosphere.densityKgM3(Math.max(0, position.z) / 2);
   const plan = predictIntercept(
-    trackPositionAt(track, tick),
+    position,
     track.velocity,
     LAUNCHER_POSITION,
-    (t) => defense.planningReachFactor * reachM(t, interceptor),
+    (t) => defense.planningReachFactor * reachM(t, interceptor, density),
     defense.maxPlannedFlightS,
   );
   if (!plan || distance(plan.point, LAUNCHER_POSITION) < defense.minInterceptRangeM) return null;
-  return plan;
+  const v = track.velocity;
+  const pk = killProbability(
+    Math.hypot(v.x, v.y, v.z),
+    speedAfterMps(plan.timeS, interceptor, density),
+  );
+  return { ...plan, pk };
+}
+
+/**
+ * The engagement envelope: the farthest ground range at which the battery can intercept a
+ * target at `altitudeM`, using the planner's reach (with drag and margin) within the longest
+ * planned flight. The inner edge is the minimum intercept range.
+ */
+export function envelopeRangeM(
+  altitudeM: number,
+  defense: DefenseConfig,
+  interceptor: InterceptorConfig,
+  atmosphere: Atmosphere = EXPONENTIAL_ATMOSPHERE,
+): number {
+  const density = atmosphere.densityKgM3(Math.max(0, altitudeM) / 2);
+  const reach =
+    defense.planningReachFactor * reachM(defense.maxPlannedFlightS, interceptor, density);
+  return reach > altitudeM ? Math.sqrt(reach * reach - altitudeM * altitudeM) : 0;
 }

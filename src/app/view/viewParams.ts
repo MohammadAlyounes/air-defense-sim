@@ -1,12 +1,24 @@
 import { HEIGHT_SCALES, type HeightScale } from '../views/3d/coords';
+import { COVERAGE_ALTITUDES_M, type CoverageAltitude } from '../world/world';
 import { CAMERA_MODES, type CameraMode, type ViewState } from './viewStore';
 
 /**
  * View settings from the URL, so a link can open a particular view, e.g.
- * `?t=75&select=3&camera=follow&heights=4`. Unknown or invalid values are ignored.
+ * `?t=75&select=3&camera=follow&heights=4&coverage=50&truth=1`. Unknown or invalid values are ignored.
  */
 export interface ViewOptions {
-  state: Partial<Pick<ViewState, 'cameraMode' | 'heightScale' | 'selectedId' | 'showLabels'>>;
+  state: Partial<
+    Pick<
+      ViewState,
+      | 'cameraMode'
+      | 'heightScale'
+      | 'selectedId'
+      | 'showLabels'
+      | 'coverageAltM'
+      | 'compareTruth'
+      | 'showEnvelope'
+    >
+  >;
   /** `welcome=0` hides the first-visit welcome card (screenshots, embeds). */
   welcome: boolean;
 }
@@ -32,6 +44,17 @@ export function parseViewOptions(search: string): ViewOptions {
 
   const labels = params.get('labels');
   if (labels !== null) state.showLabels = !OFF.includes(labels);
+
+  const envelope = params.get('envelope');
+  if (envelope !== null) state.showEnvelope = !OFF.includes(envelope);
+
+  const truth = params.get('truth');
+  if (truth !== null) state.compareTruth = !OFF.includes(truth);
+
+  const coverage = Number(params.get('coverage'));
+  if ((COVERAGE_ALTITUDES_M as readonly number[]).includes(coverage)) {
+    state.coverageAltM = coverage as CoverageAltitude;
+  }
 
   const welcome = params.get('welcome');
   return { state, welcome: welcome === null || !OFF.includes(welcome) };

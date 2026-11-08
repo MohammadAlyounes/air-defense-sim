@@ -5,6 +5,7 @@ import { useViewStore } from '../../view/viewStore';
 import { WelcomeCard } from '../WelcomeCard';
 import { AircraftLayer } from './AircraftLayer';
 import { CameraRig } from './CameraRig';
+import { AssetLayer, EnvelopeLayer } from './DefenseLayer';
 import { EffectsLayer } from './EffectsLayer';
 import { useRedrawOnChange } from './frame';
 import { LabelLayer, LabelProjector } from './Labels';
@@ -12,6 +13,7 @@ import { RadarSite } from './RadarSite';
 import { InterceptorLayer } from './InterceptorLayer';
 import { PlacementGhost, PlacementZone } from './PlacementGhost';
 import { GroundAndRings } from './Scene';
+import { TrackEstimateLayer } from './TrackEstimateLayer';
 import { ViewControls } from './ViewControls';
 
 const BACKGROUND = '#060b16';
@@ -53,8 +55,11 @@ function Scene() {
       <hemisphereLight args={['#d6e6ff', '#0a1322', 1.15]} />
       <directionalLight position={[40, 70, 25]} intensity={1.7} />
       <GroundAndRings />
+      <AssetLayer />
+      <EnvelopeLayer />
       <RadarSite />
       <AircraftLayer />
+      <TrackEstimateLayer />
       <InterceptorLayer />
       <EffectsLayer />
       <PlacementZone />
@@ -83,6 +88,7 @@ const HINTS = {
 
 function BottomBar() {
   const cameraMode = useViewStore((state) => state.cameraMode);
+  const compareTruth = useViewStore((state) => state.compareTruth);
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 p-2">
       <p className="hidden rounded-md bg-ink-950/60 px-2 py-1 text-[11px] text-ink-300 backdrop-blur-sm md:block">
@@ -93,8 +99,10 @@ function BottomBar() {
         content={
           <>
             <strong className="text-ink-100">Ground truth</strong>: this view shows where every
-            aircraft really is. The radar scope shows only what the radar has seen. Later steps add
-            noise, tracking and the gap between the two.
+            aircraft really is, even behind hills. The radar scope shows only what the radar has
+            seen: noisy echoes, the odd false alarm, nothing in the blind zones. Press T (or
+            &ldquo;truth&rdquo; under the scope) to add the battery&rsquo;s tracks here, each joined
+            to the real aircraft by its error.
           </>
         }
       >
@@ -103,7 +111,7 @@ function BottomBar() {
           className="pointer-events-auto ml-auto flex cursor-help items-center gap-1.5 rounded-full border border-ink-600 bg-ink-900/85 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-ink-200 backdrop-blur"
         >
           <Info aria-hidden="true" className="size-3 text-accent" />
-          Ground truth
+          {compareTruth ? 'Truth + tracks' : 'Ground truth'}
         </span>
       </Tooltip>
     </div>

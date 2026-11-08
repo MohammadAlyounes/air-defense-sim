@@ -2,7 +2,114 @@
 
 One short entry per step, newest first: what was built, the decisions behind it, and what comes next.
 
-> **Roadmap compressed (2026-11-08).** The eleven remaining steps were merged into six, so v1.0 is now Step 9 instead of Step 14 ([PROJECT_PLAN.md](PROJECT_PLAN.md), Section 16). Entries below keep the numbering they were written with: old Steps 4 + 5 are now Step 4, 6 + 7 are Step 5, 8 + 9 are Step 6, 10 + 12 are Step 7, 11 is Step 8, and 13 + 14 are Step 9.
+> **Roadmap compressed (2026-11-08).** The eleven remaining steps were merged into six, so v1.0 is now Step 9 instead of Step 14 ([PROJECT_PLAN.md](PROJECT_PLAN.md), Section 16). Older entries may still name steps by their old numbers: old Steps 4 + 5 are now Step 4, 6 + 7 are Step 5, 8 + 9 are Step 6, 10 + 12 are Step 7, 11 is Step 8, and 13 + 14 are Step 9.
+
+## Steps 5 and 6 · Decide & engage (2026-11-07)
+
+Built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08, in the new numbering. Identification, defended assets and threat evaluation complete most of Step 5; the rules of engagement, fire channels, kill probability and the envelope are the first part of Step 6.
+
+**Built**
+
+- **Defended assets (`src/sim/assets.ts`):** the battery, a town and a power plant, each with a threat ring and a leak radius. Scenario hostiles head for one of them; leaks name the asset reached.
+- **Threat evaluation:** the closest point of approach to every asset, from the filtered track. A threat is assigned to the asset it reaches soonest, for hostile and unknown tracks alike.
+- **Identification with mistakes:**
+  - Up to two IFF checks, 4 s apart. Friendly transponders answer 90% of checks and civil codes are received 98% of the time.
+  - Silence on the first check makes a track **unknown**, on both **hostile**.
+  - A friendly aircraft destroyed is an identification error: counted in the stats, shown in the header and on a result card.
+- **Rules of engagement:**
+  - Weapons control HOLD, TIGHT or FREE, and operator mode AUTO or SEMI-AUTO, set with a recorded `setRules` command.
+  - In SEMI-AUTO each shot is proposed and waits for `approveEngagement` or `holdFire`; proposals lapse when the shot becomes impossible.
+  - The header badges are clickable, and A and H answer from the keyboard.
+- **Fire channels:** at most three engagements at once (proposed, waiting or flying). The header meter is live, and the NOW line reports saturation.
+- **Kill probability:** a fuze within the lethal radius kills with `Pk = Pk_target × clamp(v / 600, 0.5, 1)`. It is predicted at assignment and drawn at the fuze (miss reason "survived"). `certainKill` keeps exact tests exact.
+- **Engagement envelope:** `envelopeRangeM(h)` from the planner's reach, drawn as a dome in 3D (umbrella button, `?envelope=1`).
+- **Views:**
+  - An approval card with the evidence (identity, threatened asset, intercept point, chance of a kill).
+  - A "Why?" section in the inspector, one sentence per step: identity, threat, rules, shot or reason for waiting.
+  - Assets on the scope and in 3D (threat rings that follow the ground, markers, labels).
+  - The narrator learns every new event: unknown and hostile identifications, the threatened asset, proposals, approvals, holds, rule changes, "burst … but survived", ID errors.
+- **Concept cards:** closest point of approach, engagement envelope, kill probability, rules of engagement.
+- **Tests:** 19 new unit tests and 3 new browser tests, 187 unit and 28 browser tests in all.
+  - Unit tests cover IFF answers, the rules, Pk values, the envelope, CPA to any point and the asset ranking.
+  - Simulation tests cover approval, holding fire and switching back to AUTO, HOLD, FREE engaging one check sooner, a friendly with a dead transponder shot down and counted, fire-channel limits, leaks at the power plant, survivals under Pk, and replay of rule changes.
+  - Browser tests cycle the rule badges, approve a shot in SEMI-AUTO, and read the inspector's "Why?" and the envelope toggle.
+
+**Decisions**
+
+- **Silence is evidence, not proof.** "Unknown" between the two checks gives weapons control something real to decide. FREE fires one check (4 s) sooner, at ten times the risk to a friend with a faulty transponder. The lesson is the trade-off, so neither setting is "right".
+- **Rules as recorded commands.** Clicking a header badge dispatches `setRules`, so a run where a friendly was shot down replays exactly.
+- **A generic kill probability.** Two textbook trends (agile targets are harder, slow interceptors steer worse) and nothing about real seekers or warheads. Jets now survive a first shot a third of the time or more, which makes shoot-look-shoot visible.
+- **Drops still aim at the battery.** Scenario hostiles spread over the three assets; dropped threats keep flying at the battery, so the placement readout stays simple.
+
+**Next: Step 4, part 2.** Wind, threat routes and evasive turns, the standard atmosphere, and clutter and Doppler. Then the kinematic classifier and air corridors finish Step 5.
+
+## Step 5 · Track & identify, part 1: tracking (2026-11-07)
+
+Built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08, in the new numbering. Identification and threat evaluation arrive with the next entry.
+
+**Built**
+
+- **Kalman filter (`src/sim/kalman.ts`):** a 6-state constant-velocity filter (position and velocity in 3D) with white-noise-acceleration process noise and a Joseph-form update. The radar's range, bearing and elevation errors become a measurement covariance in metres through the Jacobian. Includes the innovation and its normalized square (NIS) for gating, and the horizontal uncertainty ellipse.
+- **Tracker (`src/sim/tracker.ts`):**
+  - Gating at `d² ≤ 16.27` (chi-square, 3 degrees of freedom, 99.9%) and global nearest-neighbour association, with every track predicted to each plot's own tick.
+  - At most one plot per track per antenna pass.
+  - The truth link is gone from association: a track's `truthId` now only records which aircraft made its last echo, for the overlay, tests and physics.
+- **Batched association:** plots are matched in 0.2 s (18°) batches and committed 0.2 s late, and kill assessment looks at the same lagged arc.
+- **Views:**
+  - A 2σ uncertainty ellipse around every track on the scope.
+  - A ±1σ column in the track table.
+  - A truth vs. perception toggle: the "truth" button under the scope, the T key or `?truth=1`. It shows grey true positions and dashed error lines on the scope, the battery's tracks as identity-coloured rings with error lines in 3D, and a "Track vs truth" row in the inspector with the real error next to the filter's own estimate.
+- **Concept cards:** the Kalman filter, and gating and association (also opened from the track table).
+- **Tests:** 16 new unit tests and 2 new browser tests, 168 unit and 25 browser tests in all.
+  - The filter is checked against hand-worked values: prediction and process noise, the halfway update, velocity from two plots, measurement geometry, ellipse axes and a 3 × 3 inverse. A consistency test checks that the NIS averages 3 over 390 updates.
+  - Association tests cover crossing tracks, the gate and the once-per-pass rule.
+  - Simulation tests check that tracks beat raw echoes, that velocities settle within a few m/s, and that a swarm ends with one track per drone.
+
+**Decisions**
+
+- **Batches to stop track theft.** Matching each echo as it arrived let the first echo of a swarm grab the wide gate of a neighbour's brand-new track, and the swarm's tracks never settled. Matching 18° of sweep together, and committing late, fixes it at a cost of 0.2 s.
+- **Truth still guides interceptors in view.** The fire-control picture stays perfect while the target is visible. Kill probability, and so misses, arrives in Step 6. Guiding by the 4-second search track would turn every shot into a near miss for reasons that have nothing to do with the lesson.
+- **A filter that tests its own honesty.** The NIS consistency test fails if the filter claims to be surer (or less sure) than it really is, which catches wrong Q or R much better than a single error threshold.
+- **σ, not Σ.** CSS upper-casing turned the column header's σ into Σ; that header opts out.
+
+**Next:** identification mistakes, defended assets and a "Why?" for every decision (the rest of Step 5), with the first engagement rules from Step 6.
+
+## Step 4 · Environment & radar, part 1: terrain and radar (2026-11-07)
+
+Built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08, in the new numbering. Wind, threat routes and evasive turns, the standard atmosphere, and clutter and Doppler come in part 2.
+
+**Built**
+
+- **Procedural terrain (`src/sim/terrain.ts`):** seeded value noise with rotated octaves and one ridged octave, flat within 3 km of the battery, rising to about 750 m. A 257 × 257 grid, sampled bilinearly, generated once and shared by everything.
+- **Line of sight, horizon and coverage (`src/sim/propagation.ts`):** the 4/3 Earth model, a sampled line of sight that tells "below the horizon" from "masked by terrain", and a radial-sweep coverage map of the lowest visible height at every bearing and range.
+- **Radar realism (`src/sim/radar.ts`):**
+  - Swerling 1 detection probability from the SNR (`Pd = Pfa^(1/(1+SNR))`), with the old ranges now meaning "seen on half the looks".
+  - Gaussian noise on range, bearing and elevation.
+  - False alarms at `λ = Pfa × cells = 0.6` per turn.
+- **Tracks:** a tentative track is dropped if the next look brings nothing (the log says "dropped", usually a false alarm); confirmed tracks survive three silent turns. The command node only fires at tracks seen within the last look.
+- **Terrain following:** drones and cruise-missile-like targets hold their height above the ground ahead, jets keep their altitude but clear the hills, all within a climb rate per type.
+- **Air drag:** an exponential atmosphere and a ballistic coefficient slow the coasting interceptor. The planner's reach uses the closed form `s = ln(1 + k·v₀·t)/k`, at the air density halfway up to the target.
+- **Guidance out of sight:** while terrain hides the target, the interceptor steers toward the track's extrapolated position; it can now hit the ground.
+- **Views:**
+  - The 3D terrain mesh is drawn by one shader: relief, contours, a 10 km grid, the sweep's glow and the blind zones. Range rings follow the ground, and drops land where the pointer's ray meets the terrain.
+  - The scope gets a faint relief layer and the blind-zone overlay. The switch (off, 50 m, 300 m, 1 km) is shared with 3D and the URL (`?coverage=50`).
+  - The placement readout predicts where on its route the radar first sees the threat and warns when the terrain hides it. The inspector gains a "Radar view" row: in view (with the chance per look), hidden by terrain (and from what height it would show), or below the horizon.
+- **Concept cards:** radar horizon, terrain masking, detection probability, air drag.
+- **Tests:** 31 new unit tests and 3 new browser tests, 152 unit and 23 browser tests in all.
+  - The physics is checked against hand-computed values: the horizon, curvature drop, ridge shadows, Pd, the 50% range, λ, air density, drag deceleration and the analytic coast (including step-by-step integration against it).
+  - Simulation-level tests cover masking behind a ridge, terrain following, the noise level, false alarms that never confirm, detection odds near and far, the full loop over terrain, and replay.
+  - Browser tests switch the blind zones on and off, open them from a link, check the inspector's radar view and the placement warning.
+
+**Decisions**
+
+- **An "ideal" radar for exact tests.** `IDEAL_SEARCH_RADAR` (threshold detection, no noise, no false alarms) with `terrain: false` keeps the Step 3 tests exact. New tests cover the realistic radar separately.
+- **The terrain has its own seed.** Every run uses the same map, so a scenario's geometry doesn't change when you press "New seed", and the app builds the terrain and coverage once.
+- **Masking where it matters.** A first landscape hid little inside 17 km (the cruise-missile-like target's detection range). The hills now start 6 km out, so the south and west hide low flyers until 7 to 10 km out, while the north and east stay open. The contrast is the lesson.
+- **False alarms are honest.** They start real tentative tracks, which the M-of-N rule (here: two echoes in a row) drops. The tracker never "knows" which echoes are false.
+- **Kill assessment survives masking.** A hit target's track is kept until the beam comes round, even if the target was last seen several turns earlier. Without that, kills behind a ridge went unconfirmed.
+- **No screenshots for this step.** The owner will capture all media in one pass once the v1.0 features are in.
+
+**Next:** tracking with a Kalman filter, the first part of Step 5. Part 2 of Step 4 (wind, threat routes and evasive turns, the standard atmosphere, and clutter and Doppler) follows once this work is on `main`.
 
 ## Step 3 · First intercept (2026-11-07)
 

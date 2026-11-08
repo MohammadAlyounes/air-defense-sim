@@ -29,7 +29,7 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 - **Drag threats onto the map.** Small drones, drone swarms, cruise-missile-like targets and fast jets, plus friendly and civil aircraft that must _not_ be engaged.
 - **Watch the whole defense loop.** A live analysis bar follows every track through **Detect → Track → Identify → Evaluate → Assign → Engage → Assess**, with a plain-language "Now" line.
 - **Ask "Why?"** Click any decision to see the reasoning: the evidence, the threat score, the intercept geometry and the chance of a hit.
-- **See the physics, not magic.** Radar horizon, terrain masking, Kalman filtering and proportional navigation, each explained in three sentences and one formula.
+- **See the physics, not magic.** Radar horizon, terrain masking, detection probability, air drag, Kalman filtering and proportional navigation, each explained in three sentences and one formula.
 - **Experiment.** Tune parameters, save and share scenarios, rewind and try a different decision, or run a scenario hundreds of times to see the odds.
 
 ## Quick start
@@ -139,13 +139,156 @@ An interceptor that always points at its target ends up in a long tail chase. In
 
 [Going deeper →](docs/concepts/03-2-proportional-navigation.md)
 
+### Radar horizon — why the Earth's curve hides low flyers
+
+Radar waves travel in almost straight lines, but the Earth curves away beneath them, so far enough out even open ground hides a low target. The air bends radio waves slightly back down, which the textbook "4/3 Earth" model handles by drawing the Earth a third larger than it is. The higher the antenna and the higher the target, the farther the horizon.
+
+- **Formula:** `d ≈ 4.12 km × (√h_radar + √h_target)`, heights in metres
+- **Example:** with the 12 m antenna, a target at 50 m is below the horizon beyond 4.12 × (3.5 + 7.1) ≈ 43 km; a jet at 6,000 m stays in view out to 330 km.
+- **See it:** select a low aircraft far out: the inspector's "Radar view" row says when it is below the horizon.
+
+[Going deeper →](docs/concepts/04-1-radar-horizon.md)
+
+### Terrain masking — why hills hide what flies low behind them
+
+A hill casts a "radar shadow", much like a shadow from a lamp at the radar's antenna. A target flying low behind the hill sits inside that shadow and cannot be seen, however strong the radar. The shadow is deeper the taller the hill, the closer it stands to the radar, and the farther the target is behind it.
+
+- **Formula:** behind a hill of height `H` at distance `d₁`, a target at distance `d₂` is seen only above `h ≈ H × d₂ / d₁` (antenna near the ground)
+- **Example:** a 400 m ridge 10 km out hides everything below about 1,200 m at 30 km, so a target flying 50 m above the ground stays hidden until it crosses the ridge.
+- **See it:** switch on "Blind zones" under the scope: orange shows where the radar cannot see a target at 50 m, 300 m or 1 km above the ground.
+
+[Going deeper →](docs/concepts/04-2-terrain-masking.md)
+
+### Detection probability — why the radar sometimes misses, and sometimes sees ghosts
+
+A radar decides "target or not" by checking whether the echo rises above a threshold set over the receiver's noise. A real target's echo flickers from scan to scan as it turns, so near its maximum range it is only seen on some looks. Set the threshold lower and you see more, but random noise also crosses it more often: those are false alarms.
+
+- **Formula:** `Pd = Pfa^(1 / (1 + SNR))` for a flickering (Swerling 1) target, with `SNR ∝ σ / R⁴`
+- **Example:** with a false-alarm chance Pfa = 10⁻⁶ per cell, a drone at its 9.5 km "50% range" is seen on half the looks, and on 85% of them at 6.6 km. Over 600,000 cells per turn, about 0.6 false alarms appear each turn.
+- **See it:** watch for lone blips that appear once and vanish: the log calls them "dropped", because a second echo never came to confirm them.
+
+[Going deeper →](docs/concepts/04-3-detection-probability.md)
+
+### Air drag — why an interceptor's reach depends on altitude
+
+Once its motor burns out, an interceptor coasts and the air slows it down. Drag grows with the square of speed and with air density, and the air thins out with height, halving about every 6 km. So the same interceptor reaches farther, and arrives faster, against a high target than against a low one.
+
+- **Formula:** `a_drag = ρ(h) · v² / (2β)`, with `ρ(h) = 1.225 kg/m³ × e^(−h / 8.5 km)` and ballistic coefficient `β = 20,000 kg/m²`
+- **Example:** at sea level and 760 m/s, drag slows it by 17.7 m/s² (almost 2 g); after 10 s of coasting it is down to 617 m/s and has flown 6.8 km instead of 7.6 km.
+- **See it:** drop a fast jet high and a cruise-missile-like target low at the same distance: the low one is intercepted closer in, after a slower flight.
+
+[Going deeper →](docs/concepts/04-4-air-drag.md)
+
+### Kalman filter — how the tracker sees through the noise
+
+Every radar echo is a little off, so joining the raw blips would give a jittery track and a wild velocity. A Kalman filter keeps a best guess of position and velocity, together with how unsure it is, and moves the guess forward between echoes. When a new echo arrives, it blends the guess and the echo in proportion to how much it trusts each.
+
+- **Formula:** `x̂ ← x̂⁻ + K · (z − x̂⁻)`, with the gain `K = P⁻ / (P⁻ + R)` (in one dimension: P⁻ is the prediction's variance, R the echo's)
+- **Example:** a prediction good to ±80 m and an echo good to ±80 m give K = 0.5: the new estimate lies halfway, good to ±57 m (80 / √2). After a dozen echoes a jet's speed is known to within a few m/s, where two raw echoes 4 s apart could be 30 m/s off.
+- **See it:** the faint ellipse around each track on the scope is its 2σ uncertainty, and the track table's ±1σ column shrinks as echoes come in. Press T to compare tracks with the truth.
+
+[Going deeper →](docs/concepts/05-1-kalman-filter.md)
+
+### Gating and association — which echo belongs to which track
+
+With several targets, false alarms and noise, the tracker must decide which new echo continues which track, without knowing what made it. It draws a "gate" around each track's predicted position, sized by its uncertainty, and only echoes inside the gate are candidates. The closest pairs, measured in standard deviations, are matched first; leftover echoes start new tentative tracks.
+
+- **Formula:** `d² = νᵀ · S⁻¹ · ν < 16.3`, where ν is the gap between the echo and the prediction and S its expected spread (the 99.9% limit for three dimensions)
+- **Example:** a track predicted to ±100 m: an echo 250 m off is 2.5 standard deviations (d² = 6.3) and joins it; one 500 m off is 5 standard deviations (d² = 25) and starts a new track instead.
+- **See it:** drop a drone swarm: six echoes close together. Watch the tracks settle into one per drone after a few sweeps, and press T to see which track follows which drone.
+
+[Going deeper →](docs/concepts/05-2-gating-association.md)
+
+### Closest point of approach — how the battery decides what is a threat
+
+A hostile aircraft is only a threat if its course will bring it close to something the battery defends. Projecting its track straight ahead gives the moment it will be closest to each defended asset, and how close: the closest point of approach (CPA). If that distance falls inside an asset's threat ring, and the moment is still ahead, the track is a threat, and threats are ranked by how soon they arrive.
+
+- **Formula:** `t_cpa = −(r · v) / |v|²` and `d_cpa = |r + v · t_cpa|`, with `r` the track's position relative to the asset and `v` its velocity
+- **Example:** a target 20 km east and 10 km south of the town, flying north-west at 280 m/s, is closest to the town in about 75 s, at 7 km: outside the town's 2.5 km ring, so not a threat to it. Turn it 20° toward the town and it becomes one.
+- **See it:** select a hostile track: the inspector's "Why?" names the asset it threatens, how close it will pass and when. The header's "Next impact" counts down to the most urgent one.
+
+[Going deeper →](docs/concepts/05-3-closest-point-of-approach.md)
+
+### Engagement envelope — where the battery can reach
+
+An interceptor can only meet a target it can reach in time, before its motor's energy is spent and air drag has slowed it down. The set of places it can reach within its longest planned flight forms a dome over the battery: the engagement envelope. A threat outside it must wait until it flies in; a threat inside the 1.5 km minimum range is already too close.
+
+- **Formula:** `R_max(h) = √(reach(t_max, ρ(h/2))² − h²)`, where `reach` is the interceptor's straight-line reach with drag in air of density ρ, with a 10% margin
+- **Example:** with a 34 s planned flight, the dome reaches about 17 km at ground level and a little farther at 6 km up, where the thinner air saps less speed; it closes over the top at about 20 km.
+- **See it:** press the umbrella button in the 3D view to show the dome. Drop a jet 35 km out: the command node waits ("out of reach for now") until the jet enters it.
+
+[Going deeper →](docs/concepts/06-1-engagement-envelope.md)
+
+### Kill probability — why one interceptor is not always enough
+
+Even an interceptor that passes within its lethal radius does not always destroy its target. The chance that it does is the single-shot kill probability, Pk. It is lower against fast, agile targets and when the interceptor arrives slow after a long flight. So the battery looks after every shot and fires again if the target survived, until the threat is down or it is too late.
+
+- **Formula:** `Pk = Pk_target × clamp(v_interceptor / 600 m/s, 0.5, 1)`, with Pk_target = 0.95 (slow), 0.85 (medium) or 0.75 (above 250 m/s); two shots give `1 − (1 − Pk)²`
+- **Example:** a fast jet met by an interceptor slowed to 450 m/s: Pk = 0.75 × 0.75 = 0.56. A second shot raises the chance to 1 − 0.44² = 0.81.
+- **See it:** the approval card, the log and the inspector show the chance of a kill for each shot. Watch for "burst … but survived" in the event log, followed by a second launch.
+
+[Going deeper →](docs/concepts/06-2-kill-probability.md)
+
+### Rules of engagement — why speed and safety pull in opposite directions
+
+Before firing, the battery must decide what a track is. It interrogates it with an identification check (IFF): friendly aircraft answer, civil aircraft broadcast a transponder code, hostiles stay silent. But a friendly transponder can fail, so silence is evidence, not proof, and the rules decide how much evidence is enough.
+
+- **Formula:** chance a friend stays silent on `n` checks = `0.1ⁿ`; weapons TIGHT wait for 2 silent checks (1 in 100), weapons FREE fire after 1 (1 in 10)
+- **Example:** FREE engages a jet 4 s sooner than TIGHT, but out of every ten friendly aircraft with a faulty transponder heading for a defended asset, about one would be shot down. Under TIGHT, about one in a hundred.
+- **See it:** click "WCS TIGHT" in the header to switch to FREE or HOLD, and "AUTO" to SEMI-AUTO to approve every shot yourself (A to approve, H to hold fire).
+
+[Going deeper →](docs/concepts/06-3-rules-of-engagement.md)
+
 <!-- concepts:end -->
 
-**Coming next:** air density, drag, turn radius, the radar equation, the radar horizon and terrain masking (Step 4) · noise, the Kalman filter and identification (Step 5) · kill probability and saturation (Step 6).
+**Coming next:** wind, turn radius, the radar equation and RCS, clutter and Doppler (Step 4) · identification friend-or-foe (Step 5) · missile energy, kill assessment and saturation (Step 6).
 
 ## Build log
 
-Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first.
+Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first. Steps 4 to 6 are still in progress, so their entries are not tagged yet.
+
+### Steps 5 and 6 · Decide & engage (the rest of Step 5, the start of Step 6)
+
+The command node gets things worth defending, rules to follow, limits to live with, and a reason for every decision.
+
+- **Defended assets:** a town and a power plant join the battery, each with a threat ring. Threats are ranked by the closest point of approach to the asset they will reach soonest, and leaks are counted where they happen.
+- **Identification that can go wrong:** friendly transponders fail one check in ten. A silent track is "unknown" after one check and "hostile" after two, so a friend with a dead transponder can be shot down: an identification error, counted as a failure.
+- **Rules of engagement:** click the header badges to switch weapons control (TIGHT, FREE, HOLD) and the operator mode (AUTO, SEMI-AUTO). In SEMI-AUTO the battery proposes each shot with its evidence; approve with A, hold fire with H.
+- **Kill probability:** a burst inside the lethal radius destroys the target only with the chance Pk, lower against fast, agile targets and with a tired interceptor. The battery looks again and fires again.
+- **Fire channels and saturation:** three engagements at a time. A swarm fills them, and the NOW line says when the defense is saturated.
+- **"Why?" for every decision:** the inspector explains the identity, the threatened asset, what the rules allow, and the shot and its chance of a kill. The engagement envelope can be shown as a dome in 3D.
+
+> **Engineering note: the rules are commands too.** Rule changes, approvals and holds are recorded like drops, so a run where a friendly was shot down under weapons FREE replays exactly, ready to be studied.
+
+_Screenshots and a clip for this step come with the v1.0 media pass._
+
+### Step 5 · Track & identify (part 1: tracking)
+
+The battery's picture of the sky becomes a real estimate, with an honest measure of how sure it is.
+
+- **Kalman filter:** every track blends its prediction with each new echo, weighted by how much it trusts each. Positions jitter less than the raw echoes and velocities settle within a few m/s.
+- **Association without the truth:** echoes join tracks by gating and global nearest neighbour, matched in 0.2 s batches so close neighbours like a drone swarm compete fairly. The tracker never knows which aircraft made an echo.
+- **Uncertainty you can see:** a faint 2σ ellipse around each track on the scope, stretched sideways far out where bearing errors dominate, and a ±1σ column in the track table.
+- **Truth vs. perception:** press T (or "truth" under the scope) to see where aircraft really are: grey crosses and error lines on the scope, the battery's tracks as rings next to the real aircraft in 3D, and the tracking error in the inspector.
+
+> **Engineering note: a filter that checks its own honesty.** The unit tests feed the filter noisy measurements and check that its normalized innovation averages 3, the value a chi-square law with three degrees of freedom predicts. A filter that claimed to be surer than it is would fail.
+
+_Screenshots and a clip for this step come with the v1.0 media pass._
+
+### Step 4 · Environment & radar (part 1: terrain and radar)
+
+The battlespace gets a landscape, and the radar becomes honest about what it can and cannot see.
+
+- **Procedural terrain:** fictional hills and ridges around a flat valley, generated from a seed, in 3D (with relief shading and contour lines) and as a faint relief on the scope. Drones and cruise-missile-like targets follow the ground; jets climb over it.
+- **Radar horizon and terrain masking:** the radar sees only along clear lines of sight over the curved Earth. Low flyers hide behind the ridges to the south and west until they are 7 to 10 km out.
+- **Blind zones:** one switch under the scope shades, on the scope and on the 3D terrain, where the radar cannot see a target at 50 m, 300 m or 1 km above the ground.
+- **Detection probability, noise and false alarms:** echoes flicker near the edge of range, every measurement is a little off, and noise sometimes makes a ghost blip. A single echo never becomes a track on its own, so ghosts are dropped and never engaged.
+- **Air drag:** interceptors slow down as they coast, more in the thick air near the ground, and the command node plans with it.
+- **Readouts that explain:** the placement card warns when the terrain will hide a threat, and the inspector says whether the radar can see the selected aircraft, and why not.
+
+> **Engineering note: one terrain, many readers.** The landscape is generated once from its own seed and shared by the simulation, the scope, the 3D mesh and the placement readout, so the blind zones you see are exactly the ones the radar uses. A radial sweep builds the whole coverage map in a few milliseconds.
+
+_Screenshots and a clip for this step come with the v1.0 media pass._
 
 ### Step 3 · First intercept
 
@@ -240,8 +383,13 @@ The foundation everything else builds on.
 - [x] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
 - [x] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
 - [ ] **Step 4 · Environment & radar:** terrain, atmosphere, wind and drag, threat routes; radar equation, noise, horizon, terrain masking, clutter and coverage maps
+  - In: terrain, terrain following, drag, detection probability, noise, false alarms, horizon, masking and the coverage map
+  - Still to come: wind, threat routes and evasive turns, the standard atmosphere, clutter and Doppler
 - [ ] **Step 5 · Track & identify:** Kalman tracking, uncertainty ellipses, truth vs. perception; identification, civil traffic, defended assets, threat ranking with "Why?"
+  - In: Kalman tracking, gating and association, uncertainty ellipses, track quality, truth vs. perception, identification with transponder failures, defended assets, threat ranking with "Why?"
+  - Still to come: the kinematic classifier and air corridors
 - [ ] **Step 6 · Engage & assess:** fire channels, engagement envelopes, kill probability, doctrine and operator approval; kill assessment, saturation, telemetry and the full analysis bar
+  - In: fire channels, the engagement envelope, kill probability, rules of engagement and operator approval
 - [ ] **Step 7 · Scenarios & replay:** save, load and share, editor and raid generator; timeline scrubbing, rewind and branch, Monte Carlo, CSV export
 - [ ] **Step 8 · Learning layer:** ten guided lessons, live equations, challenges, after-action review
 - [ ] **Step 9 · Polish & release v1.0:** cinematic intro, effects, sound, themes, accessibility, demo video and the v1.0 release

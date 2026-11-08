@@ -1,12 +1,17 @@
 import {
-  DEFAULT_DEFENSE,
+  coverageAt,
+  DEFAULT_ASSETS,
   TICK_S,
+  trackEllipseAt,
   trackPositionAt,
   TRAFFIC,
+  type CoverageMap,
+  type DefendedAsset,
   type Effect,
   type Identity,
   type RadarSize,
   type Snapshot,
+  type Terrain,
   type Track,
   type TrafficTypeId,
   type Vec3,
@@ -52,6 +57,7 @@ const LEADER_S = 30;
 /** Track symbol colours: the same colour language as the rest of the console. */
 export const IDENTITY_COLOR: Readonly<Record<Identity, string>> = {
   pending: '#facc15',
+  unknown: '#fb923c',
   hostile: '#f87171',
   friend: '#60a5fa',
   neutral: '#4ade80',
@@ -68,8 +74,10 @@ export function createScopeLayout(
   size: number,
   dpr: number,
   rangeM: number,
-  /** Courses passing inside this ring are threats (shown dashed). */
-  defendedRadiusM = DEFAULT_DEFENSE.threatRadiusM,
+  /** Defended assets: each drawn with its threat radius (dashed); courses passing inside are threats. */
+  assets: readonly DefendedAsset[] = DEFAULT_ASSETS,
+  /** Drawn as a faint relief map under the rings. */
+  terrain: Terrain | null = null,
 ): ScopeLayout {
   const radiusPx = size / 2 - 4;
   const staticLayer = document.createElement('canvas');
@@ -78,9 +86,103 @@ export function createScopeLayout(
   const ctx = staticLayer.getContext('2d');
   if (ctx) {
     ctx.scale(dpr, dpr);
-    drawStatic(ctx, size, radiusPx, rangeM, defendedRadiusM);
+    drawStatic(ctx, size, radiusPx, rangeM, assets, terrain);
   }
   return { size, dpr, radiusPx, rangeM, staticLayer };
+}
+
+/** Relief colours: contour lines every 100 m, slopes lit from the north-west. */
+const CONTOUR_M = 100;
+
+/**
+ * Paints the terrain inside the scope's circle, one pixel at a time: a little brighter with
+ * height, shaded by slope, with thin contour lines. It stays faint, so echoes stand out.
+ */
+function terrainImage(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  radius: number,
+  rangeM: number,
+  terrain: Terrain,
+): ImageData {
+  const px = ctx.canvas.width;
+  const scale = px / size;
+  const metresPerPx = rangeM / (radius * scale);
+  const c = px / 2;
+  const heights = new Float32Array(px * px);
+  for (let y = 0; y < px; y++) {
+    for (let x = 0; x < px; x++) {
+      heights[y * px + x] = terrain.heightAt((x - c) * metresPerPx, (c - y) * metresPerPx);
+    }
+  }
+  const image = ctx.createImageData(px, px);
+  const data = image.data;
+  const maxH = Math.max(1, terrain.maxHeightM);
+  const r2 = (radius * scale) ** 2;
+  for (let y = 1; y < px - 1; y++) {
+    for (let x = 1; x < px - 1; x++) {
+      if ((x - c) ** 2 + (y - c) ** 2 > r2) continue;
+      const i = y * px + x;
+      const h = heights[i] ?? 0;
+      const dx = ((heights[i + 1] ?? h) - (heights[i - 1] ?? h)) / (2 * metresPerPx);
+      const dy = ((heights[i + px] ?? h) - (heights[i - px] ?? h)) / (2 * metresPerPx);
+      // Light from the north-west: slopes facing it brighten, the others darken.
+      const light = Math.max(-1, Math.min(1, (-dx + dy) * 6));
+      const band = Math.floor(h / CONTOUR_M);
+      const contour =
+        h > 1 &&
+        (band !== Math.floor((heights[i + 1] ?? h) / CONTOUR_M) ||
+          band !== Math.floor((heights[i + px] ?? h) / CONTOUR_M));
+      const lift = (h / maxH) * 0.55;
+      const alpha = Math.max(
+        0,
+        Math.min(1, 0.08 + 0.55 * lift + 0.12 * light + (contour ? 0.22 : 0)),
+      );
+      const o = i * 4;
+      data[o] = 120;
+      data[o + 1] = 190;
+      data[o + 2] = 175;
+      data[o + 3] = Math.round(alpha * 120);
+    }
+  }
+  return image;
+}
+
+/**
+ * Where the radar cannot see a target flying `altitudeM` above the ground: a translucent
+ * orange shade over the scope, from the coverage map. Drawn once per altitude and size.
+ */
+export function createCoverageLayer(
+  layout: ScopeLayout,
+  map: CoverageMap,
+  altitudeM: number,
+): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  const px = layout.staticLayer.width;
+  canvas.width = px;
+  canvas.height = px;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  const scale = px / layout.size;
+  const metresPerPx = layout.rangeM / (layout.radiusPx * scale);
+  const c = px / 2;
+  const r2 = (layout.radiusPx * scale) ** 2;
+  const image = ctx.createImageData(px, px);
+  const data = image.data;
+  for (let y = 0; y < px; y++) {
+    for (let x = 0; x < px; x++) {
+      if ((x - c) ** 2 + (y - c) ** 2 > r2) continue;
+      const blind = coverageAt(map, (x - c) * metresPerPx, (c - y) * metresPerPx) > altitudeM;
+      if (!blind) continue;
+      const o = (y * px + x) * 4;
+      data[o] = 251;
+      data[o + 1] = 146;
+      data[o + 2] = 60;
+      data[o + 3] = 64;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
 }
 
 type ScopeGeometry = Pick<ScopeLayout, 'size' | 'radiusPx' | 'rangeM'>;
@@ -143,7 +245,8 @@ function drawStatic(
   size: number,
   radius: number,
   rangeM: number,
-  defendedRadiusM: number,
+  assets: readonly DefendedAsset[],
+  terrain: Terrain | null,
 ) {
   const c = size / 2;
 
@@ -154,6 +257,18 @@ function drawStatic(
   ctx.beginPath();
   ctx.arc(c, c, radius, 0, TWO_PI);
   ctx.fill();
+
+  if (terrain && terrain.maxHeightM > 0) {
+    // putImageData ignores the transform, so the relief goes through a layer of its own.
+    const layer = document.createElement('canvas');
+    layer.width = ctx.canvas.width;
+    layer.height = ctx.canvas.height;
+    const layerCtx = layer.getContext('2d');
+    if (layerCtx) {
+      layerCtx.putImageData(terrainImage(layerCtx, size, radius, rangeM, terrain), 0, 0);
+      ctx.drawImage(layer, 0, 0, size, size);
+    }
+  }
 
   // Range rings every 10 km, labelled along the north-north-east radial.
   ctx.font = '9px "JetBrains Mono Variable", ui-monospace, monospace';
@@ -206,13 +321,27 @@ function drawStatic(
     ctx.fillText(label, p.x, p.y);
   }
 
-  // The defended area: hostiles whose course passes inside it are threats.
+  // Defended assets: hostiles whose course passes inside a dashed ring are threats to it.
+  const scale = radius / rangeM;
   ctx.save();
-  ctx.setLineDash([3, 4]);
-  ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
-  ctx.beginPath();
-  ctx.arc(c, c, (defendedRadiusM / rangeM) * radius, 0, TWO_PI);
-  ctx.stroke();
+  ctx.font = '600 9px Inter Variable, system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  for (const asset of assets) {
+    const x = c + asset.position.x * scale;
+    const y = c - asset.position.y * scale;
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+    ctx.beginPath();
+    ctx.arc(x, y, asset.threatRadiusM * scale, 0, TWO_PI);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (asset.id === 0) continue; // the battery has its own symbol
+    ctx.fillStyle = 'rgba(251, 191, 36, 0.9)';
+    ctx.fillRect(x - 3, y - 3, 6, 6);
+    ctx.fillStyle = 'rgba(253, 230, 138, 0.85)';
+    ctx.fillText(asset.name, x + 6, y - 6);
+  }
   ctx.restore();
 
   // The battery at the centre.
@@ -237,6 +366,10 @@ export function drawScope(
   frame: RenderFrame,
   /** Aircraft selected in the UI: its track gets a highlight box. */
   selectedId: number | null = null,
+  /** Blind-zone shading from `createCoverageLayer`, or null. */
+  coverage: HTMLCanvasElement | null = null,
+  /** Truth vs. perception: mark where aircraft really are, and each track's error. */
+  compareTruth = false,
 ) {
   const { size, dpr, radiusPx } = layout;
   const c = size / 2;
@@ -245,6 +378,7 @@ export function drawScope(
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.drawImage(layout.staticLayer, 0, 0);
+  if (coverage) ctx.drawImage(coverage, 0, 0);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const timeS = previous.timeS + (current.timeS - previous.timeS) * alpha;
@@ -295,9 +429,11 @@ export function drawScope(
   drawEffects(ctx, layout, current.effects, timeS);
   drawEngagements(ctx, layout, frame);
   for (const track of current.tracks) drawTrack(ctx, layout, track, tick);
+  if (compareTruth) drawTruth(ctx, layout, frame, tick);
 
   // The selected aircraft: a box around its track symbol.
-  const selected = current.tracks.find((t) => t.truthId === selectedId);
+  const selected =
+    selectedId === null ? undefined : current.tracks.find((t) => t.truthId === selectedId);
   if (selected) {
     const at = trackPositionAt(selected, tick);
     drawSelectionBox(ctx, scopePoint(layout, at.x, at.y));
@@ -316,6 +452,28 @@ function drawTrack(ctx: CanvasRenderingContext2D, layout: ScopeLayout, track: Tr
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
   ctx.lineWidth = 1.5;
+
+  // The 2-sigma uncertainty ellipse: the tracker is about 86% sure the target is inside.
+  const ellipse = trackEllipseAt(track, tick);
+  const major = 2 * ellipse.majorM * scale;
+  if (major >= 2.5) {
+    ctx.save();
+    ctx.globalAlpha *= 0.45;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    // Canvas angles run clockwise from east; a compass bearing runs clockwise from north.
+    ctx.ellipse(
+      x,
+      y,
+      major,
+      Math.max(1, 2 * ellipse.minorM * scale),
+      ellipse.bearingRad - Math.PI / 2,
+      0,
+      TWO_PI,
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
 
   if (track.velocity) {
     ctx.globalAlpha *= 0.6;
@@ -354,6 +512,49 @@ function drawTrack(ctx: CanvasRenderingContext2D, layout: ScopeLayout, track: Tr
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText(`T${track.id}`, x + 7, y - 7);
+  ctx.restore();
+}
+
+/**
+ * Truth vs. perception: a grey cross where every aircraft really is (including those the radar
+ * has not seen), and a thin line from each track to the aircraft behind it: the tracking error.
+ */
+function drawTruth(
+  ctx: CanvasRenderingContext2D,
+  layout: ScopeLayout,
+  frame: RenderFrame,
+  tick: number,
+) {
+  const { previous, current, alpha } = frame;
+  const before = new Map(previous.aircraft.map((a) => [a.id, a.position]));
+  const truth = new Map<number, { x: number; y: number }>();
+  ctx.save();
+  ctx.strokeStyle = 'rgba(203, 213, 225, 0.85)';
+  ctx.lineWidth = 1.2;
+  for (const aircraft of current.aircraft) {
+    const old = before.get(aircraft.id);
+    const at = old ? lerp(old, aircraft.position, alpha) : aircraft.position;
+    const p = scopePoint(layout, at.x, at.y);
+    truth.set(aircraft.id, p);
+    ctx.beginPath();
+    ctx.moveTo(p.x - 3, p.y);
+    ctx.lineTo(p.x + 3, p.y);
+    ctx.moveTo(p.x, p.y - 3);
+    ctx.lineTo(p.x, p.y + 3);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(203, 213, 225, 0.5)';
+  ctx.setLineDash([2, 2]);
+  for (const track of current.tracks) {
+    const real = track.truthId === null ? undefined : truth.get(track.truthId);
+    if (!real) continue;
+    const at = trackPositionAt(track, tick);
+    const p = scopePoint(layout, at.x, at.y);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(real.x, real.y);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

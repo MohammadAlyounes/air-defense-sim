@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { Activity, ListOrdered, ScrollText } from 'lucide-react';
+import { ConceptPopover } from '../components/ConceptPopover';
 import { Panel } from '../components/Panel';
 import { Tooltip } from '../components/Tooltip';
 import { STAGES } from '../data/stages';
@@ -8,21 +9,34 @@ import { formatKm } from '../sim/narrator';
 import { useSimState } from '../sim/simContext';
 import { useViewStore } from '../view/viewStore';
 
-const TRACK_COLUMNS = ['Track', 'Identity', 'Range', 'Alt', 'Speed', 'Stage'] as const;
+const TRACK_COLUMNS = ['Track', 'Identity', 'Range', 'Alt', 'Speed', '±1σ', 'Stage'] as const;
+
+const COLUMN_HINT: Partial<Record<(typeof TRACK_COLUMNS)[number], string>> = {
+  '±1σ':
+    'How sure the tracker is of the position: one standard deviation along the long axis of its uncertainty ellipse. It shrinks as echoes come in and grows while the track coasts.',
+};
 
 const IDENTITY_TEXT = {
   pending: { label: 'identifying', className: 'text-unknown' },
+  unknown: { label: 'unknown', className: 'text-suspect' },
   hostile: { label: 'hostile', className: 'text-hostile' },
   friend: { label: 'friendly', className: 'text-friend' },
   neutral: { label: 'civil', className: 'text-neutral' },
 } as const;
+
+/** "±45 m", "±1.2 km". */
+function formatSigma(metres: number): string {
+  return metres < 1000
+    ? `±${grouped.format(Math.round(metres))} m`
+    : `±${(metres / 1000).toFixed(1)} km`;
+}
 
 const STAGE_LABEL = Object.fromEntries(STAGES.map((stage) => [stage.id, stage.label]));
 const grouped = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
 /**
  * The battery's tracks, most urgent first: threats by time to their closest approach, then the
- * rest by range. A row selects its aircraft. Step 5 adds track quality and uncertainty.
+ * rest by range. A row selects its aircraft. The ±1σ column shows how sure the tracker is.
  */
 export function TrackTablePanel({ className }: { className?: string }) {
   const rows = useSimState((state) => state.defense.tracks);
@@ -34,6 +48,12 @@ export function TrackTablePanel({ className }: { className?: string }) {
       panelId="tracks"
       className={className}
       bodyClassName="overflow-auto"
+      actions={
+        <>
+          <ConceptPopover concept="gatingAssociation" label="How echoes are matched to tracks" />
+          <ConceptPopover concept="kalmanFilter" label="How the tracker sees through the noise" />
+        </>
+      }
     >
       <table className="w-full text-left text-[11.5px]" data-testid="track-table">
         <thead className="sticky top-0 bg-ink-900 text-[10px] uppercase tracking-[0.08em] text-ink-300">
@@ -44,12 +64,24 @@ export function TrackTablePanel({ className }: { className?: string }) {
                 scope="col"
                 className="px-2 py-1.5 font-semibold first:pl-3 last:pr-3"
               >
-                {column}
+                {COLUMN_HINT[column] ? (
+                  <Tooltip content={COLUMN_HINT[column]}>
+                    {/* normal-case: an upper-case σ would turn into Σ. */}
+                    <span
+                      tabIndex={0}
+                      className="cursor-help normal-case underline decoration-dotted"
+                    >
+                      {column}
+                    </span>
+                  </Tooltip>
+                ) : (
+                  column
+                )}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="font-mono tabular-nums">
+        <tbody className="font-mono tabular-nums whitespace-nowrap">
           {rows.length === 0 ? (
             <tr>
               <td
@@ -69,7 +101,7 @@ export function TrackTablePanel({ className }: { className?: string }) {
                   onClick={() => useViewStore.getState().select(row.truthId)}
                   className={clsx(
                     'cursor-pointer border-t border-ink-800/70 transition-colors hover:bg-ink-850',
-                    row.truthId === selectedId && 'bg-ink-800',
+                    row.truthId !== null && row.truthId === selectedId && 'bg-ink-800',
                   )}
                 >
                   <td className="py-1 pr-2 pl-3">
@@ -79,7 +111,9 @@ export function TrackTablePanel({ className }: { className?: string }) {
                         event.stopPropagation();
                         useViewStore.getState().select(row.truthId);
                       }}
-                      aria-current={row.truthId === selectedId ? 'true' : undefined}
+                      aria-current={
+                        row.truthId !== null && row.truthId === selectedId ? 'true' : undefined
+                      }
                       className="font-semibold text-ink-100 hover:text-accent"
                     >
                       T{row.id}
@@ -92,6 +126,9 @@ export function TrackTablePanel({ className }: { className?: string }) {
                   <td className="px-2 py-1 text-ink-200">{grouped.format(row.altitudeM)} m</td>
                   <td className="px-2 py-1 text-ink-200">
                     {row.speedMps === null ? '—' : `${grouped.format(row.speedMps)} m/s`}
+                  </td>
+                  <td className="px-2 py-1 text-ink-300" data-sigma={Math.round(row.sigmaM)}>
+                    {formatSigma(row.sigmaM)}
                   </td>
                   <td
                     className={clsx(
@@ -211,10 +248,13 @@ export function EventLogPanel() {
               <button
                 type="button"
                 onClick={() => useViewStore.getState().select(entry.aircraftId)}
-                aria-current={entry.aircraftId === selectedId ? 'true' : undefined}
+                aria-current={
+                  entry.aircraftId !== null && entry.aircraftId === selectedId ? 'true' : undefined
+                }
                 className={clsx(
                   'flex w-full gap-2 rounded px-1.5 py-1 text-left transition-colors hover:bg-ink-850',
-                  entry.aircraftId === selectedId &&
+                  entry.aircraftId !== null &&
+                    entry.aircraftId === selectedId &&
                     'bg-ink-800 shadow-[inset_2px_0_0_0_var(--color-accent)]',
                 )}
               >

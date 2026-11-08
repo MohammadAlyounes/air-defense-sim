@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { Simulation } from '../../sim';
+import { Simulation, IDEAL_SEARCH_RADAR } from '../../sim';
 import { aircraftFacts } from './aircraftFacts';
 
-function jetFlyingAt(sim = new Simulation({ seed: 1, autoTraffic: false })) {
+function jetFlyingAt(
+  sim = new Simulation({ seed: 1, autoTraffic: false, terrain: false, radar: IDEAL_SEARCH_RADAR }),
+) {
   sim.dispatch({ kind: 'spawnTraffic', type: 'jet', eastM: 0, northM: -30_000, headingRad: 0 });
   return sim;
 }
@@ -34,16 +36,24 @@ describe('aircraftFacts', () => {
     };
     // Before the beam reaches the south: not detected; a jet is seen from about 36 km.
     expect(at(1)).toEqual(['Not detected', 'Not engaged', 'not detected yet']);
-    expect(aircraftFacts(sim.snapshot(), 1)?.trackDetail).toBe('radar sees it from 36 km');
+    expect(aircraftFacts(sim.snapshot(), 1)?.trackDetail).toBe('seen on half the looks from 36 km');
     expect(at(3)).toEqual(['T1 · identifying', 'Waiting', 'identification check']);
-    // First echo at 2 s (the beam reaches the south), confirmed at 6 s, identified and
-    // assigned at 8 s, launch 1.5 s later.
-    expect(at(8.5)).toEqual(['T1 · hostile', 'Assigned', 'launch in 1.0 s']);
+    // First echo at 2 s (the beam reaches the south), confirmed at 6 s (the tracker commits
+    // echoes 0.2 s after the sweep). No answer to the first identification check at 8.2 s: unknown.
+    expect(at(9)).toEqual(['T1 · unknown', 'Threat', 'closest approach in 1:19']);
+    // No answer to the second one at 12.2 s either: hostile, assigned, launch 1.5 s later.
+    expect(at(12.5)).toEqual(['T1 · hostile', 'Assigned', 'launch in 1.2 s']);
     expect(at(20)?.[1]).toBe('Engaged by I1');
   });
 
   it('shows friendly aircraft as never engaged', () => {
-    const sim = new Simulation({ seed: 1, autoTraffic: false });
+    const sim = new Simulation({
+      seed: 1,
+      autoTraffic: false,
+      terrain: false,
+      radar: IDEAL_SEARCH_RADAR,
+      interceptor: { certainKill: true },
+    });
     sim.dispatch({
       kind: 'spawnTraffic',
       type: 'friendly',

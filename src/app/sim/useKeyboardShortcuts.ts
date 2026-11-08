@@ -9,11 +9,16 @@ export const SHORTCUTS = {
   faster: '+',
   slower: '-',
   restart: 'R',
+  approve: 'A',
+  holdFire: 'H',
 } as const;
 
 const INTERACTIVE = 'input, textarea, select, button, a, [contenteditable="true"], [role="slider"]';
 
-/** Space, ".", "+", "-" and "R" control the simulation from anywhere on the page. */
+/**
+ * Space, ".", "+", "-" and "R" control the simulation from anywhere on the page; in SEMI mode,
+ * A approves the oldest proposed shot and H holds fire on it.
+ */
 export function useKeyboardShortcuts(controller: SimController): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -45,6 +50,20 @@ export function useKeyboardShortcuts(controller: SimController): void {
         case 'R':
           controller.restart();
           break;
+        case 'a':
+        case 'A':
+        case 'h':
+        case 'H': {
+          const proposal = controller
+            .getFrame()
+            .current.engagements.find((e) => e.state === 'proposed');
+          if (!proposal) break;
+          controller.dispatch({
+            kind: event.key.toLowerCase() === 'a' ? 'approveEngagement' : 'holdFire',
+            engagementId: proposal.id,
+          });
+          break;
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);

@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber';
 import clsx from 'clsx';
 import { memo, useCallback, useRef, type ReactNode } from 'react';
+import { DEFAULT_ASSETS } from '../../../sim';
 import { TRAFFIC_BY_ID } from '../../data/threatCatalog';
 import { formatAltitudeShort } from '../../lib/format';
 import { useSimController } from '../../sim/simContext';
@@ -11,8 +12,6 @@ import { interpolated, useAircraftRoster, type RosterEntry } from './frame';
 import { anchorLabel, projectLabels } from './labelAnchors';
 import {
   COMPASS_RADIUS_KM,
-  DEFENDED_LABEL_BEARING_RAD,
-  DEFENDED_RADIUS_KM,
   RADAR_RANGE_KM,
   RING_LABEL_BEARING_RAD,
   RING_STEP_KM,
@@ -63,13 +62,13 @@ function GroundLabels() {
           <span className="font-mono text-[10px] text-ink-300/80">{radius} km</span>
         </FixedLabel>
       ))}
-      <FixedLabel
-        x={(DEFENDED_RADIUS_KM + 0.8) * Math.sin(DEFENDED_LABEL_BEARING_RAD)}
-        y={0.05}
-        z={-(DEFENDED_RADIUS_KM + 0.8) * Math.cos(DEFENDED_LABEL_BEARING_RAD)}
-      >
-        <span className="font-mono text-[10px] text-warn/80">defended area</span>
-      </FixedLabel>
+      {DEFAULT_ASSETS.filter((asset) => asset.id !== 0).map((asset) => (
+        <FixedLabel key={asset.id} x={asset.position.x / 1000} y={0.6} z={-asset.position.y / 1000}>
+          <span className="rounded bg-ink-950/60 px-1 font-mono text-[10px] text-warn/90">
+            {asset.name}
+          </span>
+        </FixedLabel>
+      ))}
       {COMPASS.map(([letter, x, z]) => (
         <FixedLabel key={letter} x={x * COMPASS_RADIUS_KM} y={0.05} z={z * COMPASS_RADIUS_KM}>
           <span className="font-mono text-[12px] font-semibold text-accent/80">{letter}</span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Simulation, type SimEvent } from '../../sim';
+import { Simulation, type SimEvent, IDEAL_SEARCH_RADAR } from '../../sim';
 import {
   compassPoint,
   describeEvent,
@@ -55,11 +55,23 @@ describe('describeEvent', () => {
         rangeM: 9_500,
       }),
     ).toEqual({ source: 'radar', text: 'New contact T3 at bearing 090°, 9.5 km.' });
-    expect(describeEvent({ ...base, kind: 'identified', trackId: 3, identity: 'hostile' })).toEqual(
-      {
-        source: 'command',
-        text: 'T3 identified as hostile: no reply to the identification check.',
-      },
+    const identified = (identity: 'hostile' | 'unknown' | 'friend', checks: number) =>
+      describeEvent({
+        ...base,
+        kind: 'identified',
+        trackId: 3,
+        identity,
+        evidence: identity === 'friend' ? 'friendReply' : 'noReply',
+        checks,
+      }).text;
+    expect(identified('unknown', 1)).toBe(
+      'T3 is unknown: no answer to identification check 1. Checking again in 4 s.',
+    );
+    expect(identified('hostile', 2)).toBe(
+      'T3 identified as hostile: no answer to 2 identification checks.',
+    );
+    expect(identified('friend', 1)).toBe(
+      'T3 identified as friendly: it answered the identification check.',
     );
     expect(
       describeEvent({
@@ -74,7 +86,13 @@ describe('describeEvent', () => {
   });
 
   it('says how an interceptor ended', () => {
-    const result = (hit: boolean, missDistanceM: number, reason: 'passed' | 'outOfTime' | null) =>
+    const result = (
+      hit: boolean,
+      missDistanceM: number,
+      reason: 'passed' | 'outOfTime' | 'survived' | null,
+      pk: number | null = null,
+      targetAffiliation: 'hostile' | 'friend' = 'hostile',
+    ) =>
       describeEvent({
         ...base,
         kind: 'interceptResult',
@@ -83,10 +101,18 @@ describe('describeEvent', () => {
         hit,
         missDistanceM,
         reason,
+        pk,
+        targetAffiliation,
       }).text;
     expect(result(true, 0.2, null)).toBe('I2 hit T3 (closest approach under 1 m).');
     expect(result(false, 42, 'passed')).toBe('I2 missed T3 by 42 m.');
     expect(result(false, 2_300, 'outOfTime')).toBe('I2 ran out of flight time, 2.3 km from T3.');
+    expect(result(false, 6, 'survived', 0.62)).toBe(
+      'I2 burst 6 m from T3, but T3 survived (chance of a kill was 62%).',
+    );
+    expect(result(true, 3, null, 0.9, 'friend')).toBe(
+      'I2 hit T3 (closest approach 3 m). It was a friendly aircraft: an identification failure.',
+    );
   });
 
   it('describes traffic present at the start differently from new arrivals', () => {
@@ -105,7 +131,13 @@ describe('describeEvent', () => {
 describe('describeNow', () => {
   /** A jet 30 km north, flying at the battery, with every event recorded. */
   function jetRun() {
-    const sim = new Simulation({ seed: 1, autoTraffic: false });
+    const sim = new Simulation({
+      seed: 1,
+      autoTraffic: false,
+      terrain: false,
+      radar: IDEAL_SEARCH_RADAR,
+      interceptor: { certainKill: true },
+    });
     sim.dispatch({
       kind: 'spawnTraffic',
       type: 'jet',
@@ -130,12 +162,17 @@ describe('describeNow', () => {
   it('narrates the loop, from the first echo to the confirmed kill', () => {
     const at = jetRun();
     expect(at(2)).toBe('Radar sweeping, one turn every 4 s. No contacts yet.');
-    expect(at(5)).toBe('Radar sweeping, one turn every 4 s. 1 track: 1 being identified.');
-    expect(at(10.5)).toBe('T1 assigned: launch in 1.0 s.');
+    expect(at(5)).toBe('Radar sweeping, one turn every 4 s. 1 track: 1 unconfirmed.');
+    expect(at(9)).toBe('Radar sweeping, one turn every 4 s. 1 track: 1 being identified.');
+    expect(at(10.5)).toBe(
+      'Unknown T1 is heading for the battery (closest approach in 1:18): weapons TIGHT, so the battery waits for the next identification check.',
+    );
+    expect(at(14.5)).toBe('T1 assigned: launch in 1.2 s.');
     expect(at(20)).toMatch(/^Engaging T1: interceptor I1 in flight, intercept in \d+ s\.$/);
-    expect(at(39.2)).toBe('I1 hit T1. The radar will look again to confirm the kill.');
-    expect(at(41.6)).toMatch(
-      /^T1 destroyed, confirmed by the radar 35 s after it was first detected\.$/,
+    // Air drag slows the coasting interceptor: a 31 s flight.
+    expect(at(46)).toBe('I1 hit T1. The radar will look again to confirm the kill.');
+    expect(at(48.5)).toMatch(
+      /^T1 destroyed, confirmed by the radar 41 s after it was first detected\.$/,
     );
   });
 

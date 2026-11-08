@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { predictIntercept } from './c2';
-import { distance, sub, vec3, type Vec3 } from './core/vec';
+import { distance, length, sub, vec3, type Vec3 } from './core/vec';
 import {
   closestApproach,
   DEFAULT_INTERCEPTOR as I,
+  dragAcceleration,
   GRAVITY_MPS2,
   guidanceAcceleration,
   launchVelocity,
   reachM,
+  speedAfterMps,
   stepMissile,
 } from './interceptor';
 
@@ -62,9 +64,42 @@ describe('interceptor flight', () => {
     expect(v.x).toBeCloseTo(0, 9);
   });
 
-  it('reaches 1.6 km by the end of a 4 s boost, then flies on at 760 m/s', () => {
-    expect(reachM(4, I)).toBeCloseTo(40 * 4 + 0.5 * 180 * 16, 9); // 1,600 m
-    expect(reachM(14, I)).toBeCloseTo(1_600 + 760 * 10, 9); // 9,200 m
+  it('reaches 1.6 km by the end of a 4 s boost, then flies on at 760 m/s without drag', () => {
+    const noDrag = { ...I, ballisticCoefficientKgM2: Infinity };
+    expect(reachM(4, noDrag)).toBeCloseTo(40 * 4 + 0.5 * 180 * 16, 9); // 1,600 m
+    expect(reachM(14, noDrag)).toBeCloseTo(1_600 + 760 * 10, 9); // 9,200 m
+    expect(speedAfterMps(14, noDrag)).toBeCloseTo(760, 9);
+  });
+
+  it('slows down in the air as it coasts: v = v0 / (1 + k·v0·t), with k = ρ / 2β', () => {
+    // Sea level: k = 1.225 / 40,000 = 3.0625e-5 per metre. After 10 s of coasting from
+    // 760 m/s, k·v0·t = 0.23275: speed 760 / 1.23275 = 616.5 m/s, distance ln(1.23275)/k = 6,833 m.
+    expect(speedAfterMps(14, I)).toBeCloseTo(616.5, 1);
+    expect(reachM(14, I)).toBeCloseTo(1_600 + 6_833, 0);
+    // Higher up the air is thinner, so it keeps more speed.
+    expect(speedAfterMps(14, I, 0.5)).toBeGreaterThan(speedAfterMps(14, I));
+  });
+
+  it('feels a drag deceleration of ρ·v² / 2β, against its motion', () => {
+    // 760 m/s at sea level: 1.225 × 760² / 40,000 = 17.7 m/s².
+    const drag = dragAcceleration(vec3(0, 760, 0), 1.225, 20_000);
+    expect(drag.y).toBeCloseTo(-17.689, 3);
+    expect(drag.x).toBeCloseTo(0, 12);
+    expect(length(dragAcceleration(vec3(0, 760, 0), 1.225, Infinity))).toBe(0);
+  });
+
+  it('matches the analytic coast when integrated step by step', () => {
+    // Level flight along y with no target to steer for: only drag (and gravity, cancelled
+    // here by a target straight ahead at the same height, which commands nothing but lift).
+    const level = { ...I, boostS: 0 };
+    let missile = { position: vec3(0, 0, 0), velocity: vec3(0, 760, 0) };
+    const vacuumDensity = { densityKgM3: () => 1.225 };
+    for (let t = 0; t < 10; t += 0.002) {
+      const ahead = vec3(0, missile.position.y + 50_000, missile.position.z);
+      missile = stepMissile(missile, t, ahead, vec3(0, 0, 0), 0.002, level, vacuumDensity);
+    }
+    expect(missile.velocity.y).toBeCloseTo(616.5, 0);
+    expect(missile.position.y).toBeCloseTo(6_833, -1);
   });
 
   it('finds the closest approach inside a step, analytically', () => {
@@ -82,7 +117,7 @@ describe('interceptor flight', () => {
       target.position,
       target.velocity,
       vec3(0, 0, 0),
-      (t) => 0.9 * reachM(t, I),
+      (t) => 0.9 * reachM(t, I, 1.225 * Math.exp(-1_500 / 8_500)),
       34,
     );
     expect(plan).not.toBeNull();
@@ -111,7 +146,7 @@ describe('interceptor flight', () => {
     }
     expect(miss).toBeLessThan(I.lethalRadiusM);
     // It arrives close to the planned time (the plan keeps a 10% margin).
-    expect(flight).toBeLessThan(plan?.timeS ?? 0);
+    expect(flight).toBeLessThan(1.05 * (plan?.timeS ?? 0));
     expect(distance(missile.position, targetPos)).toBeLessThan(I.lethalRadiusM * 2);
   });
 });

@@ -1,12 +1,65 @@
 import { describe, expect, it } from 'vitest';
-import { closestApproachToOrigin, iffAnswer, predictIntercept } from './c2';
+import { DEFAULT_ASSETS } from './assets';
+import {
+  closestApproachTo,
+  closestApproachToOrigin,
+  DEFAULT_DEFENSE,
+  engageable,
+  envelopeRangeM,
+  evaluateThreat,
+  iffAnswer,
+  killProbability,
+  predictIntercept,
+} from './c2';
 import { vec3 } from './core/vec';
+import { DEFAULT_INTERCEPTOR, reachM } from './interceptor';
 
 describe('identification', () => {
-  it('trusts the identification answer: friends reply, civil aircraft squawk, others are hostile', () => {
-    expect(iffAnswer('friend')).toBe('friend');
-    expect(iffAnswer('neutral')).toBe('neutral');
-    expect(iffAnswer('hostile')).toBe('hostile');
+  const config = { friendReplyProbability: 0.9, civilSquawkProbability: 0.98 };
+
+  it('hears friends reply and civil aircraft squawk, unless the transponder fails', () => {
+    expect(iffAnswer('friend', 0.5, config)).toBe('friend');
+    expect(iffAnswer('friend', 0.95, config)).toBeNull(); // the 10% of checks it misses
+    expect(iffAnswer('neutral', 0.5, config)).toBe('neutral');
+    expect(iffAnswer('neutral', 0.99, config)).toBeNull();
+  });
+
+  it('never hears a hostile', () => {
+    expect(iffAnswer('hostile', 0, config)).toBeNull();
+  });
+});
+
+describe('rules of engagement', () => {
+  it('fires at hostiles when weapons are tight, also at unknowns when free, never on hold', () => {
+    expect(engageable('hostile', 'TIGHT')).toBe(true);
+    expect(engageable('unknown', 'TIGHT')).toBe(false);
+    expect(engageable('unknown', 'FREE')).toBe(true);
+    expect(engageable('friend', 'FREE')).toBe(false);
+    expect(engageable('neutral', 'FREE')).toBe(false);
+    expect(engageable('hostile', 'HOLD')).toBe(false);
+  });
+});
+
+describe('kill probability', () => {
+  it('is highest against slow targets with a fast interceptor', () => {
+    expect(killProbability(40, 700)).toBeCloseTo(0.95, 9);
+    expect(killProbability(240, 700)).toBeCloseTo(0.85, 9);
+    expect(killProbability(340, 700)).toBeCloseTo(0.75, 9);
+  });
+
+  it('falls as the interceptor tires: × v / 600 m/s, at least half', () => {
+    expect(killProbability(340, 450)).toBeCloseTo(0.75 * 0.75, 9);
+    expect(killProbability(40, 100)).toBeCloseTo(0.95 * 0.5, 9);
+  });
+});
+
+describe('engagement envelope', () => {
+  it('reaches as far as the planned reach in the longest planned flight, minus the altitude', () => {
+    const low = envelopeRangeM(0, DEFAULT_DEFENSE, DEFAULT_INTERCEPTOR);
+    expect(low).toBeCloseTo(0.9 * reachM(34, DEFAULT_INTERCEPTOR, 1.225), 3);
+    // Higher up the air is thinner, so it reaches farther, until the altitude itself eats it.
+    expect(envelopeRangeM(6_000, DEFAULT_DEFENSE, DEFAULT_INTERCEPTOR)).toBeGreaterThan(low);
+    expect(envelopeRangeM(40_000, DEFAULT_DEFENSE, DEFAULT_INTERCEPTOR)).toBe(0);
   });
 });
 
@@ -20,6 +73,37 @@ describe('threat evaluation', () => {
 
   it('gives a negative time for traffic flying away', () => {
     expect(closestApproachToOrigin(vec3(0, 5_000, 0), vec3(0, 100, 0)).timeS).toBeLessThan(0);
+  });
+
+  it('measures the closest approach to any point', () => {
+    // Flying east along y = 3 km, from x = −10 km: passes 1 km from (0, 2 km) in 50 s at 200 m/s.
+    const pass = closestApproachTo(vec3(0, 2_000, 0), vec3(-10_000, 3_000, 500), vec3(200, 0, 0));
+    expect(pass.distanceM).toBeCloseTo(1_000, 6);
+    expect(pass.timeS).toBeCloseTo(50, 6);
+  });
+
+  it('names the defended asset a course threatens soonest', () => {
+    // Heading straight for the town from 20 km east of it, at 250 m/s.
+    const town = DEFAULT_ASSETS[1]?.position ?? vec3(0, 0, 0);
+    const threat = evaluateThreat(
+      vec3(town.x + 20_000, town.y, 50),
+      vec3(-250, 0, 0),
+      DEFAULT_ASSETS,
+    );
+    // It passes the battery's 5 km zone first? The battery is 6.5 km east of the town and 4 km
+    // south of this course: inside its threat radius, and reached sooner.
+    expect(threat?.assetId).toBe(0);
+    // Far to the north of everything, it threatens nothing.
+    expect(evaluateThreat(vec3(20_000, 30_000, 50), vec3(-250, 0, 0), DEFAULT_ASSETS)).toBeNull();
+    // Coming at the power plant from the south-east, it threatens the power plant only.
+    const plant = DEFAULT_ASSETS[2]?.position ?? vec3(0, 0, 0);
+    const pass = evaluateThreat(
+      vec3(plant.x + 10_000, plant.y - 10_000, 50),
+      vec3(-200, 200, 0),
+      DEFAULT_ASSETS,
+    );
+    expect(pass?.assetId).toBe(2);
+    expect(pass?.timeToClosestS).toBeCloseTo(50, 6);
   });
 });
 

@@ -16,7 +16,8 @@ import { SimProvider } from './sim/SimProvider';
 import { useSelectionGuard } from './view/useSelectionGuard';
 import { useViewShortcuts } from './view/useViewShortcuts';
 import { BattlespaceFallback } from './views/BattlespaceFallback';
-import { RadarScope, ScopeLegend } from './views/RadarScope';
+import { CoverageControl, RadarScope, ScopeLegend } from './views/RadarScope';
+import { ApprovalCard } from './views/ApprovalCard';
 import { ResultToasts } from './views/ResultToasts';
 
 // three.js is large: load the 3D view in its own chunk, after the console is on screen.
@@ -60,6 +61,7 @@ function Console() {
             </Suspense>
           </ErrorBoundary>
           <ResultToasts />
+          <ApprovalCard />
         </Panel>
         <Panel
           title="Sensor scope"
@@ -75,6 +77,7 @@ function Console() {
           }
         >
           <RadarScope />
+          <CoverageControl />
           <ScopeLegend />
         </Panel>
         <TrackTablePanel className="area-tracks" />

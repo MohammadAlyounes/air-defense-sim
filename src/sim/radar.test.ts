@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { TICK_S } from './core/clock';
-import { antennaAzimuth, sweptOver } from './radar';
+import {
+  antennaAzimuth,
+  DEFAULT_SEARCH_RADAR,
+  detectionProbability,
+  detectionRangeM,
+  falseAlarmsPerTurn,
+  lookProbability,
+  signalToNoise,
+  sweptOver,
+} from './radar';
 
 const deg = (d: number) => (d * Math.PI) / 180;
 
@@ -34,5 +43,35 @@ describe('search radar sweep', () => {
       }
       expect(hits).toBe(1);
     }
+  });
+});
+
+describe('detection probability', () => {
+  it('follows Pd = Pfa^(1/(1+SNR)) for a fluctuating target', () => {
+    // Pfa = 1e-6 and SNR = 20 (13 dB): Pd = 1e-6^(1/21) = 0.518.
+    expect(detectionProbability(20, 1e-6)).toBeCloseTo(0.518, 3);
+    // Ten times the SNR: Pd = 1e-6^(1/201) = 0.934.
+    expect(detectionProbability(200, 1e-6)).toBeCloseTo(0.934, 3);
+    // No signal: only noise, which crosses the threshold with probability Pfa.
+    expect(detectionProbability(0, 1e-6)).toBeCloseTo(1e-6, 12);
+  });
+
+  it('detects a target on half the scans at its 50% range, more often when closer', () => {
+    const radar = DEFAULT_SEARCH_RADAR;
+    const drone = 0.01;
+    const r50 = detectionRangeM(drone, radar); // 9.5 km
+    expect(lookProbability(drone, r50, radar)).toBeCloseTo(0.5, 9);
+    // SNR ∝ 1/R⁴: at 70% of the range the SNR is 4.2 times larger.
+    expect(signalToNoise(drone, 0.7 * r50, radar) / signalToNoise(drone, r50, radar)).toBeCloseTo(
+      1 / 0.7 ** 4,
+      9,
+    );
+    expect(lookProbability(drone, 0.7 * r50, radar)).toBeCloseTo(0.845, 2);
+    expect(lookProbability(drone, 1.3 * r50, radar)).toBeLessThan(0.3);
+    expect(lookProbability(drone, 41_000, radar)).toBe(0); // beyond the instrumented range
+  });
+
+  it('expects λ = Pfa × cells false alarms per antenna turn', () => {
+    expect(falseAlarmsPerTurn(DEFAULT_SEARCH_RADAR)).toBeCloseTo(0.6, 9);
   });
 });

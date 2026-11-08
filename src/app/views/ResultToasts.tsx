@@ -57,6 +57,11 @@ function Card({ result, onClose }: { result: ResultCard; onClose: () => void }) 
   const kill = result.kind === 'kill';
   const Icon = kill ? ShieldCheck : ShieldAlert;
   const what = withArticle(TRAFFIC_NOUN[result.type]);
+  const title = kill
+    ? `Threat destroyed · ${trackName(result.trackId ?? 0)}`
+    : result.kind === 'idError'
+      ? `Identification failure · ${trackName(result.trackId ?? 0)}`
+      : `A threat reached the ${(result.asset ?? 'battery').toLowerCase()}`;
   return (
     <div
       data-testid="result-card"
@@ -71,9 +76,7 @@ function Card({ result, onClose }: { result: ResultCard; onClose: () => void }) 
         className={clsx('mt-0.5 size-5 shrink-0', kill ? 'text-ok' : 'text-alert')}
       />
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-ink-100">
-          {kill ? `Threat destroyed · ${trackName(result.trackId ?? 0)}` : 'A threat got through'}
-        </p>
+        <p className="text-[13px] font-semibold text-ink-100">{title}</p>
         {kill ? (
           <p className="mt-0.5 text-[12px] leading-snug text-ink-200">
             Detected at {formatKm(result.detectedRangeM ?? 0)} ·{' '}
@@ -83,10 +86,15 @@ function Card({ result, onClose }: { result: ResultCard; onClose: () => void }) 
               : `${result.interceptorsFired} interceptors`}
             <span className="block text-ink-300">It was {what}.</span>
           </p>
+        ) : result.kind === 'idError' ? (
+          <p className="mt-0.5 text-[12px] leading-snug text-ink-200">
+            It was {what}, shot down because it never answered the identification check. Every
+            identification mistake counts as a failure.
+          </p>
         ) : (
           <p className="mt-0.5 text-[12px] leading-snug text-ink-200">
-            {what.charAt(0).toUpperCase() + what.slice(1)} reached the battery before it could be
-            stopped.
+            {what.charAt(0).toUpperCase() + what.slice(1)} reached the{' '}
+            {(result.asset ?? 'battery').toLowerCase()} before it could be stopped.
           </p>
         )}
       </div>

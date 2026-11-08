@@ -6,11 +6,15 @@ export const VIEW_SHORTCUTS = {
   cameras: '1–4',
   clearSelection: 'Esc',
   labels: 'L',
+  truth: 'T',
 } as const;
 
 const TYPING = 'input, textarea, select, [contenteditable="true"], [role="slider"]';
 
-/** 1–4 choose a camera, Esc clears the selection and L toggles the aircraft labels. */
+/**
+ * 1–4 choose a camera, Esc clears the selection, L toggles the aircraft labels and T the truth
+ * comparison.
+ */
 export function useViewShortcuts(): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -22,6 +26,7 @@ export function useViewShortcuts(): void {
       if (mode) view.setCameraMode(mode.id);
       else if (event.key === 'Escape') view.select(null);
       else if (event.key === 'l' || event.key === 'L') view.setShowLabels(!view.showLabels);
+      else if (event.key === 't' || event.key === 'T') view.setCompareTruth(!view.compareTruth);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
