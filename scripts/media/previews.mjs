@@ -2,7 +2,7 @@
 //
 //   npm run media:previews
 //
-// - public/og-image.png         1200x627, used in <meta property="og:image"> (LinkedIn, X, Slack)
+// - public/og-image.png         1200x627, used in <meta property="og:image"> (link previews)
 // - docs/media/social-preview.png 1280x640, upload in GitHub: Settings -> General -> Social preview
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';

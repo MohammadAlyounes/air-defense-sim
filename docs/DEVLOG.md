@@ -2,6 +2,8 @@
 
 One short entry per step, newest first: what was built, the decisions behind it, and what comes next.
 
+> **Roadmap compressed (2026-11-08).** The eleven remaining steps were merged into six, so v1.0 is now Step 9 instead of Step 14 ([PROJECT_PLAN.md](PROJECT_PLAN.md), Section 16). Entries below keep the numbering they were written with: old Steps 4 + 5 are now Step 4, 6 + 7 are Step 5, 8 + 9 are Step 6, 10 + 12 are Step 7, 11 is Step 8, and 13 + 14 are Step 9.
+
 ## Step 3 · First intercept (2026-11-07)
 
 **Built**
@@ -37,7 +39,7 @@ One short entry per step, newest first: what was built, the decisions behind it,
 - **Touch places by tapping.** A finger dragging a card would fight the palette's scrolling, so on touch screens you tap a card, then the map. Mouse and pen can do both; the keyboard can place too.
 - **Media as animated WebP.** The Step 3 clip shows the whole console, so it uses WebP (2.3 MB) like Step 2. The clip script can now script drags.
 
-**Next: Step 4 · Environment.** Procedural terrain, the standard atmosphere, wind and drag; threat behaviors with routes, terrain following and evasive turns.
+**Next: Step 4 · Environment & radar.** Procedural terrain, the standard atmosphere, wind and drag; threat behaviors with routes, terrain following and evasive turns; then the radar equation, measurement noise, false alarms, the radar horizon, terrain masking, clutter and coverage maps.
 
 ## Step 2 · 3D scene (2026-11-06)
 

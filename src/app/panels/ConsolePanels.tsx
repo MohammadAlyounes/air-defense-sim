@@ -22,7 +22,7 @@ const grouped = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
 /**
  * The battery's tracks, most urgent first: threats by time to their closest approach, then the
- * rest by range. A row selects its aircraft. Step 6 adds track quality and uncertainty.
+ * rest by range. A row selects its aircraft. Step 5 adds track quality and uncertainty.
  */
 export function TrackTablePanel({ className }: { className?: string }) {
   const rows = useSimState((state) => state.defense.tracks);
@@ -115,7 +115,7 @@ const TELEMETRY_SERIES = ['Altitude', 'Speed', 'g-load', 'Signal'] as const;
 
 export function TelemetryPanel() {
   return (
-    <Panel title="Telemetry" icon={Activity} step={9} bodyClassName="flex flex-col">
+    <Panel title="Telemetry" icon={Activity} step={6} bodyClassName="flex flex-col">
       <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
         {TELEMETRY_SERIES.map((series) => (
           <span

@@ -16,4 +16,4 @@ A radar sees an object by the echo it sends back, and that echo weakens very fas
 
 **Why it matters.** Time is everything in air defense. A drone first seen at 9.5 km and flying at 40 m/s leaves about four minutes; a cruise-missile-like target first seen at 17 km and flying at 240 m/s leaves about 70 seconds.
 
-**What Step 5 adds.** Detection becomes a probability (the Swerling model): even inside the range an echo can be missed, and false alarms appear. The radar horizon and the terrain also block the view, so low flyers can hide.
+**What Step 4 adds.** Detection becomes a probability (the Swerling model): even inside the range an echo can be missed, and false alarms appear. The radar horizon and the terrain also block the view, so low flyers can hide.
