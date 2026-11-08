@@ -65,7 +65,7 @@ function KpiGroup({ situation: s }: { situation: SituationSummary }) {
       </Kpi>
       <Kpi
         label="Next impact"
-        hint="Time until the most urgent threat reaches its closest point to the battery. Defended assets such as towns arrive in Step 7."
+        hint="Time until the most urgent threat reaches its closest point to the battery. Defended assets such as towns arrive in Step 5."
         arrivesInStep={KPI_ARRIVES_IN_STEP.nextImpact}
       >
         <span className="font-mono tabular-nums text-ink-100">

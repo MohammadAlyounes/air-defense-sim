@@ -4,7 +4,7 @@ import type { Track } from './types';
 
 /**
  * Where the battery believes a track is at `tick`: its last echo, moved on at the velocity
- * estimated from the last two echoes. Step 6 replaces this with a Kalman filter's estimate.
+ * estimated from the last two echoes. Step 5 replaces this with a Kalman filter's estimate.
  */
 export function trackPositionAt(track: Track, tick: number): Vec3 {
   if (!track.velocity) return track.position;

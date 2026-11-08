@@ -1,7 +1,7 @@
 /**
  * Search radar: a rotating antenna that paints every aircraft its beam sweeps past, as long as
  * the echo is strong enough. Step 3 adds detection range by radar size (the fourth-root law);
- * noise, false alarms, the radar horizon and terrain masking arrive in Step 5.
+ * noise, false alarms, the radar horizon and terrain masking arrive in Step 4.
  */
 
 export interface SearchRadarConfig {

@@ -7,7 +7,7 @@ Every model in the simulator: its equations, its assumptions and its limits. Thi
 - **Frame:** local East-North-Up (ENU), in metres. `x` points east, `y` north, `z` up, and the origin is the battery.
 - **Units:** SI inside the simulation (m, s, rad). Names that leave the simulation carry their unit, such as `speedMps` or `altitudeM`.
 - **Bearings:** compass style, with 0 at north, π/2 at east, increasing clockwise: `β = atan2(x, y)`.
-- **Earth model (Step 1):** flat. Earth curvature arrives with the radar horizon in Step 5.
+- **Earth model (Step 1):** flat. Earth curvature arrives with the radar horizon in Step 4.
 
 ## Time and randomness (Step 1)
 
@@ -72,19 +72,19 @@ Aim points use `r = R·√u` (with `u` uniform), which spreads them evenly over 
   | medium     | 2 m²             | fast jet, friendly  | 35.7 km        |
   | large      | 40 m²            | airliner            | 40 km (capped) |
 
-**Limitations:** inside its range a target is always detected, and positions are exact. There is no measurement noise, no missed detections, no false alarms, no radar horizon, no terrain masking and no clutter. Step 5 replaces this with probabilistic detection, noise, Earth curvature, terrain masking and clutter.
+**Limitations:** inside its range a target is always detected, and positions are exact. There is no measurement noise, no missed detections, no false alarms, no radar horizon, no terrain masking and no clutter. Step 4 replaces this with probabilistic detection, noise, Earth curvature, terrain masking and clutter.
 
 ## Tracks (Step 3)
 
 - **Tentative, then confirmed:** the first plot of an aircraft creates a track (T1, T2, …); the second confirms it.
 - **Velocity:** the difference between the last two plots, divided by the time between them (4 s). Exact while plots are exact.
 - **Position now:** the last plot moved on at the estimated velocity: `p(t) = p_last + v · (t − t_last)`.
-- **Association:** each plot joins the track of the aircraft that produced it. This uses the plot's link to the truth, a stand-in until Step 6 adds gating and nearest-neighbour association.
+- **Association:** each plot joins the track of the aircraft that produced it. This uses the plot's link to the truth, a stand-in until Step 5 adds gating and nearest-neighbour association.
 - **Dropped** after two antenna turns without a plot, unless an interceptor is still being guided to it.
 
 ## Identification and threat evaluation (Step 3)
 
-- **Identification:** 2 s after a track is confirmed, the identification check answers: friendly aircraft reply (friend), civil aircraft broadcast a civil transponder code (civil), anything else is treated as hostile. Step 7 adds mistakes, a kinematic classifier and air corridors.
+- **Identification:** 2 s after a track is confirmed, the identification check answers: friendly aircraft reply (friend), civil aircraft broadcast a civil transponder code (civil), anything else is treated as hostile. Step 5 adds mistakes, a kinematic classifier and air corridors.
 - **Threat:** a hostile track whose straight course passes within 5 km of the battery, still approaching. With the track's ground position `p` and velocity `v`:
 
   ```
@@ -134,7 +134,7 @@ A generic, fictional interceptor, modelled as a point mass (round numbers chosen
 
 - **Self-destruct:** after 40 s of flight, on hitting the ground, or if the target is gone.
 
-**Limitations:** no air drag (Step 4), no guidance phases (Step 8) and a perfect tracking radar: the interceptor is guided to the real target. Against non-maneuvering targets with perfect information, proportional navigation hits almost dead centre.
+**Limitations:** no air drag (Step 4), no guidance phases (Step 6) and a perfect tracking radar: the interceptor is guided to the real target. Against non-maneuvering targets with perfect information, proportional navigation hits almost dead centre.
 
 ## Kill assessment and leaks (Step 3)
 

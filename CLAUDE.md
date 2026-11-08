@@ -14,10 +14,10 @@ An open-source, browser-based, educational air-defense simulator.
 
 ## Owner requirements (non-negotiable)
 
-1. **Portfolio quality.** Attractive and intuitive for the general public, credible for specialists: simple by default, deep on demand.
+1. **Polished and approachable.** Attractive and intuitive for the general public, credible for specialists: simple by default, deep on demand.
 2. **Drag-and-drop threats.** Palette cards (drone, swarm, cruise-missile-like, fast jet, friendly aircraft, airliner) are dropped on the 2D map or the 3D terrain, and the battery reacts live.
 3. **Header analysis bar.** Live counts for each stage, KPIs, and a plain-language "Now" line, always visible.
-4. **Easy to share and run.** A live demo on GitHub Pages, a demo video, and `npm install && npm run dev`.
+4. **Easy to run.** A live demo on GitHub Pages, a demo video, and `npm install && npm run dev`.
 5. **A README that teaches.** Easy to scan. Every step adds concise physics concept cards and a build-log entry.
 6. **Safe and generic.** See the safety guardrails below.
 7. **Fixed author credit.** The header always shows "Created by Mohammad Alyounes" on every screen size, and the footer shows "© 2026 Mohammad Alyounes". Both come from `AUTHOR` in `src/app/data/links.ts`. Never remove, hide or change them; a browser test fails CI if you do. Keep the credit in the README, `NOTICE`, `CITATION.cff` and the social preview card too.
@@ -88,7 +88,7 @@ The full concept texts live in `docs/concepts/NN-M-slug.md` (step `NN`, order `M
 
 Both media scripts accept `--query "seed=2026&t=75&paused=0"` for repeatable shots: simulation options from `src/app/sim/params.ts`, view options (`select`, `camera`, `heights`, `labels`, `welcome=0`) from `src/app/view/viewParams.ts`. `media:gif` can also script the clip with `--actions` (timed key presses and clicks).
 
-Planned: `npm run demo:record` (Step 14).
+Planned: `npm run demo:record` (Step 9).
 
 ## Environment notes
 

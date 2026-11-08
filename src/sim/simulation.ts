@@ -453,7 +453,7 @@ export class Simulation {
         continue;
       }
 
-      // Velocity from the last two echoes (exact while measurements are perfect; Step 6 adds
+      // Velocity from the last two echoes (exact while measurements are perfect; Step 5 adds
       // noise and a Kalman filter).
       const gapS = (tick - track.lastPaintTick) * TICK_S;
       const updated: Track = {

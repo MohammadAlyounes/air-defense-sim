@@ -27,13 +27,13 @@ export interface SituationSummary {
 export const KPI_ARRIVES_IN_STEP = {
   threats: 3,
   interceptors: 3,
-  channels: 8,
+  channels: 6,
   nextImpact: 3,
 } as const;
 
 /**
  * The header as of Step 3: the whole loop runs in a first version. Fire channels arrive with
- * the tracking radar's limits in Step 8, together with operator approval (the battery fires on
+ * the tracking radar's limits in Step 6, together with operator approval (the battery fires on
  * its own until then: AUTO, at hostiles only: weapons TIGHT).
  */
 export function liveSituation(input: { defense: DefenseSummary; now: string }): SituationSummary {
@@ -59,7 +59,7 @@ export const WEAPONS_CONTROL_HELP: Readonly<Record<WeaponsControl, string>> = {
 export const OPERATOR_MODE_HELP: Readonly<Record<OperatorMode, string>> = {
   MANUAL: 'Manual: you approve every shot.',
   SEMI: 'Semi-auto: the system recommends, you confirm.',
-  AUTO: 'Auto: the system engages on its own, within the rules. Step 8 lets you approve each shot.',
+  AUTO: 'Auto: the system engages on its own, within the rules. Step 6 lets you approve each shot.',
 };
 
 export const OPERATOR_MODE_LABEL: Readonly<Record<OperatorMode, string>> = {

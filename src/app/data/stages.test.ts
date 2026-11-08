@@ -24,9 +24,9 @@ describe('defense loop stages', () => {
 });
 
 describe('roadmap', () => {
-  it('numbers steps 0 to 14 without gaps', () => {
-    expect(ROADMAP.map((s) => s.step)).toEqual(Array.from({ length: 15 }, (_, i) => i));
-    expect(LAST_STEP).toBe(14);
+  it('numbers steps 0 to 9 without gaps', () => {
+    expect(ROADMAP.map((s) => s.step)).toEqual(Array.from({ length: 10 }, (_, i) => i));
+    expect(LAST_STEP).toBe(9);
   });
 
   it('points the current step at a real roadmap entry', () => {

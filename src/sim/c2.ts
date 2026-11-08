@@ -9,8 +9,8 @@ export const LAUNCHER_POSITION: Vec3 = vec3(0, 0, 0);
 
 /**
  * The command node, Step 3 version: it identifies tracks, decides which ones threaten the
- * battery and when an interceptor can reach them. Identification becomes richer in Step 7,
- * and engagement rules (operator approval, doctrine, fire channels) arrive in Step 8.
+ * battery and when an interceptor can reach them. Identification becomes richer in Step 5,
+ * and engagement rules (operator approval, doctrine, fire channels) arrive in Step 6.
  */
 export interface DefenseConfig {
   /** The identification check (IFF) answers this long after a track is confirmed, s. */
@@ -54,7 +54,7 @@ export type Identity = 'pending' | 'friend' | 'neutral' | 'hostile';
 /**
  * The identification check, Step 3 version: friendly aircraft answer the IFF interrogation,
  * civil aircraft broadcast civil transponder codes, and anything that does neither is treated
- * as hostile. Step 7 adds mistakes, a kinematic classifier and air corridors.
+ * as hostile. Step 5 adds mistakes, a kinematic classifier and air corridors.
  */
 export function iffAnswer(affiliation: Affiliation): Exclude<Identity, 'pending'> {
   return affiliation;

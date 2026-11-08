@@ -12,6 +12,6 @@ At true scale the battlespace is a thin sheet, 80 km across but only 11 km tall 
 
 **Constant on-screen size.** For a camera with a vertical field of view `θ`, an object of size `s` at distance `d` covers `s / (2 d tan(θ/2))` of the screen height. Solving for `s` keeps it at a fixed number of pixels: `s = 2 d tan(θ/2) × pixels / screen height`. The 3D view applies this to every aircraft and to the radar site, every frame. Bigger types get a few more pixels (a drone 24, an airliner 36), so size still hints at what you are looking at.
 
-**Why stretch heights at all?** Altitude matters in air defense: low flyers hide below the radar horizon (Step 5), and an interceptor's reach has a ceiling (Step 8). With heights stretched, the difference between 50 m and 300 m stays visible.
+**Why stretch heights at all?** Altitude matters in air defense: low flyers hide below the radar horizon (Step 4), and an interceptor's reach has a ceiling (Step 6). With heights stretched, the difference between 50 m and 300 m stays visible.
 
 **What is never stretched.** The simulation always uses true heights. Stretching happens only when drawing, after the physics is done.

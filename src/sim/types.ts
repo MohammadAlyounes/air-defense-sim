@@ -34,7 +34,7 @@ export interface Aircraft {
 export interface Plot {
   tick: number;
   timeS: number;
-  /** Measured position. Perfect in Step 1; measurement noise arrives in Step 5. */
+  /** Measured position. Perfect in Step 1; measurement noise arrives in Step 4. */
   position: Vec3;
   bearingRad: number;
   rangeM: number;
@@ -53,7 +53,7 @@ export interface Track {
   id: EntityId;
   /**
    * The aircraft whose echoes feed this track. Step 3 links each echo to its track by it
-   * (perfect association); Step 6 replaces that with gating and nearest-neighbour association.
+   * (perfect association); Step 5 replaces that with gating and nearest-neighbour association.
    */
   truthId: EntityId;
   createdTick: number;

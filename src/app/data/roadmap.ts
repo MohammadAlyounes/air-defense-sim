@@ -27,47 +27,39 @@ export const ROADMAP: readonly RoadmapStep[] = [
   },
   {
     step: 4,
-    title: 'Environment',
-    summary: 'Terrain, atmosphere, wind and drag; three threat types with routes.',
+    title: 'Environment & radar',
+    summary:
+      'Terrain, atmosphere, wind and drag, threat routes; radar equation, noise, horizon, masking, clutter, coverage maps.',
   },
   {
     step: 5,
-    title: 'Radar realism',
-    summary: 'Radar equation, noise, horizon, terrain masking, clutter and coverage maps.',
+    title: 'Track & identify',
+    summary:
+      'Kalman tracking, uncertainty ellipses, truth vs. perception; identification, civil traffic, assets, threat ranking with "Why?".',
   },
   {
     step: 6,
-    title: 'Tracking',
-    summary: 'Kalman tracking, uncertainty ellipses, track quality, truth vs. perception.',
+    title: 'Engage & assess',
+    summary:
+      'Fire channels, envelopes, kill probability, doctrine, operator approval; kill assessment, saturation, telemetry.',
   },
   {
     step: 7,
-    title: 'Identify & evaluate',
-    summary: 'Identification, friendly and civil traffic, threat ranking with "Why?".',
+    title: 'Scenarios & replay',
+    summary:
+      'Save, load and share scenarios, editor, raid generator; timeline scrubbing, rewind and branch, Monte Carlo, CSV export.',
   },
   {
     step: 8,
-    title: 'Engage',
-    summary: 'Engagement envelopes, kill probability, doctrine and missile phases.',
+    title: 'Learning layer',
+    summary: 'Ten guided lessons, live equations, skill levels, challenges, after-action review.',
   },
   {
     step: 9,
-    title: 'Assess',
-    summary: 'Kill assessment and re-engagement; full analysis bar, log, telemetry, inspector.',
+    title: 'Polish & release v1.0',
+    summary:
+      'Cinematic intro, effects, sound, themes, accessibility, demo video and the v1.0 release.',
   },
-  { step: 10, title: 'Scenarios', summary: 'Save, load and share; editor and raid generator.' },
-  {
-    step: 11,
-    title: 'Learning layer',
-    summary: 'Ten guided lessons, live equations, challenges, after-action review.',
-  },
-  {
-    step: 12,
-    title: 'Replay & analysis',
-    summary: 'Timeline scrubbing, rewind and branch, Monte Carlo, CSV export.',
-  },
-  { step: 13, title: 'Polish', summary: 'Cinematic intro, effects, sound, themes, accessibility.' },
-  { step: 14, title: 'Release v1.0', summary: 'Demo video, final README and the launch kit.' },
 ];
 
 /** The step the repository is currently on. Bump this when a step ships. */

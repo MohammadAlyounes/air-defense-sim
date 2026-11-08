@@ -10,7 +10,7 @@ import { useSimController, useSimState } from '../sim/simContext';
 import { SHORTCUTS } from '../sim/useKeyboardShortcuts';
 
 /**
- * Player bar: simulation controls next to the replay timeline (Step 12), the way a video
+ * Player bar: simulation controls next to the replay timeline (Step 7), the way a video
  * player keeps its buttons beside the scrubber.
  */
 export function PlayerBar({ className }: { className?: string }) {
@@ -125,7 +125,7 @@ export function PlayerBar({ className }: { className?: string }) {
         <div className="relative h-1.5 min-w-16 flex-1 rounded-full bg-ink-800" aria-hidden="true">
           <span className="absolute top-1/2 left-0 size-3 -translate-y-1/2 rounded-full border-2 border-accent bg-ink-950" />
         </div>
-        <StepBadge step={12} />
+        <StepBadge step={7} />
       </div>
     </div>
   );

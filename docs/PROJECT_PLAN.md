@@ -1,19 +1,14 @@
 # Air Defense Simulator — Project Plan
 
-**Version 0.2 · 2026-11-06** · The build starts at Step 0 once the GitHub repository is ready.
+**Version 0.3 · 2026-11-08** · Steps 0–3 are shipped; Step 4 is next.
 
-v0.2 adds four things:
-
-- portfolio and LinkedIn requirements;
-- the drag-and-drop threat palette;
-- the header analysis bar;
-- the README rule to explain the physics at every step.
+v0.3 compresses the remaining roadmap from eleven steps (old Steps 4–14) into six (Steps 4–9), so v1.0 is Step 9 instead of Step 14 (Section 16). v0.2 added the drag-and-drop threat palette, the header analysis bar and the README rule to explain the physics at every step.
 
 ---
 
 ## 1. Owner requirements
 
-1. **Portfolio-grade and shareable on LinkedIn.** Attractive and intuitive for the general public, credible for specialists: _simple by default, deep on demand_.
+1. **Polished and approachable.** Attractive and intuitive for the general public, credible for specialists: _simple by default, deep on demand_.
 2. **Drag-and-drop threats.** Pick any drone, missile or jet in the interface, drag it onto the map, and watch the battery respond live.
 3. **Full analysis bar in the header.** An always-visible live summary of the whole defense loop and its key numbers.
 4. **Demo video, plus source code that is easy to clone and run.**
@@ -26,10 +21,10 @@ v0.2 adds four things:
 
 **One-liner:** an open-source browser sandbox where anyone can drag a threat onto a map and watch, control and question how a generic air-defense system turns radar blips into decisions — and see why it succeeds or fails.
 
-| Audience                                     | What they need                                                         |
-| -------------------------------------------- | ---------------------------------------------------------------------- |
-| General public, LinkedIn visitors, students  | A 10-second "wow", obvious interactions, plain-language narration      |
-| Specialists, engineers, recruiters, teachers | Correct models, visible math, telemetry and exports, clean tested code |
+| Audience                         | What they need                                                         |
+| -------------------------------- | ---------------------------------------------------------------------- |
+| General public, students         | A 10-second "wow", obvious interactions, plain-language narration      |
+| Specialists, engineers, teachers | Correct models, visible math, telemetry and exports, clean tested code |
 
 **Learning outcomes.** After using the simulator, a learner can explain:
 
@@ -111,7 +106,7 @@ WCS TIGHT · SEMI-AUTO │ NOW: Engaging T3 (cruise missile) — intercept in 12
   - cost-exchange ratio;
   - false-track count.
 - **Mobile:** collapses to the pipeline and the Now line; tap to expand.
-- **Grows with the build:** the first version ships at Step 3 and is complete by Step 9.
+- **Grows with the build:** the first version shipped at Step 3 and is complete by Step 6.
 
 ## 6. Toolkit (versions checked on npm, 2026-11-03)
 
@@ -378,29 +373,28 @@ There will also be scored challenges and an open sandbox.
 - **Defensive framing:** non-graphic effects. Identification and rules-of-engagement mistakes count as failures.
 - **Visible rules:** a disclaimer on the start screen, and `SAFETY.md` with content rules for community scenarios (no recreations of real sites, no real-system parameter sheets).
 
-## 14. Portfolio and LinkedIn launch kit
+## 14. Release kit
 
-- **An always-live demo.** GitHub Pages, deployed by CI on every push from Step 0, so there is always a link to share.
+- **An always-live demo.** GitHub Pages, deployed by CI on every push from Step 0, so there is always a working version to try.
 - **A fast first impression.**
   - The cinematic intro and onboarding hint from Section 3.
   - The 3D code is split out so the page loads quickly.
   - Phones get a view-only mode.
 - **Rich link previews.**
-  - The demo site gets Open Graph tags with a 1200×627 preview image, the size LinkedIn uses for link cards.
+  - The demo site gets Open Graph tags with a 1200×627 link-preview image.
   - The GitHub repo gets a 1280×640 social preview image, which the owner uploads in the repo settings.
 - **Demo video (60–90 s).**
   - It is rendered frame by frame from a scripted, deterministic scenario, so it plays smoothly even without a GPU.
   - It can be re-recorded with `npm run demo:record`.
-  - Captions are burned in, because LinkedIn autoplays muted.
+  - Captions are burned in, so it works with the sound off.
   - The hook comes in the first 3 seconds; an end card shows the repo and demo links.
-  - Two cuts: 16:9 for GitHub and YouTube, 1:1 for the LinkedIn feed.
+  - A 16:9 cut for the README and the release page.
 - **README media.** Light GIFs or animated WebP for each feature. The full MP4 is attached through GitHub's web editor so it plays inline.
 - **Clone and run.**
   - Four commands (below), Node 22+, npm only.
   - _Open in GitHub Codespaces_ and _Open in StackBlitz_ buttons for running without installing anything.
-- **Follow the build.** Every step is a git tag (for example `step-05-radar`), so anyone can check out a step and watch the project grow. Each tag has a build-log entry with a screenshot.
+- **Follow the build.** Every step is a git tag (for example `step-04-environment-radar`), so anyone can check out a step and watch the project grow. Each tag has a build-log entry with a screenshot.
 - **Signals for specialists.** CI badges, strict TypeScript, physics tests, the ARCHITECTURE and MODELS docs, and a clean commit history.
-- **LinkedIn post draft.** Written at release: hook, what it does, three things learned, tech stack, links, hashtags. The owner posts it.
 - **Built with Claude.** `CLAUDE.md` and `docs/DEVLOG.md` show how the project was built with Claude Code.
 
 ```bash
@@ -447,25 +441,20 @@ npm run dev
 
 ## 16. Build roadmap
 
-Each step ends with a working demo, passing tests, at least one README concept card (where there is new physics) and a git tag.
+Each step ends with a working demo, passing tests, at least one README concept card (where there is new physics) and a git tag. Steps 0–3 are done. In v0.3 the remaining eleven steps were merged into six: neighbouring steps that change the same models and panels now ship together, and nothing was dropped.
 
-| Step | Tag                         | What you will see                                                                                     | Concepts added to the README                                                |
-| ---- | --------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 0    | `step-00-launchpad`         | Repo, tooling, CI, live demo URL (app shell), README skeleton, CLAUDE.md, Codespaces/StackBlitz       | —                                                                           |
-| 1    | `step-01-sim-core`          | Deterministic clock, play/pause/step/speed, a target moving on the 2D scope                           | Fixed time step and determinism                                             |
-| 2    | `step-02-3d-scene`          | 3D ground, models, trails, labels, cameras; 2D↔3D selection sync                                      | Local coordinates (ENU) and scale                                           |
-| 3    | `step-03-first-intercept`   | First full loop + **drag-and-drop palette v1** + **analysis bar v1**                                  | Detection range; proportional navigation                                    |
-| 4    | `step-04-environment`       | Terrain, atmosphere, wind, drag; 3 threat types with routes and terrain-following                     | Air density (ISA); drag; turn radius                                        |
-| 5    | `step-05-radar`             | Radar equation, false alarms, noise, horizon, masking, clutter; sweep; coverage maps                  | Radar equation and RCS; radar horizon; terrain masking; clutter and Doppler |
-| 6    | `step-06-tracking`          | Kalman tracking, uncertainty ellipses, track table, truth vs. perception                              | Noise and the Kalman filter                                                 |
-| 7    | `step-07-identify-evaluate` | Identification, classifier, corridors, friendly and civil traffic, assets, threat ranking with "Why?" | Identification friend-or-foe; closest point of approach                     |
-| 8    | `step-08-engage`            | Channels, envelopes, intercept point, kill probability, doctrine, operator approval, missile phases   | Engagement envelope; missile energy; kill probability and doctrine          |
-| 9    | `step-09-assess`            | Kill assessment, re-engagement, threats getting through; full analysis bar, log, telemetry, inspector | Kill assessment; saturation                                                 |
-| 10   | `step-10-scenarios`         | Save/load/share, editor, dragging defenders, raid generator, library                                  | —                                                                           |
-| 11   | `step-11-learning`          | Lesson engine + 10 lessons, live equations, skill levels, challenges, after-action review             | —                                                                           |
-| 12   | `step-12-analysis`          | Timeline scrubbing, rewind and branch, run comparison, Monte Carlo, CSV export                        | Monte Carlo and probability                                                 |
-| 13   | `step-13-polish`            | Cinematic intro and onboarding, effects, sound, themes, accessibility, mobile viewer                  | —                                                                           |
-| 14   | `v1.0.0`                    | Demo video, GIFs, preview images, final README, LinkedIn post draft, release                          | —                                                                           |
+| Step | Tag                         | What you will see                                                                                                                                                            | Concepts added to the README                                                                                      | Was     |
+| ---- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------- |
+| 0 ✓  | `step-00-launchpad`         | Repo, tooling, CI, live demo URL (app shell), README skeleton, CLAUDE.md, Codespaces                                                                                         | —                                                                                                                 | 0       |
+| 1 ✓  | `step-01-sim-core`          | Deterministic clock, play/pause/step/speed, a target moving on the 2D scope                                                                                                  | Fixed time step and determinism; antenna rotation                                                                 | 1       |
+| 2 ✓  | `step-02-3d-scene`          | 3D ground, models, trails, labels, cameras; 2D↔3D selection sync                                                                                                             | Local coordinates (ENU); seeing scale                                                                             | 2       |
+| 3 ✓  | `step-03-first-intercept`   | First full loop + **drag-and-drop palette v1** + **analysis bar v1**                                                                                                         | Detection range; proportional navigation                                                                          | 3       |
+| 4    | `step-04-environment-radar` | Terrain, atmosphere, wind, drag; threat routes and terrain-following; radar equation, false alarms, noise, horizon, masking, clutter; coverage maps                          | Air density (ISA); drag; turn radius; radar equation and RCS; radar horizon; terrain masking; clutter and Doppler | 4 + 5   |
+| 5    | `step-05-track-identify`    | Kalman tracking, gating, uncertainty ellipses, track table, truth vs. perception; identification, classifier, corridors, civil traffic, assets, threat ranking with "Why?"   | Noise and the Kalman filter; identification friend-or-foe; closest point of approach                              | 6 + 7   |
+| 6    | `step-06-engage-assess`     | Channels, envelopes, intercept point, kill probability, doctrine, operator approval, missile phases; kill assessment, re-engagement, full analysis bar, telemetry, inspector | Engagement envelope; missile energy; kill probability and doctrine; kill assessment; saturation                   | 8 + 9   |
+| 7    | `step-07-scenarios-replay`  | Save/load/share, editor, dragging defenders, raid generator, library; timeline scrubbing, rewind and branch, run comparison, Monte Carlo, CSV export                         | Monte Carlo and probability                                                                                       | 10 + 12 |
+| 8    | `step-08-learning`          | Lesson engine + 10 lessons, live equations, skill levels, challenges, after-action review                                                                                    | —                                                                                                                 | 11      |
+| 9    | `v1.0.0`                    | Cinematic intro and onboarding, effects, sound, themes, accessibility, mobile viewer; demo video, GIFs, preview images, final README, release                                | —                                                                                                                 | 13 + 14 |
 
 **Workflow for every step:**
 

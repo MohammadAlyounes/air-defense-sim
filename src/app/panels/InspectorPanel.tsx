@@ -50,7 +50,7 @@ const LATER = [
   'Why this launcher, and the chance of a hit',
 ] as const;
 
-/** What the selected aircraft is and what it is doing; "why the system acts" comes in Step 9. */
+/** What the selected aircraft is and what it is doing; "why the system acts" comes in Step 6. */
 export function InspectorPanel() {
   const selectedId = useViewStore((state) => state.selectedId);
   return (
@@ -81,7 +81,7 @@ function Empty() {
       <div>
         <p className="flex items-center gap-2 text-[11px] text-ink-300">
           Then, <strong className="font-semibold text-ink-100">why</strong> the system acts:
-          <StepBadge step={9} />
+          <StepBadge step={6} />
         </p>
         <ul className="mt-1.5 space-y-1">
           {LATER.map((point) => (
