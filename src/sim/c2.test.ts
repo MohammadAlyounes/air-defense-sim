@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { STANDARD_ATMOSPHERE } from './atmosphere';
 import { DEFAULT_ASSETS } from './assets';
 import {
+  assumedCivil,
   closestApproachTo,
   closestApproachToOrigin,
   DEFAULT_DEFENSE,
@@ -9,7 +10,9 @@ import {
   envelopeRangeM,
   evaluateThreat,
   iffAnswer,
+  identityAfterSilence,
   killProbability,
+  mayThreaten,
   predictIntercept,
 } from './c2';
 import { vec3 } from './core/vec';
@@ -28,16 +31,51 @@ describe('identification', () => {
   it('never hears a hostile', () => {
     expect(iffAnswer('hostile', 0, config)).toBeNull();
   });
+
+  it('makes a silent track suspect if it flies like a threat, unknown if not, then hostile', () => {
+    const rules = { iffChecks: 2 };
+    expect(identityAfterSilence(1, rules, 'fast', null)).toBe('suspect');
+    expect(identityAfterSilence(1, rules, 'slow', null)).toBe('suspect');
+    expect(identityAfterSilence(1, rules, 'lowFast', null)).toBe('suspect');
+    expect(identityAfterSilence(1, rules, 'aircraft', null)).toBe('unknown');
+    expect(identityAfterSilence(1, rules, 'airliner', null)).toBe('unknown');
+    for (const profile of ['fast', 'slow', 'lowFast', 'aircraft', 'airliner'] as const) {
+      expect(identityAfterSilence(2, rules, profile, null)).toBe('hostile');
+    }
+  });
+
+  it('never calls an airliner flying a civil corridor hostile on silence alone', () => {
+    const rules = { iffChecks: 2 };
+    expect(assumedCivil('airliner', 1)).toBe(true);
+    expect(assumedCivil('airliner', null)).toBe(false);
+    // Flying like a jet inside the corridor does not count: it is not an airliner's profile.
+    expect(assumedCivil('fast', 1)).toBe(false);
+    expect(identityAfterSilence(2, rules, 'airliner', 1)).toBe('unknown');
+    expect(identityAfterSilence(10, rules, 'airliner', 1)).toBe('unknown');
+    expect(identityAfterSilence(2, rules, 'fast', 1)).toBe('hostile');
+  });
 });
 
 describe('rules of engagement', () => {
-  it('fires at hostiles when weapons are tight, also at unknowns when free, never on hold', () => {
+  it('fires at hostiles when weapons are tight, also at unknowns and suspects when free, never on hold', () => {
     expect(engageable('hostile', 'TIGHT')).toBe(true);
     expect(engageable('unknown', 'TIGHT')).toBe(false);
+    expect(engageable('suspect', 'TIGHT')).toBe(false);
     expect(engageable('unknown', 'FREE')).toBe(true);
+    expect(engageable('suspect', 'FREE')).toBe(true);
+    expect(engageable('pending', 'FREE')).toBe(false);
     expect(engageable('friend', 'FREE')).toBe(false);
     expect(engageable('neutral', 'FREE')).toBe(false);
     expect(engageable('hostile', 'HOLD')).toBe(false);
+  });
+
+  it('weighs only checked tracks that are not friend or civil as possible threats', () => {
+    expect(mayThreaten('unknown')).toBe(true);
+    expect(mayThreaten('suspect')).toBe(true);
+    expect(mayThreaten('hostile')).toBe(true);
+    expect(mayThreaten('pending')).toBe(false);
+    expect(mayThreaten('friend')).toBe(false);
+    expect(mayThreaten('neutral')).toBe(false);
   });
 });
 

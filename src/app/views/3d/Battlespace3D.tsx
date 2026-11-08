@@ -5,7 +5,7 @@ import { useViewStore } from '../../view/viewStore';
 import { WelcomeCard } from '../WelcomeCard';
 import { AircraftLayer } from './AircraftLayer';
 import { CameraRig } from './CameraRig';
-import { AssetLayer, EnvelopeLayer } from './DefenseLayer';
+import { AssetLayer, CorridorLayer, EnvelopeLayer } from './DefenseLayer';
 import { EffectsLayer } from './EffectsLayer';
 import { useRedrawOnChange } from './frame';
 import { LabelLayer, LabelProjector } from './Labels';
@@ -56,6 +56,7 @@ function Scene() {
       <directionalLight position={[40, 70, 25]} intensity={1.7} />
       <GroundAndRings />
       <AssetLayer />
+      <CorridorLayer />
       <EnvelopeLayer />
       <RadarSite />
       <AircraftLayer />

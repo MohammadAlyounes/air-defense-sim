@@ -82,6 +82,7 @@ export function RadarScope() {
               at: target.at,
               valid: target.valid,
               timeToBatteryS: facts.timeToBatteryS,
+              corridorName: facts.corridor?.name ?? null,
               route: facts.route,
             }
           : null;
@@ -163,20 +164,22 @@ export function RadarScope() {
   );
 }
 
+const DIAMOND = 'M6 1.5 10.5 6 6 10.5 1.5 6Z';
+/** Four half-circle lobes, as on the scope (`traceIdentityShape`). */
+const QUATREFOIL =
+  'M3.75 3.75A2.25 2.25 0 0 1 8.25 3.75A2.25 2.25 0 0 1 8.25 8.25A2.25 2.25 0 0 1 3.75 8.25A2.25 2.25 0 0 1 3.75 3.75Z';
+
 const LEGEND = [
-  { label: 'hostile', color: IDENTITY_COLOR.hostile, shape: 'M6 1.5 10.5 6 6 10.5 1.5 6Z' },
+  { label: 'hostile', color: IDENTITY_COLOR.hostile, shape: DIAMOND },
+  { label: 'suspect', color: IDENTITY_COLOR.suspect, shape: DIAMOND, dashed: true },
+  { label: 'unknown', color: IDENTITY_COLOR.unknown, shape: QUATREFOIL },
   {
     label: 'friend',
     color: IDENTITY_COLOR.friend,
     shape: 'M6 1.8a4.2 4.2 0 1 1 0 8.4 4.2 4.2 0 0 1 0-8.4Z',
   },
   { label: 'civil', color: IDENTITY_COLOR.neutral, shape: 'M2.2 2.2h7.6v7.6H2.2Z' },
-  {
-    label: 'identifying',
-    color: IDENTITY_COLOR.pending,
-    shape: 'M6 1.8a4.2 4.2 0 1 1 0 8.4 4.2 4.2 0 0 1 0-8.4Z',
-    dashed: true,
-  },
+  { label: 'identifying', color: IDENTITY_COLOR.pending, shape: QUATREFOIL, dashed: true },
 ] as const;
 
 const COVERAGE_LABEL: Readonly<Record<CoverageView, string>> = {
@@ -295,6 +298,13 @@ export function ScopeLegend() {
           <path d="M1 6h14" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="2.5 2" />
         </svg>
         defended assets
+      </li>
+      <li className="flex items-center gap-1">
+        <svg viewBox="0 0 16 12" className="h-3 w-4" aria-hidden="true">
+          <rect x="0.5" y="3" width="15" height="6" fill="#4ade80" fillOpacity="0.12" />
+          <path d="M0.5 3h15M0.5 9h15" stroke="#4ade80" strokeOpacity="0.6" strokeDasharray="3 2" />
+        </svg>
+        civil corridor
       </li>
       <li className="flex items-center gap-1">
         <svg viewBox="0 0 16 12" className="h-3 w-4" aria-hidden="true">

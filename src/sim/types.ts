@@ -1,4 +1,6 @@
+import type { AirCorridor } from './airspace';
 import type { Identity, Rules } from './c2';
+import type { FlightProfile } from './classify';
 import type { DefendedAsset } from './assets';
 import type { Vec3 } from './core/vec';
 import type { WindConfig } from './flight';
@@ -109,6 +111,13 @@ export interface Track {
   /** The Kalman filter's state and covariance at the last echo. */
   estimate: KalmanState;
   confirmedTick: number | null;
+  /**
+   * What it flies like, from its filtered speed and height (the kinematic classifier); null
+   * until the second echo gives it a velocity.
+   */
+  profile: FlightProfile | null;
+  /** The civil air corridor it flies, inside and along it, if any (see `fliesCorridor`). */
+  corridorId: number | null;
   identity: Identity;
   /** Identification checks tried so far, and when the next one is due (tick). */
   iffChecks: number;
@@ -249,6 +258,9 @@ export type SimEvent =
       /** The evidence: the answer to the identification check, or how many went unanswered. */
       evidence: 'friendReply' | 'civilCode' | 'noReply';
       checks: number;
+      /** What the track flew like at the check, and the corridor it flew, if any. */
+      profile: FlightProfile | null;
+      corridorId: number | null;
     })
   | (TrackEventBase & {
       kind: 'threatEvaluated';
@@ -310,8 +322,11 @@ export type Command =
       type: TrafficTypeId;
       eastM: number;
       northM: number;
-      /** Compass heading: 0 = north, clockwise. */
-      headingRad: number;
+      /**
+       * Compass heading: 0 = north, clockwise. Without one, an airliner joins the nearest civil
+       * corridor and other traffic heads for the battery.
+       */
+      headingRad?: number;
       /** Above the ground for terrain-following types (drones, cruise), above the datum otherwise. */
       altitudeM?: number;
     }
@@ -356,6 +371,8 @@ export interface Snapshot {
   channels: { used: number; total: number };
   rules: Rules;
   assets: readonly DefendedAsset[];
+  /** Civil air corridors: lanes airliners fly, where silence alone is not taken as hostile. */
+  corridors: readonly AirCorridor[];
   /** The wind 10 m above the ground; it grows with height (see `windSpeedAt`). */
   wind: WindConfig;
   effects: readonly Effect[];

@@ -96,7 +96,12 @@ function Readout({
   const wind = useSimController().getFrame().current.wind;
   const facts = placementFacts(type, target.at, altitudeM, undefined, wind);
   const dogLeg = facts.route.length > 1;
-  const masked = facts.firstSeenM === null || facts.firstSeenM < facts.detectedFromM - 1_000;
+  // Seen where it is dropped: the radar has it at once (it starts inside the detection range).
+  const seenAtOnce = facts.firstSeenM !== null && facts.firstSeenM >= facts.rangeM - 100;
+  // Hidden for longer than open ground would explain: the terrain is in the way.
+  const masked =
+    facts.firstSeenM === null ||
+    facts.firstSeenM < Math.min(facts.detectedFromM, facts.rangeM) - 1_000;
   const tooFar = facts.rangeM > MAX_DROP_RANGE_M;
   // Keep the card on screen: flip to the left or above near the edges.
   const left = x + 300 > window.innerWidth ? x - 296 : x + 22;
@@ -118,12 +123,30 @@ function Readout({
             {formatBearing(facts.bearingRad)} · {grouped.format(altitudeM)} m
           </p>
           <p className="mt-0.5">
-            {dogLeg ? 'Flies a dog-leg and reaches' : 'Reaches'} the battery in{' '}
-            {formatIn(facts.timeToBatteryS)} ·{' '}
+            {facts.corridor ? (
+              facts.corridor.joinInS > 0 ? (
+                <>
+                  Joins the {facts.corridor.name} in {formatIn(facts.corridor.joinInS)} and flies it
+                  out of the area
+                </>
+              ) : (
+                <>Flies the {facts.corridor.name} out of the area</>
+              )
+            ) : (
+              <>
+                {dogLeg ? 'Flies a dog-leg and reaches' : 'Reaches'} the battery in{' '}
+                {formatIn(facts.timeToBatteryS ?? 0)}
+              </>
+            )}{' '}
+            ·{' '}
             {facts.firstSeenM === null ? (
               'the radar never sees it on this route'
             ) : (
-              <>the radar should see it from {formatKm(facts.firstSeenM)}</>
+              <>
+                {seenAtOnce
+                  ? 'the radar sees it at once'
+                  : `the radar should see it from ${formatKm(facts.firstSeenM)}`}
+              </>
             )}
           </p>
           {masked && facts.firstSeenM !== null && (

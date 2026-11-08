@@ -259,6 +259,16 @@ A hostile aircraft is only a threat if its course will bring it close to somethi
 
 [Going deeper →](docs/concepts/05-3-closest-point-of-approach.md)
 
+### Identification friend-or-foe — why silence is evidence, not proof
+
+The battery interrogates every confirmed track by radio: a friendly aircraft's transponder (a radio that replies on its own) answers, a civil one broadcasts its code, a hostile stays silent. A transponder can fail, so each silent check only makes "hostile" more likely, and it takes two in a row to declare it. What the track flies like adds evidence: silent and flying like a drone, a cruise missile or a jet, it is "suspect" at once; silent but flying like an airliner along a civil corridor, it is never called hostile on silence alone.
+
+- **Formula:** `odds(hostile after n silent checks) = odds(hostile before) × 10ⁿ`, because a hostile is always silent and a friend only on 1 check in 10
+- **Example:** starting from even odds, one silent check makes a track 10 to 1 hostile (91%) and two make it 100 to 1 (99%): there the battery declares it hostile.
+- **See it:** select any track: the inspector's "Classifier" line says what it flies like, and "Why?" counts its silent checks. The green lanes on the scope are the civil corridors.
+
+[Going deeper →](docs/concepts/05-4-identification-friend-or-foe.md)
+
 ### Engagement envelope — where the battery can reach
 
 An interceptor can only meet a target it can reach in time, before its motor's energy is spent and air drag has slowed it down. The set of places it can reach within its longest planned flight forms a dome over the battery: the engagement envelope. A threat outside it must wait until it flies in; a threat inside the 1.5 km minimum range is already too close.

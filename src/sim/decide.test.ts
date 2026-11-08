@@ -78,7 +78,8 @@ describe('Step 6: weapons control', () => {
       jetInbound(sim);
       return ofKind(sim.run(50 * 30), 'engagementAssigned')[0]?.timeS ?? Infinity;
     };
-    // FREE engages an 'unknown' (one silent check); TIGHT waits for 'hostile' (two).
+    // FREE engages a 'suspect' (one silent check, and it flies like a jet); TIGHT waits for
+    // 'hostile' (two).
     expect(assignedAt('TIGHT') - assignedAt('FREE')).toBeCloseTo(4, 6);
   });
 });

@@ -55,7 +55,12 @@ describe('describeEvent', () => {
         rangeM: 9_500,
       }),
     ).toEqual({ source: 'radar', text: 'New contact T3 at bearing 090°, 9.5 km.' });
-    const identified = (identity: 'hostile' | 'unknown' | 'friend', checks: number) =>
+    const identified = (
+      identity: 'hostile' | 'suspect' | 'unknown' | 'friend',
+      checks: number,
+      profile: 'fast' | 'aircraft' | 'airliner' | null = 'aircraft',
+      corridorId: number | null = null,
+    ) =>
       describeEvent({
         ...base,
         kind: 'identified',
@@ -63,12 +68,23 @@ describe('describeEvent', () => {
         identity,
         evidence: identity === 'friend' ? 'friendReply' : 'noReply',
         checks,
+        profile,
+        corridorId,
       }).text;
     expect(identified('unknown', 1)).toBe(
       'T3 is unknown: no answer to identification check 1. Checking again in 4 s.',
     );
+    expect(identified('suspect', 1, 'fast')).toBe(
+      'T3 is suspect: no answer to identification check 1, and it flies like a jet. Checking again in 4 s.',
+    );
+    expect(identified('unknown', 3, 'airliner', 1)).toBe(
+      'T3 is unknown: no answer to identification check 3, but it flies like an airliner along the North corridor, so silence alone does not make it hostile. Checking again in 4 s.',
+    );
     expect(identified('hostile', 2)).toBe(
       'T3 identified as hostile: no answer to 2 identification checks.',
+    );
+    expect(identified('hostile', 2, 'fast')).toBe(
+      'T3 identified as hostile: no answer to 2 identification checks, and it flies like a jet.',
     );
     expect(identified('friend', 1)).toBe(
       'T3 identified as friendly: it answered the identification check.',
@@ -167,7 +183,7 @@ describe('describeNow', () => {
     expect(at(5)).toBe('Radar sweeping, one turn every 4 s. 1 track: 1 unconfirmed.');
     expect(at(9)).toBe('Radar sweeping, one turn every 4 s. 1 track: 1 being identified.');
     expect(at(10.5)).toBe(
-      'Unknown T1 is heading for the battery (closest approach in 1:18): weapons TIGHT, so the battery waits for the next identification check.',
+      'Suspect T1 is heading for the battery (closest approach in 1:18): weapons TIGHT, so the battery waits for the next identification check.',
     );
     expect(at(14.5)).toBe('T1 assigned: launch in 1.2 s.');
     expect(at(20)).toMatch(/^Engaging T1: interceptor I1 in flight, intercept in \d+ s\.$/);

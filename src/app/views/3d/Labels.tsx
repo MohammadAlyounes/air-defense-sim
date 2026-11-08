@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber';
 import clsx from 'clsx';
 import { memo, useCallback, useRef, type ReactNode } from 'react';
-import { DEFAULT_ASSETS } from '../../../sim';
+import { corridorPoint, DEFAULT_ASSETS, DEFAULT_CORRIDORS } from '../../../sim';
 import { TRAFFIC_BY_ID } from '../../data/threatCatalog';
 import { formatAltitudeShort } from '../../lib/format';
 import { useSimController } from '../../sim/simContext';
@@ -9,13 +9,14 @@ import { useViewStore } from '../../view/viewStore';
 import { AFFILIATION_COLOR } from './aircraftModels';
 import { toScene } from './coords';
 import { interpolated, useAircraftRoster, type RosterEntry } from './frame';
-import { anchorLabel, projectLabels } from './labelAnchors';
+import { anchorLabel, LABEL_RANK, projectLabels, type LabelRank } from './labelAnchors';
 import {
   COMPASS_RADIUS_KM,
   RADAR_RANGE_KM,
   RING_LABEL_BEARING_RAD,
   RING_STEP_KM,
 } from './sceneConstants';
+import { groundSceneY } from './terrainGeometry';
 
 /** Inside the canvas: moves the labels after the camera and the aircraft have moved. */
 export function LabelProjector() {
@@ -24,9 +25,10 @@ export function LabelProjector() {
 }
 
 /**
- * Text over the 3D view: aircraft name tags, range ring distances and compass letters.
- * Mouse users can click a tag; keyboard and screen-reader users have the event log and the
- * inspector, so the layer is hidden from assistive technology.
+ * Text over the 3D view: aircraft name tags, defended assets, civil corridors, range ring
+ * distances and compass letters. Corridor names and ring distances step aside where an aircraft
+ * tag covers them. Mouse users can click a tag; keyboard and screen-reader users have the event
+ * log and the inspector, so the layer is hidden from assistive technology.
  */
 export function LabelLayer() {
   return (
@@ -55,16 +57,42 @@ const COMPASS = [
 function GroundLabels() {
   const sin = Math.sin(RING_LABEL_BEARING_RAD);
   const cos = Math.cos(RING_LABEL_BEARING_RAD);
+  const heightScale = useViewStore((state) => state.heightScale);
   return (
     <>
+      {DEFAULT_CORRIDORS.map((lane) => {
+        // On the ground below the lane's centreline, where it passes closest to the battery. A
+        // label up at the lane's floor would float over the middle of the map for the lane
+        // nearer the camera, as if the lane ran over the defended assets.
+        const at = corridorPoint(lane, 0, 0);
+        return (
+          <FixedLabel
+            key={`corridor-${lane.id}`}
+            x={at.x / 1000}
+            y={groundSceneY(at.x, at.y, heightScale) + 0.05}
+            z={-at.y / 1000}
+            rank={LABEL_RANK.feature}
+          >
+            <span className="rounded bg-ink-950/60 px-1 py-px font-mono text-[10px] text-neutral/90">
+              {lane.name} · {lane.floorM / 1000}–{lane.ceilingM / 1000} km
+            </span>
+          </FixedLabel>
+        );
+      })}
       {RINGS.map((radius) => (
-        <FixedLabel key={radius} x={radius * sin} y={0.05} z={-radius * cos}>
+        <FixedLabel
+          key={radius}
+          x={radius * sin}
+          y={0.05}
+          z={-radius * cos}
+          rank={LABEL_RANK.distance}
+        >
           <span className="font-mono text-[10px] text-ink-300/80">{radius} km</span>
         </FixedLabel>
       ))}
       {DEFAULT_ASSETS.filter((asset) => asset.id !== 0).map((asset) => (
         <FixedLabel key={asset.id} x={asset.position.x / 1000} y={0.6} z={-asset.position.y / 1000}>
-          <span className="rounded bg-ink-950/60 px-1 font-mono text-[10px] text-warn/90">
+          <span className="rounded bg-ink-950/60 px-1 py-px font-mono text-[10px] text-warn/90">
             {asset.name}
           </span>
         </FixedLabel>
@@ -78,26 +106,31 @@ function GroundLabels() {
   );
 }
 
-/** A label pinned to a fixed point of the scene, centred on it. */
+/** A label pinned to a fixed point of the scene, centred on it (see `LABEL_RANK`). */
 function FixedLabel({
   x,
   y,
   z,
+  rank = LABEL_RANK.always,
   children,
 }: {
   x: number;
   y: number;
   z: number;
+  rank?: LabelRank;
   children: ReactNode;
 }) {
   const anchor = useCallback(
     (element: HTMLDivElement | null) =>
-      element ? anchorLabel(element, (out) => !!out.set(x, y, z)) : undefined,
-    [x, y, z],
+      element ? anchorLabel(element, (out) => !!out.set(x, y, z), false, rank) : undefined,
+    [x, y, z, rank],
   );
   return (
     <div ref={anchor} className="invisible absolute top-0 left-0">
-      <div className="-translate-x-1/2 -translate-y-1/2 whitespace-nowrap">{children}</div>
+      {/* Flex and leading-none: the box is the text's own, for the label overlap test. */}
+      <div className="flex -translate-x-1/2 -translate-y-1/2 whitespace-nowrap leading-none">
+        {children}
+      </div>
     </div>
   );
 }

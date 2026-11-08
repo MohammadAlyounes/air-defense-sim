@@ -1,6 +1,19 @@
 /** Public API of the simulation core. The app imports from here, never from deeper files. */
+export {
+  CORRIDOR_HEADING_TOLERANCE_RAD,
+  corridorFlown,
+  corridorFrame,
+  corridorHalfLengthM,
+  corridorPoint,
+  corridorRoute,
+  DEFAULT_CORRIDORS,
+  fliesCorridor,
+  nearestCorridor,
+  type AirCorridor,
+} from './airspace';
 export { DEFAULT_ASSETS, nearestAsset, type DefendedAsset } from './assets';
 export {
+  assumedCivil,
   closestApproachTo,
   closestApproachToOrigin,
   DEFAULT_DEFENSE,
@@ -8,8 +21,10 @@ export {
   engageable,
   envelopeRangeM,
   evaluateThreat,
+  identityAfterSilence,
   killProbability,
   LAUNCHER_POSITION,
+  mayThreaten,
   planIntercept,
   predictIntercept,
   type DefenseConfig,
@@ -28,6 +43,18 @@ export {
   type AirState,
   type Atmosphere,
 } from './atmosphere';
+export {
+  AIRLINER_FROM_M,
+  AIRLINER_FROM_MPS,
+  FAST_FROM_MPS,
+  flightProfile,
+  LOW_BELOW_M,
+  LOW_FAST_FROM_MPS,
+  looksLikeThreat,
+  SLOW_BELOW_MPS,
+  THREAT_PROFILES,
+  type FlightProfile,
+} from './classify';
 export { FixedStepClock, TICK_HZ, TICK_S } from './core/clock';
 export {
   angleDiff,

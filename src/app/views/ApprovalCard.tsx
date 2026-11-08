@@ -1,8 +1,19 @@
 import { Crosshair, Hand } from 'lucide-react';
+import type { FlightProfile, Identity } from '../../sim';
 import { ConceptPopover } from '../components/ConceptPopover';
+import { PROFILE_TEXT } from '../sim/identityText';
 import { assetPhrase, formatIn, formatKm, trackName } from '../sim/narrator';
 import { useSimController, useSimState } from '../sim/simContext';
 import { useViewStore } from '../view/viewStore';
+
+/** What the battery knows about a proposed target, in a few words. */
+function evidence(identity: Identity, profile: FlightProfile | null): string {
+  if (identity === 'unknown') return 'unknown (no answer yet)';
+  if (identity === 'suspect') {
+    return `suspect (no answer yet, and it flies like ${profile ? PROFILE_TEXT[profile].like : 'a threat'})`;
+  }
+  return 'hostile (never answered)';
+}
 
 /**
  * SEMI mode: the system proposes each shot and waits. The card shows the oldest proposal with
@@ -42,8 +53,7 @@ export function ApprovalCard() {
         >
           {t}
         </button>{' '}
-        is{' '}
-        {proposal.identity === 'unknown' ? 'unknown (no answer yet)' : 'hostile (never answered)'}
+        is {evidence(proposal.identity, proposal.profile)}
         {proposal.assetId !== null && proposal.timeToClosestS !== null && (
           <>
             {' '}

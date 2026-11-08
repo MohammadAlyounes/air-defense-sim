@@ -2,9 +2,11 @@ import {
   bearingTo,
   CALM,
   coverageAt,
+  DEFAULT_CORRIDORS,
   DEFAULT_SEARCH_RADAR,
   detectionRangeM,
   dropRoute,
+  nearestCorridor,
   RADAR_CROSS_SECTION_M2,
   TRAFFIC,
   vec3,
@@ -73,20 +75,26 @@ export function stepAltitude(type: TrafficTypeId, altitudeM: number, notches: nu
   return Math.round(Math.min(max, Math.max(min, next)) / 10) * 10;
 }
 
-/** The command that places the traffic, flying straight at the battery. */
+/** Placed airliners join the nearest civil corridor; everything else heads for the battery. */
+const joinsCorridor = (type: TrafficTypeId) => type === 'airliner';
+
+/**
+ * The command that places the traffic: flying straight at the battery, or for an airliner
+ * with no heading at all, so the simulation sends it along the nearest civil corridor.
+ */
 export function spawnCommand(
   type: TrafficTypeId,
   at: GroundPoint,
   altitudeM: number,
 ): Extract<Command, { kind: 'spawnTraffic' }> {
-  return {
+  const command: Extract<Command, { kind: 'spawnTraffic' }> = {
     kind: 'spawnTraffic',
     type,
     eastM: Math.round(at.eastM),
     northM: Math.round(at.northM),
-    headingRad: headingToBattery(at),
     altitudeM,
   };
+  return joinsCorridor(type) ? command : { ...command, headingRad: headingToBattery(at) };
 }
 
 /** Where keyboard placement puts the n-th threat: 30 km out, a little further round each time. */
@@ -103,10 +111,14 @@ const aircraftTypeOf = (type: TrafficTypeId): AircraftType => (type === 'swarm' 
 
 /**
  * The ground waypoints the simulation will fly from `at`: straight at the battery, or for a
- * cruise-missile-like target a dog-leg (off to one side, then back in) when there is room.
+ * cruise-missile-like target a dog-leg (off to one side, then back in) when there is room. An
+ * airliner joins the nearest civil corridor at 45° and flies it out of the area.
  */
 export function placementRoute(type: TrafficTypeId, at: GroundPoint): Vec3[] {
-  return dropRoute(aircraftTypeOf(type), vec3(at.eastM, at.northM, 0), headingToBattery(at));
+  const start = vec3(at.eastM, at.northM, 0);
+  return joinsCorridor(type)
+    ? dropRoute(aircraftTypeOf(type), start, undefined, DEFAULT_CORRIDORS)
+    : dropRoute(aircraftTypeOf(type), start, headingToBattery(at));
 }
 
 /** Numbers for the placement readout. */
@@ -133,13 +145,26 @@ export function placementFacts(
       ? altitudeM
       : Math.max(altitudeM, ground + 150) - ground;
   };
+  const corridor = joinsCorridor(type)
+    ? nearestCorridor(DEFAULT_CORRIDORS, at.eastM, at.northM)
+    : null;
   return {
     rangeM: groundRangeOf(at),
     bearingRad: bearingOf(at),
-    /** The waypoints it will fly, ending at the battery. */
+    /** The waypoints it will fly: ending at the battery, or at the far end of its corridor. */
     route,
-    /** Time to reach the battery along its route, through this run's wind, s. */
-    timeToBatteryS: flightTimeS(start, route, performance.speedMps, wind, aglM),
+    /** Time to reach the battery along its route, through this run's wind, s (not for airliners). */
+    timeToBatteryS: corridor ? null : flightTimeS(start, route, performance.speedMps, wind, aglM),
+    /** The civil corridor a placed airliner joins, and the time until it joins it, s (0: on it). */
+    corridor: corridor
+      ? {
+          name: corridor.name,
+          joinInS:
+            route.length > 1
+              ? flightTimeS(start, route.slice(0, 1), performance.speedMps, wind, aglM)
+              : 0,
+        }
+      : null,
     /** Range at which the radar sees it on half of its looks, over open ground (the fourth-root law), m. */
     detectedFromM,
     /**

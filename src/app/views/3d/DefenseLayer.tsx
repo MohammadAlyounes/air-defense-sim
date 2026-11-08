@@ -1,10 +1,19 @@
 import { Line } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
-import type { Group, PerspectiveCamera } from 'three';
-import { DEFAULT_ASSETS, DEFAULT_DEFENSE, DEFAULT_INTERCEPTOR, envelopeRangeM } from '../../../sim';
+import { FrontSide, type Group, type PerspectiveCamera } from 'three';
+import {
+  corridorHalfLengthM,
+  corridorPoint,
+  DEFAULT_ASSETS,
+  DEFAULT_CORRIDORS,
+  DEFAULT_DEFENSE,
+  DEFAULT_INTERCEPTOR,
+  envelopeRangeM,
+} from '../../../sim';
 import { useViewStore } from '../../view/viewStore';
 import { SCENE_UNITS_PER_M, worldSizeForPixels } from './coords';
+import { RADAR_RANGE_KM } from './sceneConstants';
 import { groundSceneY } from './terrainGeometry';
 
 /** On-screen size of an asset marker, pixels. */
@@ -144,6 +153,75 @@ export function EnvelopeLayer() {
           opacity={0.35}
           depthWrite={false}
         />
+      ))}
+    </group>
+  );
+}
+
+/** Civil corridors are drawn in the civil (neutral) green. */
+const CORRIDOR_COLOR = '#4ade80';
+
+/**
+ * Civil air corridors: each lane as a faint box between its floor and ceiling (8 to 13 km up),
+ * with dashed edges, across the radar's coverage. Airliners fly inside them.
+ */
+export function CorridorLayer() {
+  const heightScale = useViewStore((state) => state.heightScale);
+  const lanes = useMemo(
+    () =>
+      DEFAULT_CORRIDORS.map((lane) => {
+        const half = corridorHalfLengthM(lane, RADAR_RANGE_KM * 1000);
+        const w = lane.halfWidthM;
+        const point = (alongM: number, acrossM: number, heightM: number) => {
+          const p = corridorPoint(lane, alongM, acrossM);
+          return [
+            p.x * SCENE_UNITS_PER_M,
+            heightM * SCENE_UNITS_PER_M * heightScale,
+            -p.y * SCENE_UNITS_PER_M,
+          ] as [number, number, number];
+        };
+        const edges = [lane.floorM, lane.ceilingM].flatMap((h) =>
+          [-w, w].map((across) => [point(-half, across, h), point(half, across, h)]),
+        );
+        const centre = point(0, 0, (lane.floorM + lane.ceilingM) / 2);
+        const size: [number, number, number] = [
+          2 * w * SCENE_UNITS_PER_M,
+          (lane.ceilingM - lane.floorM) * SCENE_UNITS_PER_M * heightScale,
+          2 * half * SCENE_UNITS_PER_M,
+        ];
+        return { id: lane.id, edges, centre, size, yaw: -lane.axisRad };
+      }),
+    [heightScale],
+  );
+  return (
+    <group>
+      {lanes.map((lane) => (
+        <group key={lane.id}>
+          <mesh position={lane.centre} rotation={[0, lane.yaw, 0]} renderOrder={1}>
+            <boxGeometry args={lane.size} />
+            <meshBasicMaterial
+              color={CORRIDOR_COLOR}
+              transparent
+              opacity={0.035}
+              depthWrite={false}
+              side={FrontSide}
+            />
+          </mesh>
+          {lane.edges.map((points, i) => (
+            <Line
+              key={i}
+              points={points}
+              color={CORRIDOR_COLOR}
+              lineWidth={1}
+              dashed
+              dashSize={0.8}
+              gapSize={0.6}
+              transparent
+              opacity={0.45}
+              depthWrite={false}
+            />
+          ))}
+        </group>
       ))}
     </group>
   );

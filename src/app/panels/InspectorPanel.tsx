@@ -60,6 +60,7 @@ export function InspectorPanel() {
       bodyClassName="overflow-y-auto"
       actions={
         <>
+          <ConceptPopover concept="identification" label="How the battery tells friend from foe" />
           <ConceptPopover
             concept="closestApproach"
             label="How the battery decides what is a threat"
@@ -200,6 +201,13 @@ function Details({ id }: { id: number }) {
           value={facts.radarView}
           detail={facts.radarViewDetail}
           tone={TONE[facts.radarViewTone]}
+          wide
+        />
+        <Fact
+          label="Classifier"
+          value={facts.profile}
+          detail={facts.profileDetail}
+          tone={TONE[facts.profileTone]}
           wide
         />
         {facts.why.length > 0 && (

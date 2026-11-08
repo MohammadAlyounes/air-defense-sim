@@ -32,8 +32,10 @@ import {
   type Track,
   type Vec3,
   type WindConfig,
+  looksLikeThreat,
 } from '../../sim';
 import { formatSpeed } from '../lib/format';
+import { assumedCivilReason, corridorName, IDENTITY_WORD, PROFILE_TEXT } from '../sim/identityText';
 import {
   compassPoint,
   formatBearing,
@@ -78,6 +80,10 @@ export interface AircraftFacts {
   /** The battery's track of it, if the radar has seen it. */
   track: string;
   trackDetail: string;
+  /** What the kinematic classifier says the track flies like, and the corridor it flies. */
+  profile: string;
+  profileDetail: string;
+  profileTone: FactTone;
   /** Truth vs. perception: how far the track is from the aircraft, and how far the filter expects. */
   trackError: string | null;
   trackErrorDetail: string;
@@ -91,14 +97,6 @@ export interface AircraftFacts {
 
 const grouped = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const seconds = (s: number) => `${s < 10 ? s.toFixed(1) : Math.round(s)} s`;
-
-const IDENTITY_WORD = {
-  pending: 'identifying',
-  unknown: 'unknown',
-  hostile: 'hostile',
-  friend: 'friendly',
-  neutral: 'civil',
-} as const;
 
 /**
  * Ground truth about aircraft `id` in plain units, plus what the battery knows about it (its
@@ -143,6 +141,7 @@ export function aircraftFacts(snapshot: Snapshot, id: number): AircraftFacts | n
       : `seen on half the looks from ${formatKm(
           detectionRangeM(RADAR_CROSS_SECTION_M2[aircraft.radarSize], DEFAULT_SEARCH_RADAR),
         )}`,
+    ...profileFacts(track),
     ...trackError(snapshot, track, position),
     why: track ? explain(snapshot, track) : [],
     ...defenseStatus(snapshot, id, aircraft.leaked),
@@ -157,6 +156,8 @@ export function explain(snapshot: Snapshot, track: Track): string[] {
   const lines: string[] = [];
   const checks = track.iffChecks;
   const plural = (n: number) => (n === 1 ? 'check' : 'checks');
+  const like = track.profile ? PROFILE_TEXT[track.profile].like : null;
+  const civil = assumedCivilReason(track.profile, track.corridorId);
   switch (track.identity) {
     case 'pending':
       lines.push(
@@ -167,12 +168,19 @@ export function explain(snapshot: Snapshot, track: Track): string[] {
       break;
     case 'unknown':
       lines.push(
-        `Unknown: no answer to ${checks} identification ${plural(checks)}. One more silent check and it is declared hostile.`,
+        civil
+          ? `Unknown: no answer to ${checks} identification ${plural(checks)}, but ${civil}: taken for an airliner whose code was not received, so silence alone does not make it hostile.`
+          : `Unknown: no answer to ${checks} identification ${plural(checks)}, and it flies like ${like ?? 'an ordinary aircraft'}. At the next silent check it is declared hostile.`,
+      );
+      break;
+    case 'suspect':
+      lines.push(
+        `Suspect: no answer to ${checks} identification ${plural(checks)}, and it flies like ${like ?? 'a threat'}, which no civil or friendly aircraft here does. At the next silent check it is declared hostile.`,
       );
       break;
     case 'hostile':
       lines.push(
-        `Hostile: no answer to ${checks} identification ${plural(checks)}. A friendly aircraft answers 90% of checks; a civil one broadcasts its code.`,
+        `Hostile: no answer to ${checks} identification ${plural(checks)}${like && looksLikeThreat(track.profile) ? `, and it flies like ${like}` : ''}. A friendly aircraft answers 90% of checks; a civil one broadcasts its code.`,
       );
       break;
     case 'friend':
@@ -202,9 +210,14 @@ export function explain(snapshot: Snapshot, track: Track): string[] {
     lines.push('Rules: weapons are on HOLD, so the battery does not fire.');
     return lines;
   }
-  if (track.identity === 'unknown' && weaponsControl === 'TIGHT') {
+  if (
+    (track.identity === 'unknown' || track.identity === 'suspect') &&
+    weaponsControl === 'TIGHT'
+  ) {
     lines.push(
-      'Rules: weapons TIGHT allow firing at hostile tracks only, so it waits for the next check.',
+      civil
+        ? 'Rules: weapons TIGHT allow firing at hostile tracks only, and an airliner flying a corridor is not called hostile on silence alone.'
+        : 'Rules: weapons TIGHT allow firing at hostile tracks only, so it waits for the next check.',
     );
     return lines;
   }
@@ -242,6 +255,29 @@ export function explain(snapshot: Snapshot, track: Track): string[] {
       : 'Out of reach for now: an interceptor launched now could not meet it within 34 s, or only inside the 1.5 km minimum range.',
   );
   return lines;
+}
+
+/**
+ * The kinematic classifier's verdict on the track: what it flies like, from its filtered speed
+ * and height (perception, not truth), and the civil corridor it flies, if any.
+ */
+function profileFacts(
+  track: Track | undefined,
+): Pick<AircraftFacts, 'profile' | 'profileDetail' | 'profileTone'> {
+  if (!track?.profile) {
+    return {
+      profile: 'Not classified',
+      profileDetail: track ? 'needs a second echo for its speed' : 'not detected yet',
+      profileTone: 'plain',
+    };
+  }
+  const { like, rule } = PROFILE_TEXT[track.profile];
+  const lane = corridorName(track.corridorId);
+  return {
+    profile: `Flies like ${like}${lane ? ` · ${lane}` : ''}`,
+    profileDetail: lane ? `${rule} · inside the lane, along it` : rule,
+    profileTone: looksLikeThreat(track.profile) ? 'warn' : lane ? 'ok' : 'plain',
+  };
 }
 
 /** The gap between the track and the truth, next to the filter's own estimate of it. */

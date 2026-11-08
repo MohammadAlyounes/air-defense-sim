@@ -41,7 +41,7 @@ describe('parseConceptCard', () => {
       import: 'default',
       eager: true,
     });
-    expect(Object.keys(files).length).toBeGreaterThanOrEqual(21);
+    expect(Object.keys(files).length).toBeGreaterThanOrEqual(22);
     for (const markdown of [
       fixedTimeStep,
       antennaRotation,
