@@ -1,4 +1,4 @@
-import { EXPONENTIAL_ATMOSPHERE } from './atmosphere';
+import { STANDARD_ATMOSPHERE } from './atmosphere';
 import { DEFAULT_ASSETS, type DefendedAsset } from './assets';
 import {
   DEFAULT_DEFENSE,
@@ -1123,7 +1123,7 @@ export class Simulation {
         const targetEnd = add(targetStart, scale(target.velocity, dt));
         const aimVel = guideVel ?? target.velocity;
         const aim = add(guideFrom ?? target.position, scale(aimVel, k * dt));
-        const next = stepMissile(state, flightS, aim, aimVel, dt, config, EXPONENTIAL_ATMOSPHERE);
+        const next = stepMissile(state, flightS, aim, aimVel, dt, config, STANDARD_ATMOSPHERE);
         if (flightS + dt >= config.armAfterS) {
           const pass = closestApproach(
             sub(targetStart, state.position),

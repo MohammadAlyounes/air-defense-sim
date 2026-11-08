@@ -1,4 +1,4 @@
-import { EXPONENTIAL_ATMOSPHERE, SEA_LEVEL_DENSITY_KGM3, type Atmosphere } from './atmosphere';
+import { SEA_LEVEL_DENSITY_KGM3, STANDARD_ATMOSPHERE, type Atmosphere } from './atmosphere';
 import { add, cross, dot, length, normalize, scale, sub, vec3, type Vec3 } from './core/vec';
 
 /**
@@ -136,7 +136,7 @@ export function stepMissile(
   targetVel: Vec3,
   dt: number,
   config: InterceptorConfig,
-  atmosphere: Atmosphere = EXPONENTIAL_ATMOSPHERE,
+  atmosphere: Atmosphere = STANDARD_ATMOSPHERE,
 ): MissileState {
   const steer = guidanceAcceleration(
     missile.position,

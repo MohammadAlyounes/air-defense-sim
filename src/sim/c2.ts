@@ -1,4 +1,4 @@
-import { EXPONENTIAL_ATMOSPHERE, type Atmosphere } from './atmosphere';
+import { STANDARD_ATMOSPHERE, type Atmosphere } from './atmosphere';
 import { add, distance, dot, scale, vec3, type Vec3 } from './core/vec';
 import { reachM, speedAfterMps, type InterceptorConfig } from './interceptor';
 import { trackPositionAt } from './tracker';
@@ -216,7 +216,7 @@ export function planIntercept(
   tick: number,
   defense: DefenseConfig,
   interceptor: InterceptorConfig,
-  atmosphere: Atmosphere = EXPONENTIAL_ATMOSPHERE,
+  atmosphere: Atmosphere = STANDARD_ATMOSPHERE,
 ): Intercept | null {
   if (!track.velocity) return null;
   const position = trackPositionAt(track, tick);
@@ -246,7 +246,7 @@ export function envelopeRangeM(
   altitudeM: number,
   defense: DefenseConfig,
   interceptor: InterceptorConfig,
-  atmosphere: Atmosphere = EXPONENTIAL_ATMOSPHERE,
+  atmosphere: Atmosphere = STANDARD_ATMOSPHERE,
 ): number {
   const density = atmosphere.densityKgM3(Math.max(0, altitudeM) / 2);
   const reach =
