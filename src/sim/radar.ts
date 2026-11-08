@@ -120,7 +120,19 @@ export function antennaAzimuth(timeS: number, periodS: number): number {
  * `toRad` (included). Handles the jump from 359° back to 0°.
  */
 export function sweptOver(fromRad: number, toRad: number, bearingRad: number): boolean {
-  const span = (((toRad - fromRad) % TWO_PI) + TWO_PI) % TWO_PI;
-  const offset = (((bearingRad - fromRad) % TWO_PI) + TWO_PI) % TWO_PI;
-  return offset > 0 && offset <= span;
+  // Plain comparisons, no subtraction: neighbouring ticks share the exact same edge value, so
+  // every bearing falls in exactly one tick's arc. (Subtracting first, as in (b − from) mod 2π,
+  // can round a 1e-16 difference to 0 or to the whole span, so a target one rounding step from
+  // an edge could be painted twice, or never.)
+  const from = normalizeAngle(fromRad);
+  const to = normalizeAngle(toRad);
+  const b = normalizeAngle(bearingRad);
+  return from <= to ? from < b && b <= to : b > from || b <= to;
+}
+
+/** An angle brought into [0, 2π). */
+function normalizeAngle(rad: number): number {
+  if (rad >= 0 && rad < TWO_PI) return rad;
+  const a = rad - TWO_PI * Math.floor(rad / TWO_PI);
+  return a >= TWO_PI ? 0 : a;
 }
