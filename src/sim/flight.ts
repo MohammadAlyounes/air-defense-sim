@@ -146,6 +146,28 @@ export function bearingTo(from: Vec3, to: Vec3): number {
   return b < 0 ? b + TWO_PI : b;
 }
 
+/**
+ * Is `point` inside the circle an aircraft at `position`, flying along `trackRad`, would fly
+ * turning toward it at radius `radiusM`? Such a point cannot be reached by turning: the
+ * aircraft would circle it for ever. It has to fly on until the point falls outside the circle.
+ */
+export function insideTurnCircle(
+  position: Vec3,
+  trackRad: number,
+  point: Vec3,
+  radiusM: number,
+): boolean {
+  if (!Number.isFinite(radiusM)) return false;
+  const along = headingVector(trackRad);
+  const right = vec3(along.y, -along.x, 0);
+  const dx = point.x - position.x;
+  const dy = point.y - position.y;
+  const side = dx * right.x + dy * right.y >= 0 ? 1 : -1;
+  const cx = position.x + right.x * radiusM * side;
+  const cy = position.y + right.y * radiusM * side;
+  return Math.hypot(point.x - cx, point.y - cy) < radiusM;
+}
+
 /** `fromRad` turned toward `toRad` by at most `maxStepRad`, in [0, 2π). */
 export function turnToward(fromRad: number, toRad: number, maxStepRad: number): number {
   const d = angleDiff(toRad, fromRad);

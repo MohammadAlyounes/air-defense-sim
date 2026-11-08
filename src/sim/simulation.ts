@@ -43,6 +43,7 @@ import {
   breakTrack,
   CALM,
   dropRoute,
+  insideTurnCircle,
   routineLoadFactor,
   turnRadiusM,
   turnRateRadS,
@@ -71,7 +72,7 @@ import {
 } from './scenario';
 import { createTerrain, flatTerrain, type Terrain, type TerrainConfig } from './terrain';
 import {
-  associate,
+  associateWithManeuvers,
   DEFAULT_TRACKER,
   plotCovariance,
   positionOf,
@@ -543,12 +544,15 @@ export class Simulation {
         // Start the turn onto the next leg early, so it ends on the leg rather than past it.
         const turnAhead = next ? Math.abs(angleDiff(bearingTo(waypoint, next), toWaypoint)) : 0;
         const lead = Number.isFinite(radius) ? radius * Math.tan(Math.min(turnAhead, 2) / 2) : 0;
-        const behind = Math.abs(angleDiff(toWaypoint, a.trackRad)) > Math.PI / 2;
-        if (distanceM <= Math.max(lead, WAYPOINT_REACHED_M) || (behind && distanceM < 2 * radius)) {
+        // A waypoint inside the turn circle cannot be reached by turning (after an evasive break,
+        // say). A turn point is then given up; the last waypoint, its aim, is flown on from
+        // until it can turn back in.
+        const unreachable = insideTurnCircle(a.position, a.trackRad, waypoint, radius);
+        if (distanceM <= Math.max(lead, WAYPOINT_REACHED_M) || (unreachable && next)) {
           route = route.slice(1);
           continue;
         }
-        desired = toWaypoint;
+        if (!unreachable) desired = toWaypoint;
         break;
       }
     }
@@ -772,16 +776,18 @@ export class Simulation {
     const batch = this.pendingPlots;
     const batchCovariances = batch.map((plot) => plotCovariance(plot, this.antenna, this.radar));
     // Gating and nearest-neighbour association: the tracker sees only the measurements.
-    const batchOwners = associate(
+    const { owners: batchOwners, maneuvers: batchManeuvers } = associateWithManeuvers(
       batch,
       batchCovariances,
       this.tracks,
       ticks(this.radar.periodS / 2),
       this.tracker,
     );
-    const committed = batch.filter((plot) => plot.tick <= commitTick);
-    const covariances = batchCovariances.filter((_, i) => (batch[i]?.tick ?? 0) <= commitTick);
-    const owners = batchOwners.filter((_, i) => (batch[i]?.tick ?? 0) <= commitTick);
+    const isCommitted = (_: unknown, i: number) => (batch[i]?.tick ?? 0) <= commitTick;
+    const committed = batch.filter(isCommitted);
+    const covariances = batchCovariances.filter(isCommitted);
+    const owners = batchOwners.filter(isCommitted);
+    const maneuvers = batchManeuvers.filter(isCommitted);
     this.pendingPlots = batch.filter((plot) => plot.tick > commitTick);
 
     committed.forEach((plot, p) => {
@@ -799,6 +805,7 @@ export class Simulation {
           lastPaintTick: plot.tick,
           position: positionOf(estimate),
           velocity: null,
+          maneuvering: false,
           estimate,
           confirmedTick: null,
           identity: 'pending',
@@ -824,9 +831,11 @@ export class Simulation {
       }
 
       // The Kalman filter blends the new echo into the track's estimate.
-      const estimate = updateEstimate(track, plot, R, this.tracker);
+      const maneuvering = maneuvers[p] ?? false;
+      const estimate = updateEstimate(track, plot, R, this.tracker, maneuvering);
       const updated: Track = {
         ...track,
+        maneuvering,
         truthId: plot.truthId,
         paints: track.paints + 1,
         lastPaintTick: plot.tick,

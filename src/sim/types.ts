@@ -104,6 +104,8 @@ export interface Track {
   position: Vec3;
   /** Filtered velocity; null until the second echo confirms the track. */
   velocity: Vec3 | null;
+  /** The last echo only fitted through the maneuver gate: the target is turning hard. */
+  maneuvering: boolean;
   /** The Kalman filter's state and covariance at the last echo. */
   estimate: KalmanState;
   confirmedTick: number | null;
