@@ -5,6 +5,8 @@ import {
   coverageMap,
   curvatureDropM,
   EFFECTIVE_EARTH_RADIUS_M,
+  groundLit,
+  inClutter,
   lineOfSight,
   radarHorizonM,
 } from './propagation';
@@ -87,6 +89,59 @@ describe('terrain masking', () => {
         }
       }
     }
+    expect(agree / total).toBeGreaterThan(0.95);
+  });
+});
+
+describe('ground clutter', () => {
+  const antenna = vec3(0, 0, 12);
+
+  it("lights flat ground out to the antenna's own horizon: 14.3 km from a 12 m mast", () => {
+    expect(radarHorizonM(12, 0)).toBeCloseTo(14_278, -1);
+    expect(groundLit(flatTerrain(), antenna, 0, 10_000)).toBe(true);
+    expect(groundLit(flatTerrain(), antenna, 10_000, 10_000)).toBe(true);
+    expect(groundLit(flatTerrain(), antenna, 0, 14_000)).toBe(true);
+    expect(groundLit(flatTerrain(), antenna, 0, 14_500)).toBe(false);
+  });
+
+  it('lights the ground in front of a ridge and its top, but not the ground in its shadow', () => {
+    expect(groundLit(wall(), antenna, 8_000, 0)).toBe(true);
+    expect(groundLit(wall(), antenna, 10_000, 0)).toBe(true);
+    expect(groundLit(wall(), antenna, 12_000, 0)).toBe(false);
+    // Beside the ridge, the flat ground is lit as usual.
+    expect(groundLit(wall(), antenna, -12_000, 0)).toBe(true);
+  });
+
+  it('puts a target in clutter when lit ground lies at its distance on the same bearing', () => {
+    const flat = flatTerrain();
+    // Low, 6 km out: the ground below it is lit.
+    expect(inClutter(flat, antenna, vec3(0, 6_000, 300))).toBe(true);
+    // 3 km up, 12 km out: 12.4 km away, where the ground is still lit.
+    expect(inClutter(flat, antenna, vec3(0, 12_000, 3_000))).toBe(true);
+    // 10 km up, 12 km out: 15.6 km away, where the ground is below the horizon.
+    expect(inClutter(flat, antenna, vec3(0, 12_000, 10_000))).toBe(false);
+    // Low, far out: no lit ground either.
+    expect(inClutter(flat, antenna, vec3(0, 20_000, 50))).toBe(false);
+    expect(inClutter(flat, antenna, vec3(0, 0, 2_000))).toBe(true);
+  });
+
+  it('agrees with the coverage map, where the lowest visible height is the ground itself', () => {
+    const terrain = createTerrain();
+    const map = coverageMap(terrain, 12, 40_000);
+    let agree = 0;
+    let total = 0;
+    for (let b = 0; b < 360; b += 5) {
+      for (const r of [3_000, 6_000, 10_000, 14_000, 20_000, 30_000]) {
+        const east = r * Math.sin((b * Math.PI) / 180);
+        const north = r * Math.cos((b * Math.PI) / 180);
+        const minAgl = coverageAt(map, east, north);
+        // Only clear cases: lit, or in a shadow deeper than 20 m.
+        if (minAgl > 0.5 && minAgl < 20) continue;
+        total++;
+        if (groundLit(terrain, vec3(0, 0, 12), east, north) === minAgl <= 0.5) agree++;
+      }
+    }
+    expect(total).toBeGreaterThan(200);
     expect(agree / total).toBeGreaterThan(0.95);
   });
 });

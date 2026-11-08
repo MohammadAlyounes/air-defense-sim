@@ -52,11 +52,13 @@ import {
   windVelocityAt,
   type WindConfig,
 } from './flight';
-import { lineOfSight } from './propagation';
+import { inClutter, lineOfSight } from './propagation';
 import {
   antennaAzimuth,
   DEFAULT_SEARCH_RADAR,
+  closingSpeedMps,
   falseAlarmsPerTurn,
+  inDopplerNotch,
   lookProbability,
   sweptOver,
   type SearchRadarConfig,
@@ -668,8 +670,10 @@ export class Simulation {
   /**
    * Paints the aircraft the beam swept past during this tick. Each needs a clear line of sight
    * (not below the radar horizon, not behind a hill), and then is detected with the probability
-   * its signal-to-noise ratio gives. Every echo is measured with noise. Now and then noise alone
-   * crosses the threshold somewhere in the swept arc: a false alarm.
+   * its signal-to-noise ratio gives, unless its echo arrives with the echo of lit ground while it
+   * closes or opens too slowly to stand out from it by its Doppler shift. Every echo is
+   * measured with noise. Now and then noise alone crosses the threshold somewhere in the swept
+   * arc: a false alarm.
    */
   private sweep(tick: number): Plot[] {
     const from = antennaAzimuth((tick - 1) * TICK_S, this.radar.periodS);
@@ -681,6 +685,14 @@ export class Simulation {
       if (rangeM < 1 || rangeM > this.radar.rangeM) return a;
       if (!sweptOver(from, to, bearing(a.position))) return a;
       if (lineOfSight(this.terrain, this.antenna, a.position) !== 'visible') return a;
+      // Where the ground echo arrives with it, the Doppler filter that removes the clutter also
+      // removes an echo as slow as the ground's.
+      if (
+        inDopplerNotch(closingSpeedMps(this.antenna, a.position, a.velocity), this.radar) &&
+        inClutter(this.terrain, this.antenna, a.position)
+      ) {
+        return a;
+      }
       const pd = lookProbability(
         RADAR_CROSS_SECTION_M2[a.radarSize],
         distance(this.antenna, a.position),

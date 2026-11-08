@@ -59,6 +59,8 @@ export {
   coverageMap,
   curvatureDropM,
   EFFECTIVE_EARTH_RADIUS_M,
+  groundLit,
+  inClutter,
   lineOfSight,
   radarHorizonM,
   type CoverageMap,
@@ -66,11 +68,14 @@ export {
 } from './propagation';
 export {
   antennaAzimuth,
+  closingSpeedMps,
   DEFAULT_SEARCH_RADAR,
   detectionProbability,
   detectionRangeM,
+  dopplerShiftHz,
   falseAlarmsPerTurn,
   IDEAL_SEARCH_RADAR,
+  inDopplerNotch,
   lookProbability,
   signalToNoise,
   type DetectionModel,
