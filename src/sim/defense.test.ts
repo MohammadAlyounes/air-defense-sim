@@ -13,6 +13,8 @@ const emptySky = (extra: Partial<SimConfig> = {}) =>
     autoTraffic: false,
     terrain: false,
     radar: IDEAL_SEARCH_RADAR,
+    wind: false,
+    evasiveTurns: false,
     ...extra,
     interceptor: { certainKill: true, ...extra.interceptor },
   });

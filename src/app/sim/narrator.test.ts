@@ -136,6 +136,8 @@ describe('describeNow', () => {
       autoTraffic: false,
       terrain: false,
       radar: IDEAL_SEARCH_RADAR,
+      wind: false,
+      evasiveTurns: false,
       interceptor: { certainKill: true },
     });
     sim.dispatch({

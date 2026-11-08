@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { TICK_S } from './core/clock';
 import { distance, vec3 } from './core/vec';
+import {
+  angleDiff,
+  CALM,
+  dropRoute,
+  loadFactorForBank,
+  turnRateRadS,
+  windFromSeed,
+  windSpeedAt,
+} from './flight';
 import { IDEAL_SEARCH_RADAR } from './radar';
 import { Simulation } from './simulation';
 import { createTerrain, flatTerrain, type Terrain } from './terrain';
@@ -204,5 +214,143 @@ describe('Step 4 world: the full loop', () => {
     sim.run(50 * 60);
     const replayed = Simulation.replay({ seed: 77 }, sim.commandLog(), sim.tick);
     expect(replayed.stateHash()).toBe(sim.stateHash());
+  });
+});
+
+describe('Step 4 world: wind, routes and evasive turns', () => {
+  /** Flies the sim `seconds` on, sampling every aircraft's track every `every` ticks. */
+  function tracksOf(sim: Simulation, seconds: number, every = 5) {
+    const samples: { id: number; trackRad: number; x: number; y: number }[][] = [];
+    for (let t = 0; t < seconds / TICK_S / every; t++) {
+      sim.run(every);
+      samples.push(
+        sim.snapshot().aircraft.map((a) => ({
+          id: a.id,
+          trackRad: a.trackRad,
+          x: a.position.x,
+          y: a.position.y,
+        })),
+      );
+    }
+    return samples;
+  }
+
+  /** The largest change of track between two samples, for aircraft `id`. */
+  function sharpestTurn(samples: ReturnType<typeof tracksOf>, id: number): number {
+    let sharpest = 0;
+    for (let i = 1; i < samples.length; i++) {
+      const before = samples[i - 1]?.find((a) => a.id === id);
+      const after = samples[i]?.find((a) => a.id === id);
+      if (before && after) {
+        sharpest = Math.max(sharpest, Math.abs(angleDiff(after.trackRad, before.trackRad)));
+      }
+    }
+    return sharpest;
+  }
+
+  it('flies a cruise-missile-like target round its dog-leg, turning no tighter than its bank allows', () => {
+    const sim = new Simulation({
+      seed: 5,
+      autoTraffic: false,
+      terrain: false,
+      wind: false,
+      evasiveTurns: false,
+    });
+    sim.dispatch({ kind: 'setRules', rules: { weaponsControl: 'HOLD' } });
+    const start = vec3(0, 38_000, 0);
+    sim.dispatch({
+      kind: 'spawnTraffic',
+      type: 'cruise',
+      eastM: 0,
+      northM: 38_000,
+      headingRad: Math.PI,
+    });
+    const turnPoint = dropRoute('cruise', start, Math.PI)[0] ?? start;
+    const samples = tracksOf(sim, 185);
+    const path = samples.map((s) => s[0]).filter((a) => a !== undefined);
+    // It passes close by the turn point (cutting the corner by a few hundred metres)...
+    const nearest = Math.min(...path.map((a) => Math.hypot(a.x - turnPoint.x, a.y - turnPoint.y)));
+    expect(nearest).toBeLessThan(1_000);
+    // ...and then comes back in to the battery.
+    const closest = Math.min(...path.map((a) => Math.hypot(a.x, a.y)));
+    expect(closest).toBeLessThan(500);
+    // It never turns faster than a 45° bank allows: 0.041 rad/s at 240 m/s.
+    const maxRate = turnRateRadS(240, loadFactorForBank(45));
+    expect(sharpestTurn(samples, 1)).toBeLessThanOrEqual(maxRate * 5 * TICK_S + 1e-9);
+    expect(sharpestTurn(samples, 1)).toBeGreaterThan(0.9 * maxRate * 5 * TICK_S);
+  });
+
+  it('breaks hard away once an interceptor closes on a fast jet, once per interceptor', () => {
+    const run = (evasiveTurns: boolean) => {
+      const sim = new Simulation({ seed: 2026, autoTraffic: false, evasiveTurns });
+      sim.dispatch({
+        kind: 'spawnTraffic',
+        type: 'jet',
+        eastM: 0,
+        northM: 30_000,
+        headingRad: Math.PI,
+      });
+      const events: SimEvent[] = [];
+      const samples: ReturnType<typeof tracksOf> = [];
+      for (let s = 0; s < 90 * 10; s++) {
+        events.push(...sim.run(5));
+        samples.push(
+          sim.snapshot().aircraft.map((a) => ({
+            id: a.id,
+            trackRad: a.trackRad,
+            x: a.position.x,
+            y: a.position.y,
+          })),
+        );
+      }
+      return { events, samples };
+    };
+    const { events, samples } = run(true);
+    const breaks = ofKind(events, 'evasiveTurn');
+    const launched = ofKind(events, 'interceptorLaunched').map((e) => e.interceptorId);
+    expect(breaks.length).toBeGreaterThanOrEqual(1);
+    for (const b of breaks) {
+      expect(b.loadFactor).toBe(6);
+      expect(launched).toContain(b.interceptorId);
+    }
+    expect(new Set(breaks.map((b) => b.interceptorId)).size).toBe(breaks.length);
+    // In the break it pulls far more than its routine 2 g, but never more than 6 g.
+    const sharpest = sharpestTurn(samples, 1);
+    expect(sharpest).toBeGreaterThan(2 * turnRateRadS(340, 2) * 5 * TICK_S);
+    expect(sharpest).toBeLessThanOrEqual(turnRateRadS(340, 6) * 5 * TICK_S + 1e-9);
+    // Without evasive turns it flies its route at the routine bank and never breaks.
+    expect(ofKind(run(false).events, 'evasiveTurn')).toHaveLength(0);
+  });
+
+  it('flies slower over the ground into a headwind, faster downwind, and crabs in a crosswind', () => {
+    // A north wind of 8 m/s at 10 m: at a drone's 300 m it is 8 × 30^(1/7) = 13 m/s.
+    const wind = { speedMps: 8, fromRad: 0 };
+    const sim = new Simulation({ seed: 1, autoTraffic: false, terrain: false, wind });
+    sim.dispatch({ kind: 'setRules', rules: { weaponsControl: 'HOLD' } });
+    const spawn = (eastM: number, northM: number, headingRad: number) =>
+      sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM, northM, headingRad });
+    spawn(0, 20_000, Math.PI); // flying south, downwind
+    spawn(0, -20_000, 0); // flying north, into the wind
+    spawn(-20_000, 5_000, Math.PI / 2); // flying east, across it
+    sim.run(50 * 5);
+    const w = windSpeedAt(wind, 300);
+    const [downwind, upwind, across] = sim.snapshot().aircraft;
+    const speed = (v: { x: number; y: number }) => Math.hypot(v.x, v.y);
+    expect(speed(downwind?.velocity ?? vec3(0, 0, 0))).toBeCloseTo(40 + w, 6);
+    expect(speed(upwind?.velocity ?? vec3(0, 0, 0))).toBeCloseTo(40 - w, 6);
+    // Across the wind it holds its track east, nose turned north into the wind.
+    expect(across?.velocity.y ?? 1).toBeCloseTo(0, 6);
+    expect(angleDiff(across?.headingRad ?? 0, Math.PI / 2)).toBeCloseTo(-Math.asin(w / 40), 6);
+  });
+
+  it("draws each run's wind from its seed without changing anything else in the run", () => {
+    const windy = new Simulation({ seed: 9 });
+    const calm = new Simulation({ seed: 9, wind: false });
+    expect(windy.snapshot().wind).toEqual(windFromSeed(9));
+    expect(calm.snapshot().wind).toEqual(CALM);
+    const where = (sim: Simulation) =>
+      sim.snapshot().aircraft.map((a) => [a.type, a.position.x, a.position.y, a.trackRad]);
+    expect(where(windy)).toEqual(where(calm));
+    expect(where(windy).length).toBeGreaterThan(0);
   });
 });

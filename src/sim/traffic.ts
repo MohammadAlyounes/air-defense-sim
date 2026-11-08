@@ -28,7 +28,7 @@ export type AltitudeReference = 'AGL' | 'MSL';
 export interface TrafficPerformance {
   id: TrafficTypeId;
   affiliation: Affiliation;
-  /** Typical cruise speed, m/s. */
+  /** Typical cruise airspeed (its speed through the air; the wind adds to it), m/s. */
   speedMps: number;
   /** Typical flight altitude, m. */
   altitudeM: number;
@@ -38,6 +38,15 @@ export interface TrafficPerformance {
   count: number;
   /** Fastest climb or descent, used to follow the terrain, m/s. */
   climbMps: number;
+  /** Bank angle of its routine turns, degrees: the steeper, the tighter it turns. */
+  bankDeg: number;
+  /**
+   * Load factor (g) of the evasive break turn it pulls when an interceptor closes in, or 0 if it
+   * does not break away.
+   */
+  breakLoadFactor: number;
+  /** True if it flies a dog-leg route: off to one side first, then in to its target. */
+  dogLeg: boolean;
 }
 
 export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
@@ -50,6 +59,9 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     radarSize: 'tiny',
     count: 1,
     climbMps: 8,
+    bankDeg: 35,
+    breakLoadFactor: 0,
+    dogLeg: false,
   },
   swarm: {
     id: 'swarm',
@@ -60,6 +72,9 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     radarSize: 'tiny',
     count: 6,
     climbMps: 8,
+    bankDeg: 35,
+    breakLoadFactor: 0,
+    dogLeg: false,
   },
   cruise: {
     id: 'cruise',
@@ -70,6 +85,9 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     radarSize: 'small',
     count: 1,
     climbMps: 60,
+    bankDeg: 45,
+    breakLoadFactor: 0,
+    dogLeg: true,
   },
   jet: {
     id: 'jet',
@@ -80,6 +98,9 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     radarSize: 'medium',
     count: 1,
     climbMps: 150,
+    bankDeg: 60,
+    breakLoadFactor: 6,
+    dogLeg: false,
   },
   friendly: {
     id: 'friendly',
@@ -90,6 +111,9 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     radarSize: 'medium',
     count: 1,
     climbMps: 30,
+    bankDeg: 30,
+    breakLoadFactor: 0,
+    dogLeg: false,
   },
   airliner: {
     id: 'airliner',
@@ -100,6 +124,9 @@ export const TRAFFIC: Readonly<Record<TrafficTypeId, TrafficPerformance>> = {
     radarSize: 'large',
     count: 1,
     climbMps: 15,
+    bankDeg: 25,
+    breakLoadFactor: 0,
+    dogLeg: false,
   },
 };
 

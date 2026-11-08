@@ -3,7 +3,14 @@ import { Simulation, IDEAL_SEARCH_RADAR } from '../../sim';
 import { aircraftFacts } from './aircraftFacts';
 
 function jetFlyingAt(
-  sim = new Simulation({ seed: 1, autoTraffic: false, terrain: false, radar: IDEAL_SEARCH_RADAR }),
+  sim = new Simulation({
+    seed: 1,
+    autoTraffic: false,
+    terrain: false,
+    radar: IDEAL_SEARCH_RADAR,
+    wind: false,
+    evasiveTurns: false,
+  }),
 ) {
   sim.dispatch({ kind: 'spawnTraffic', type: 'jet', eastM: 0, northM: -30_000, headingRad: 0 });
   return sim;
@@ -52,6 +59,8 @@ describe('aircraftFacts', () => {
       autoTraffic: false,
       terrain: false,
       radar: IDEAL_SEARCH_RADAR,
+      wind: false,
+      evasiveTurns: false,
       interceptor: { certainKill: true },
     });
     sim.dispatch({

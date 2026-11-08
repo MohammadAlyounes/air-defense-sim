@@ -29,6 +29,28 @@ export {
   type Atmosphere,
 } from './atmosphere';
 export { FixedStepClock, TICK_HZ, TICK_S } from './core/clock';
+export {
+  angleDiff,
+  bearingTo,
+  BREAK_HOLD_S,
+  BREAK_RANGE_M,
+  CALM,
+  dropRoute,
+  dropSide,
+  GRAVITY_MPS2,
+  loadFactorForBank,
+  routeLengthM,
+  routineLoadFactor,
+  turnRadiusM,
+  turnRateRadS,
+  windFromSeed,
+  windSpeedAt,
+  windTriangle,
+  windVelocityAt,
+  WIND_SPEED_RANGE_MPS,
+  type WindConfig,
+  type WindTriangle,
+} from './flight';
 export { Rng, type RngState } from './core/rng';
 export { bearing, distance, groundRange, vec3, type Vec3 } from './core/vec';
 export { DEFAULT_INTERCEPTOR, reachM, speedAfterMps, type InterceptorConfig } from './interceptor';
