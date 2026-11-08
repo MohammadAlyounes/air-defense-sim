@@ -23,6 +23,9 @@ export {
   EXPONENTIAL_ATMOSPHERE,
   SCALE_HEIGHT_M,
   SEA_LEVEL_DENSITY_KGM3,
+  STANDARD_ATMOSPHERE,
+  standardAtmosphere,
+  type AirState,
   type Atmosphere,
 } from './atmosphere';
 export { FixedStepClock, TICK_HZ, TICK_S } from './core/clock';
