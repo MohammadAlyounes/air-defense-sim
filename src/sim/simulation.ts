@@ -1,4 +1,4 @@
-import { EXPONENTIAL_ATMOSPHERE } from './atmosphere';
+import { STANDARD_ATMOSPHERE } from './atmosphere';
 import { DEFAULT_ASSETS, type DefendedAsset } from './assets';
 import {
   DEFAULT_DEFENSE,
@@ -21,7 +21,6 @@ import {
   bearing,
   distance,
   groundRange,
-  headingVector,
   length,
   scale,
   sub,
@@ -36,11 +35,31 @@ import {
   type InterceptorConfig,
   type MissileState,
 } from './interceptor';
-import { lineOfSight } from './propagation';
+import {
+  angleDiff,
+  BREAK_HOLD_S,
+  BREAK_RANGE_M,
+  bearingTo,
+  breakTrack,
+  CALM,
+  dropRoute,
+  insideTurnCircle,
+  routineLoadFactor,
+  turnRadiusM,
+  turnRateRadS,
+  turnToward,
+  windFromSeed,
+  windTriangle,
+  windVelocityAt,
+  type WindConfig,
+} from './flight';
+import { inClutter, lineOfSight } from './propagation';
 import {
   antennaAzimuth,
   DEFAULT_SEARCH_RADAR,
+  closingSpeedMps,
   falseAlarmsPerTurn,
+  inDopplerNotch,
   lookProbability,
   sweptOver,
   type SearchRadarConfig,
@@ -53,7 +72,7 @@ import {
 } from './scenario';
 import { createTerrain, flatTerrain, type Terrain, type TerrainConfig } from './terrain';
 import {
-  associate,
+  associateWithManeuvers,
   DEFAULT_TRACKER,
   plotCovariance,
   positionOf,
@@ -99,6 +118,13 @@ export interface SimConfig {
   assets?: readonly DefendedAsset[];
   /** Rules of engagement at the start (they can change with `setRules` commands). */
   rules?: Partial<Rules>;
+  /**
+   * The wind 10 m above the ground, or `false` for calm air. By default each run draws its own
+   * from the seed (`windFromSeed`).
+   */
+  wind?: WindConfig | false;
+  /** Fast jets break away from interceptors closing on them (default true). */
+  evasiveTurns?: boolean;
 }
 
 /** Radar plots kept for the fading phosphor trail, in antenna turns. */
@@ -124,6 +150,8 @@ const MSL_CLEARANCE_M = 150;
 const FALSE_ALARM_MIN_RANGE_M = 1_000;
 /** ...and at elevations up to this angle, rad. */
 const FALSE_ALARM_MAX_ELEVATION_RAD = (15 * Math.PI) / 180;
+/** A waypoint counts as reached within this distance, m. */
+const WAYPOINT_REACHED_M = 300;
 /** Spread of a drone swarm around its leader, metres. */
 const SWARM_SPREAD_M = 700;
 /** Aircraft trails: one position every 0.5 s, the last 30 s. */
@@ -162,6 +190,10 @@ export class Simulation {
   private rules: Rules;
   private readonly areaRadiusM: number;
   private readonly traffic: AutoTrafficConfig | null;
+  private readonly wind: WindConfig;
+  private readonly evasiveTurns: boolean;
+  /** Random numbers for routes, kept apart so they never shift the run's other draws. */
+  private readonly routeRng: Rng;
   private tickCount = 0;
   private nextId = 1;
   private nextTrackId = 1;
@@ -208,6 +240,9 @@ export class Simulation {
     this.areaRadiusM = config.areaRadiusM ?? this.radar.rangeM + 2_000;
     this.traffic =
       config.autoTraffic === false ? null : { ...DEFAULT_AUTO_TRAFFIC, ...config.autoTraffic };
+    this.wind = config.wind === false ? CALM : (config.wind ?? windFromSeed(this.seed));
+    this.evasiveTurns = config.evasiveTurns ?? true;
+    this.routeRng = new Rng((this.seed ^ 0x2545f491) >>> 0);
     this.launcher = {
       ready: this.defense.launcherCapacity,
       capacity: this.defense.launcherCapacity,
@@ -217,11 +252,12 @@ export class Simulation {
 
     if (this.traffic) {
       for (let i = 0; i < this.traffic.initialCount; i++) {
-        const flight = planFlight(this.rng, this.traffic, true, this.assets);
+        const flight = planFlight(this.rng, this.traffic, true, this.assets, this.routeRng);
         this.addAircraft(
           flight.type,
           flight.position,
-          flight.velocity,
+          flight.trackRad,
+          flight.route,
           this.startupEvents,
           flight.position.z,
         );
@@ -273,7 +309,7 @@ export class Simulation {
     this.scenarioArrivals(tick, events);
     // Interceptors fly first, against the targets' positions at the start of the tick.
     this.flyInterceptors(tick, events);
-    this.moveAircraft(tick);
+    this.moveAircraft(tick, events);
     const plots = this.sweep(tick);
     this.updateTracks(tick, plots, events);
     this.identify(tick, events);
@@ -319,6 +355,7 @@ export class Simulation {
       channels: { used: this.channelsInUse(), total: this.defense.fireChannels },
       rules: { ...this.rules },
       assets: this.assets,
+      wind: { ...this.wind },
       effects: [...this.effects],
       stats: { ...this.stats },
     };
@@ -330,6 +367,8 @@ export class Simulation {
       JSON.stringify({
         tick: this.tickCount,
         rng: this.rng.state(),
+        routeRng: this.routeRng.state(),
+        wind: this.wind,
         nextId: this.nextId,
         nextTrackId: this.nextTrackId,
         nextInterceptorId: this.nextInterceptorId,
@@ -361,7 +400,6 @@ export class Simulation {
         const performance = TRAFFIC[command.type];
         const type: AircraftType = command.type === 'swarm' ? 'drone' : command.type;
         const altitudeM = command.altitudeM ?? performance.altitudeM;
-        const velocity = scale(headingVector(command.headingRad), performance.speedMps);
         for (let i = 0; i < performance.count; i++) {
           const offset =
             i === 0
@@ -371,10 +409,14 @@ export class Simulation {
                   this.rng.range(-SWARM_SPREAD_M, SWARM_SPREAD_M),
                   this.rng.range(-50, 50),
                 );
+          const start = vec3(command.eastM + offset.x, command.northM + offset.y, 0);
+          const route = dropRoute(type, start, command.headingRad);
+          const first = route[0];
           this.addAircraft(
             type,
-            vec3(command.eastM + offset.x, command.northM + offset.y, 0),
-            velocity,
+            start,
+            first ? bearingTo(start, first) : command.headingRad,
+            route,
             events,
             altitudeM + offset.z,
           );
@@ -399,23 +441,36 @@ export class Simulation {
   private scenarioArrivals(tick: number, events: SimEvent[]): void {
     if (!this.traffic || this.nextArrival === null || tick < this.nextArrival) return;
     if (this.aircraft.length < this.traffic.maxAircraft) {
-      const flight = planFlight(this.rng, this.traffic, false, this.assets);
-      this.addAircraft(flight.type, flight.position, flight.velocity, events, flight.position.z);
+      const flight = planFlight(this.rng, this.traffic, false, this.assets, this.routeRng);
+      this.addAircraft(
+        flight.type,
+        flight.position,
+        flight.trackRad,
+        flight.route,
+        events,
+        flight.position.z,
+      );
     }
     this.nextArrival = nextArrivalTick(this.rng, this.traffic, tick);
   }
 
   /**
-   * Straight, level courses at constant ground speed. Height follows the terrain: AGL traffic
-   * holds its height above the highest ground just ahead, MSL traffic keeps its altitude but
-   * climbs over hills, both within the type's climb rate.
+   * Flies every aircraft for one tick. It turns toward its next waypoint (or holds an evasive
+   * break) no faster than its bank angle allows, keeps its airspeed, and steers into the wind
+   * to hold its track over the ground. Height follows the terrain: AGL traffic holds its height
+   * above the highest ground just ahead, MSL traffic keeps its altitude but climbs over hills,
+   * both within the type's climb rate.
    */
-  private moveAircraft(tick: number): void {
+  private moveAircraft(tick: number, events: SimEvent[]): void {
     const sampleTrail = tick % TRAIL_EVERY_TICKS === 0;
-    this.aircraft = this.aircraft.map((a) => {
-      const x = a.position.x + a.velocity.x * TICK_S;
-      const y = a.position.y + a.velocity.y * TICK_S;
-      const wanted = this.cruiseHeight(a.altitudeRef, a.cruiseAltitudeM, x, y, a.velocity);
+    this.aircraft = this.aircraft.map((before) => {
+      const a = this.steer(before, tick, events);
+      const agl = a.position.z - this.terrain.heightAt(a.position.x, a.position.y);
+      const flight = windTriangle(a.trackRad, a.airspeedMps, windVelocityAt(this.wind, agl));
+      const ground = flight.groundVelocity;
+      const x = a.position.x + ground.x * TICK_S;
+      const y = a.position.y + ground.y * TICK_S;
+      const wanted = this.cruiseHeight(a.altitudeRef, a.cruiseAltitudeM, x, y, ground);
       const climb = TRAFFIC[a.type].climbMps * TICK_S;
       const floor = this.terrain.heightAt(x, y) + MIN_CLEARANCE_M;
       const z = Math.max(
@@ -426,10 +481,84 @@ export class Simulation {
       return {
         ...a,
         position,
-        velocity: vec3(a.velocity.x, a.velocity.y, (z - a.position.z) / TICK_S),
+        velocity: vec3(ground.x, ground.y, (z - a.position.z) / TICK_S),
+        headingRad: flight.headingRad,
         trail: sampleTrail ? [...a.trail.slice(1 - TRAIL_LENGTH), position] : a.trail,
       };
     });
+  }
+
+  /**
+   * Picks the aircraft's ground track for this tick: an evasive break if an interceptor is
+   * closing on a fast jet, otherwise toward its next waypoint, turning at its routine bank.
+   * Waypoints are passed when reached (or turned toward early, so the turn ends on the next
+   * leg); after the last one it flies straight on.
+   */
+  private steer(a: Aircraft, tick: number, events: SimEvent[]): Aircraft {
+    const performance = TRAFFIC[a.type];
+    let { maneuver, evaded, route } = a;
+
+    if (maneuver) {
+      const still = this.interceptors.some((i) => i.id === maneuver?.interceptorId);
+      if (tick >= maneuver.untilTick || !still) maneuver = null;
+    }
+    if (!maneuver && this.evasiveTurns && performance.breakLoadFactor > 0) {
+      const threat = this.interceptors.find(
+        (i) =>
+          i.targetId === a.id &&
+          !evaded.includes(i.id) &&
+          distance(i.position, a.position) < BREAK_RANGE_M,
+      );
+      if (threat) {
+        maneuver = {
+          kind: 'break',
+          trackRad: breakTrack(a.trackRad, a.position, threat.position),
+          untilTick: tick + ticks(BREAK_HOLD_S),
+          interceptorId: threat.id,
+        };
+        evaded = [...evaded, threat.id];
+        events.push({
+          kind: 'evasiveTurn',
+          tick,
+          timeS: tick * TICK_S,
+          id: a.id,
+          type: a.type,
+          interceptorId: threat.id,
+          loadFactor: performance.breakLoadFactor,
+        });
+      }
+    }
+
+    let desired = a.trackRad;
+    let loadFactor = routineLoadFactor(performance);
+    if (maneuver) {
+      desired = maneuver.trackRad;
+      loadFactor = performance.breakLoadFactor;
+    } else {
+      const radius = turnRadiusM(a.airspeedMps, loadFactor);
+      while (route.length > 0) {
+        const waypoint = route[0] as Vec3;
+        const toWaypoint = bearingTo(a.position, waypoint);
+        const distanceM = Math.hypot(waypoint.x - a.position.x, waypoint.y - a.position.y);
+        const next = route[1];
+        // Start the turn onto the next leg early, so it ends on the leg rather than past it.
+        const turnAhead = next ? Math.abs(angleDiff(bearingTo(waypoint, next), toWaypoint)) : 0;
+        const lead = Number.isFinite(radius) ? radius * Math.tan(Math.min(turnAhead, 2) / 2) : 0;
+        // A waypoint inside the turn circle cannot be reached by turning (after an evasive break,
+        // say). A turn point is then given up; the last waypoint, its aim, is flown on from
+        // until it can turn back in.
+        const unreachable = insideTurnCircle(a.position, a.trackRad, waypoint, radius);
+        if (distanceM <= Math.max(lead, WAYPOINT_REACHED_M) || (unreachable && next)) {
+          route = route.slice(1);
+          continue;
+        }
+        if (!unreachable) desired = toWaypoint;
+        break;
+      }
+    }
+    const maxTurn = turnRateRadS(a.airspeedMps, loadFactor) * TICK_S;
+    const trackRad = turnToward(a.trackRad, desired, maxTurn);
+    return { ...a, trackRad, route, maneuver, evaded };
   }
 
   /** The height an aircraft wants to be at over (x, y), looking a few seconds ahead. */
@@ -487,16 +616,26 @@ export class Simulation {
     this.aircraft = staying;
   }
 
-  /** Adds an aircraft at ground point (position.x, position.y), flying at `altitudeM`. */
+  /**
+   * Adds an aircraft at ground point (position.x, position.y), flying at `altitudeM` along
+   * `trackRad`, with the waypoints of `route` ahead of it.
+   */
   private addAircraft(
     type: AircraftType,
     ground: Vec3,
-    velocity: Vec3,
+    trackRad: number,
+    route: readonly Vec3[],
     events: SimEvent[],
     altitudeM: number,
   ): void {
     const performance = TRAFFIC[type];
-    const z = this.cruiseHeight(performance.altitudeRef, altitudeM, ground.x, ground.y, velocity);
+    const still = windTriangle(trackRad, performance.speedMps, vec3(0, 0, 0)).groundVelocity;
+    const z = this.cruiseHeight(performance.altitudeRef, altitudeM, ground.x, ground.y, still);
+    const flight = windTriangle(
+      trackRad,
+      performance.speedMps,
+      windVelocityAt(this.wind, z - this.terrain.heightAt(ground.x, ground.y)),
+    );
     const position = vec3(ground.x, ground.y, z);
     const aircraft: Aircraft = {
       id: this.nextId++,
@@ -504,7 +643,13 @@ export class Simulation {
       affiliation: performance.affiliation,
       radarSize: performance.radarSize,
       position,
-      velocity: vec3(velocity.x, velocity.y, 0),
+      velocity: flight.groundVelocity,
+      airspeedMps: performance.speedMps,
+      trackRad,
+      headingRad: flight.headingRad,
+      route,
+      maneuver: null,
+      evaded: [],
       altitudeRef: performance.altitudeRef,
       cruiseAltitudeM: altitudeM,
       spawnTick: this.tickCount,
@@ -529,8 +674,10 @@ export class Simulation {
   /**
    * Paints the aircraft the beam swept past during this tick. Each needs a clear line of sight
    * (not below the radar horizon, not behind a hill), and then is detected with the probability
-   * its signal-to-noise ratio gives. Every echo is measured with noise. Now and then noise alone
-   * crosses the threshold somewhere in the swept arc: a false alarm.
+   * its signal-to-noise ratio gives, unless its echo arrives with the echo of lit ground while it
+   * closes or opens too slowly to stand out from it by its Doppler shift. Every echo is
+   * measured with noise. Now and then noise alone crosses the threshold somewhere in the swept
+   * arc: a false alarm.
    */
   private sweep(tick: number): Plot[] {
     const from = antennaAzimuth((tick - 1) * TICK_S, this.radar.periodS);
@@ -542,6 +689,14 @@ export class Simulation {
       if (rangeM < 1 || rangeM > this.radar.rangeM) return a;
       if (!sweptOver(from, to, bearing(a.position))) return a;
       if (lineOfSight(this.terrain, this.antenna, a.position) !== 'visible') return a;
+      // Where the ground echo arrives with it, the Doppler filter that removes the clutter also
+      // removes an echo as slow as the ground's.
+      if (
+        inDopplerNotch(closingSpeedMps(this.antenna, a.position, a.velocity), this.radar) &&
+        inClutter(this.terrain, this.antenna, a.position)
+      ) {
+        return a;
+      }
       const pd = lookProbability(
         RADAR_CROSS_SECTION_M2[a.radarSize],
         distance(this.antenna, a.position),
@@ -621,16 +776,18 @@ export class Simulation {
     const batch = this.pendingPlots;
     const batchCovariances = batch.map((plot) => plotCovariance(plot, this.antenna, this.radar));
     // Gating and nearest-neighbour association: the tracker sees only the measurements.
-    const batchOwners = associate(
+    const { owners: batchOwners, maneuvers: batchManeuvers } = associateWithManeuvers(
       batch,
       batchCovariances,
       this.tracks,
       ticks(this.radar.periodS / 2),
       this.tracker,
     );
-    const committed = batch.filter((plot) => plot.tick <= commitTick);
-    const covariances = batchCovariances.filter((_, i) => (batch[i]?.tick ?? 0) <= commitTick);
-    const owners = batchOwners.filter((_, i) => (batch[i]?.tick ?? 0) <= commitTick);
+    const isCommitted = (_: unknown, i: number) => (batch[i]?.tick ?? 0) <= commitTick;
+    const committed = batch.filter(isCommitted);
+    const covariances = batchCovariances.filter(isCommitted);
+    const owners = batchOwners.filter(isCommitted);
+    const maneuvers = batchManeuvers.filter(isCommitted);
     this.pendingPlots = batch.filter((plot) => plot.tick > commitTick);
 
     committed.forEach((plot, p) => {
@@ -648,6 +805,7 @@ export class Simulation {
           lastPaintTick: plot.tick,
           position: positionOf(estimate),
           velocity: null,
+          maneuvering: false,
           estimate,
           confirmedTick: null,
           identity: 'pending',
@@ -673,9 +831,11 @@ export class Simulation {
       }
 
       // The Kalman filter blends the new echo into the track's estimate.
-      const estimate = updateEstimate(track, plot, R, this.tracker);
+      const maneuvering = maneuvers[p] ?? false;
+      const estimate = updateEstimate(track, plot, R, this.tracker, maneuvering);
       const updated: Track = {
         ...track,
+        maneuvering,
         truthId: plot.truthId,
         paints: track.paints + 1,
         lastPaintTick: plot.tick,
@@ -1107,6 +1267,11 @@ export class Simulation {
       const guideFrom = inView || !track ? target?.position : trackPositionAt(track, tick - 1);
       const guideVel = inView || !track?.velocity ? target?.velocity : track.velocity;
       let state: MissileState = { position: missile.position, velocity: missile.velocity };
+      // The air it flies through moves with the wind; drag depends on its speed through the air.
+      const windHere = windVelocityAt(
+        this.wind,
+        missile.position.z - this.terrain.heightAt(missile.position.x, missile.position.y),
+      );
       let outcome: {
         hit: boolean;
         missM: number | null;
@@ -1123,7 +1288,16 @@ export class Simulation {
         const targetEnd = add(targetStart, scale(target.velocity, dt));
         const aimVel = guideVel ?? target.velocity;
         const aim = add(guideFrom ?? target.position, scale(aimVel, k * dt));
-        const next = stepMissile(state, flightS, aim, aimVel, dt, config, EXPONENTIAL_ATMOSPHERE);
+        const next = stepMissile(
+          state,
+          flightS,
+          aim,
+          aimVel,
+          dt,
+          config,
+          STANDARD_ATMOSPHERE,
+          windHere,
+        );
         if (flightS + dt >= config.armAfterS) {
           const pass = closestApproach(
             sub(targetStart, state.position),

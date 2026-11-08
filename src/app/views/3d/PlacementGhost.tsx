@@ -9,13 +9,13 @@ import {
   type Mesh,
   type PerspectiveCamera,
 } from 'three';
-import { TRAFFIC, type TrafficTypeId } from '../../../sim';
-import { headingToBattery } from '../../placement/placement';
+import { bearingTo, TRAFFIC, vec3, type TrafficTypeId } from '../../../sim';
+import { headingToBattery, placementRoute } from '../../placement/placement';
 import { registerDropZone, usePlacementStore } from '../../placement/placementStore';
 import { useViewStore } from '../../view/viewStore';
 import { AFFILIATION_COLOR, aircraftGeometry } from './aircraftModels';
 import { worldTerrain } from '../../world/world';
-import { toScene, worldSizeForPixels, yawForHeading } from './coords';
+import { SCENE_UNITS_PER_M, toScene, worldSizeForPixels, yawForHeading } from './coords';
 import { groundSceneY, rayTerrainHit } from './terrainGeometry';
 
 const GHOST_PX = 30;
@@ -54,8 +54,9 @@ export function PlacementZone() {
 }
 
 /**
- * The traffic being placed, seen in 3D: a see-through model at its altitude, its route
- * straight to the battery and a line down to the ground. After a drop, a ripple marks the spot.
+ * The traffic being placed, seen in 3D: a see-through model at its altitude, the route it will
+ * fly to the battery (straight in, or a dog-leg) and a line down to the ground. After a drop, a
+ * ripple marks the spot.
  */
 export function PlacementGhost() {
   const type = usePlacementStore((s) => s.type);
@@ -109,12 +110,28 @@ export function PlacementGhost() {
         )
       : null;
   const dropTo = at && position ? groundSceneY(at.eastM, at.northM, heightScale) - position[1] : 0;
+  const route = at && type ? placementRoute(type, at) : [];
+  const first = route[0];
+  const yaw =
+    at && first ? bearingTo(vec3(at.eastM, at.northM, 0), first) : at ? headingToBattery(at) : 0;
+  // The route in the ghost's own frame (scene km, north is -z), at its height.
+  const routePoints: [number, number, number][] =
+    at && position
+      ? [
+          [0, 0, 0],
+          ...(route.length > 0 ? route : [vec3(0, 0, 0)]).map((p): [number, number, number] => [
+            p.x * SCENE_UNITS_PER_M - position[0],
+            0,
+            -p.y * SCENE_UNITS_PER_M - position[2],
+          ]),
+        ]
+      : [];
 
   return (
     <group>
       {type && position && at && (
         <group position={position}>
-          <group ref={model} rotation-y={yawForHeading(headingToBattery(at))}>
+          <group ref={model} rotation-y={yawForHeading(yaw)}>
             <mesh
               geometry={aircraftGeometry(type === 'swarm' ? 'drone' : type)}
               material={material}
@@ -122,10 +139,7 @@ export function PlacementGhost() {
             />
           </group>
           <Line
-            points={[
-              [0, 0, 0],
-              [-position[0], 0, -position[2]],
-            ]}
+            points={routePoints}
             color={color}
             lineWidth={1.6}
             dashed

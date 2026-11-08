@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { predictIntercept } from './c2';
 import { distance, length, sub, vec3, type Vec3 } from './core/vec';
+import { STANDARD_ATMOSPHERE } from './atmosphere';
 import {
   closestApproach,
   DEFAULT_INTERCEPTOR as I,
@@ -117,7 +118,7 @@ describe('interceptor flight', () => {
       target.position,
       target.velocity,
       vec3(0, 0, 0),
-      (t) => 0.9 * reachM(t, I, 1.225 * Math.exp(-1_500 / 8_500)),
+      (t) => 0.9 * reachM(t, I, STANDARD_ATMOSPHERE.densityKgM3(1_500)),
       34,
     );
     expect(plan).not.toBeNull();

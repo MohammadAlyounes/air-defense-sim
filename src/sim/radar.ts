@@ -5,8 +5,12 @@
  * signal-to-noise ratio (SNR) falls with the fourth power of range, and the chance of seeing a
  * fluctuating target (the Swerling 1 model) follows from it. Measurements carry noise, and
  * random noise spikes now and then cross the threshold: false alarms. Earth curvature and the
- * terrain can block the view entirely (`propagation.ts`).
+ * terrain can block the view entirely (`propagation.ts`). Where the radar lights the ground, the
+ * ground's own echo (clutter) is filtered out by its Doppler shift, and so is any target that
+ * closes or opens too slowly: the low-Doppler notch.
  */
+
+import type { Vec3 } from './core/vec';
 
 export type DetectionModel =
   /** Detection probability from the SNR, for a target whose echo fluctuates from scan to scan. */
@@ -32,6 +36,13 @@ export interface SearchRadarConfig {
   rangeSigmaM: number;
   azimuthSigmaRad: number;
   elevationSigmaRad: number;
+  /** Wavelength, metres: sets the Doppler shift of a moving target's echo, f = 2·v / λ. */
+  wavelengthM: number;
+  /**
+   * Half-width of the low-Doppler notch, m/s. Where the radar lights the ground, echoes that
+   * close or open slower than this are filtered out along with the ground's own (0: no notch).
+   */
+  dopplerNotchMps: number;
 }
 
 const DEG = Math.PI / 180;
@@ -47,15 +58,21 @@ export const DEFAULT_SEARCH_RADAR: SearchRadarConfig = {
   rangeSigmaM: 30,
   azimuthSigmaRad: 0.15 * DEG,
   elevationSigmaRad: 0.25 * DEG,
+  wavelengthM: 0.1,
+  dopplerNotchMps: 10,
 };
 
-/** A radar with perfect measurements and no false alarms or fluctuation: the Step 3 radar. */
+/**
+ * A radar with perfect measurements and no false alarms, fluctuation or clutter notch: the
+ * Step 3 radar.
+ */
 export const IDEAL_SEARCH_RADAR: Partial<SearchRadarConfig> = {
   detectionModel: 'threshold',
   falseAlarmProbability: 0,
   rangeSigmaM: 0,
   azimuthSigmaRad: 0,
   elevationSigmaRad: 0,
+  dopplerNotchMps: 0,
 };
 
 /**
@@ -107,6 +124,34 @@ export function detectionRangeM(rcsM2: number, radar: SearchRadarConfig): number
 export const falseAlarmsPerTurn = (radar: SearchRadarConfig): number =>
   radar.falseAlarmProbability * radar.resolutionCells;
 
+/**
+ * Closing speed: how fast a target at `position` moves toward the antenna along the line of
+ * sight, m/s (negative when it moves away). Only this part of its velocity shifts the echo's
+ * frequency; a target flying across the beam has none.
+ */
+export function closingSpeedMps(antenna: Vec3, position: Vec3, velocity: Vec3): number {
+  const dx = antenna.x - position.x;
+  const dy = antenna.y - position.y;
+  const dz = antenna.z - position.z;
+  const rangeM = Math.hypot(dx, dy, dz);
+  return rangeM > 0 ? (velocity.x * dx + velocity.y * dy + velocity.z * dz) / rangeM : 0;
+}
+
+/** Doppler shift of the echo of a target closing at `closingSpeedMps`: f = 2·v / λ, Hz. */
+export const dopplerShiftHz = (
+  closingSpeedMps: number,
+  radar: Pick<SearchRadarConfig, 'wavelengthM'>,
+): number => (2 * closingSpeedMps) / radar.wavelengthM;
+
+/**
+ * Is an echo with this closing speed inside the low-Doppler notch? The ground does not move, so
+ * its echo has no Doppler shift; the filter that removes it also removes anything this slow.
+ */
+export const inDopplerNotch = (
+  closingSpeedMps: number,
+  radar: Pick<SearchRadarConfig, 'dopplerNotchMps'>,
+): boolean => Math.abs(closingSpeedMps) < radar.dopplerNotchMps;
+
 const TWO_PI = 2 * Math.PI;
 
 /** Antenna direction after `timeS` seconds, starting from north and turning clockwise. */
@@ -120,7 +165,19 @@ export function antennaAzimuth(timeS: number, periodS: number): number {
  * `toRad` (included). Handles the jump from 359° back to 0°.
  */
 export function sweptOver(fromRad: number, toRad: number, bearingRad: number): boolean {
-  const span = (((toRad - fromRad) % TWO_PI) + TWO_PI) % TWO_PI;
-  const offset = (((bearingRad - fromRad) % TWO_PI) + TWO_PI) % TWO_PI;
-  return offset > 0 && offset <= span;
+  // Plain comparisons, no subtraction: neighbouring ticks share the exact same edge value, so
+  // every bearing falls in exactly one tick's arc. (Subtracting first, as in (b − from) mod 2π,
+  // can round a 1e-16 difference to 0 or to the whole span, so a target one rounding step from
+  // an edge could be painted twice, or never.)
+  const from = normalizeAngle(fromRad);
+  const to = normalizeAngle(toRad);
+  const b = normalizeAngle(bearingRad);
+  return from <= to ? from < b && b <= to : b > from || b <= to;
+}
+
+/** An angle brought into [0, 2π). */
+function normalizeAngle(rad: number): number {
+  if (rad >= 0 && rad < TWO_PI) return rad;
+  const a = rad - TWO_PI * Math.floor(rad / TWO_PI);
+  return a >= TWO_PI ? 0 : a;
 }

@@ -1,4 +1,4 @@
-import { EXPONENTIAL_ATMOSPHERE, SEA_LEVEL_DENSITY_KGM3, type Atmosphere } from './atmosphere';
+import { SEA_LEVEL_DENSITY_KGM3, STANDARD_ATMOSPHERE, type Atmosphere } from './atmosphere';
 import { add, cross, dot, length, normalize, scale, sub, vec3, type Vec3 } from './core/vec';
 
 /**
@@ -136,7 +136,9 @@ export function stepMissile(
   targetVel: Vec3,
   dt: number,
   config: InterceptorConfig,
-  atmosphere: Atmosphere = EXPONENTIAL_ATMOSPHERE,
+  atmosphere: Atmosphere = STANDARD_ATMOSPHERE,
+  /** The wind where it flies, m/s: drag acts on its velocity through the air. */
+  wind: Vec3 = vec3(0, 0, 0),
 ): MissileState {
   const steer = guidanceAcceleration(
     missile.position,
@@ -150,7 +152,7 @@ export function stepMissile(
       ? scale(normalize(missile.velocity), config.boostAccelMps2)
       : vec3(0, 0, 0);
   const drag = dragAcceleration(
-    missile.velocity,
+    sub(missile.velocity, wind),
     atmosphere.densityKgM3(missile.position.z),
     config.ballisticCoefficientKgM2,
   );

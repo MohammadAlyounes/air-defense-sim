@@ -21,6 +21,12 @@ import type { Plot, Track } from './types';
  */
 export interface TrackerConfig {
   processNoise: ProcessNoise;
+  /**
+   * Process noise for a target that has just maneuvered (two-stage gating). A plot that fits no
+   * track may still join a confirmed track if it fits the track predicted with this much larger
+   * noise, as a hard turn would leave it; the filter then catches up with the turn. Null: off.
+   */
+  maneuverNoise: ProcessNoise | null;
   /** Velocity uncertainty of a brand-new track (one plot, velocity unknown), m/s. */
   initialVelocitySigma: { horizontal: number; vertical: number };
   /**
@@ -33,6 +39,9 @@ export interface TrackerConfig {
 
 export const DEFAULT_TRACKER: TrackerConfig = {
   processNoise: { horizontal: 4, vertical: 30 },
+  // A fast jet breaking at 6 g can be 800 m off the straight-line prediction by the next echo,
+  // 4 s later; this noise puts that inside the gate (σ ≈ 290 m after one antenna turn).
+  maneuverNoise: { horizontal: 4_000, vertical: 30 },
   initialVelocitySigma: { horizontal: 120, vertical: 30 },
   gate: 16.27,
 };
@@ -83,14 +92,21 @@ export function startEstimate(
   return initialState(toVector(plot.position), R, config.initialVelocitySigma);
 }
 
-/** Predicts the track to the plot's tick, then blends the plot in. */
+/**
+ * Predicts the track to the plot's tick, then blends the plot in. A plot that joined through the
+ * maneuver gate is blended into the prediction made with the maneuver noise, whose larger
+ * uncertainty lets the estimate jump onto the target's new path.
+ */
 export function updateEstimate(
   track: Track,
   plot: Plot,
   R: readonly number[],
   config: TrackerConfig = DEFAULT_TRACKER,
+  maneuver = false,
 ): KalmanState {
-  return update(estimateAt(track, plot.tick, config), toVector(plot.position), R);
+  const noise = maneuver && config.maneuverNoise ? config.maneuverNoise : config.processNoise;
+  const predicted = predict(track.estimate, (plot.tick - track.lastPaintTick) * TICK_S, noise);
+  return update(predicted, toVector(plot.position), R);
 }
 
 export const positionOf = (state: KalmanState): Vec3 =>
@@ -112,22 +128,49 @@ export function associate(
   minGapTicks: number,
   config: TrackerConfig = DEFAULT_TRACKER,
 ): number[] {
-  const pairs: { plot: number; track: number; nis: number }[] = [];
-  tracks.forEach((track, t) => {
-    plots.forEach((plot, p) => {
-      if (plot.tick - track.lastPaintTick < minGapTicks) return;
-      const predicted = estimateAt(track, plot.tick, config);
-      const { nis } = innovation(predicted, toVector(plot.position), covariances[p] ?? []);
-      if (nis <= config.gate) pairs.push({ plot: p, track: t, nis });
-    });
-  });
-  pairs.sort((a, b) => a.nis - b.nis || a.track - b.track || a.plot - b.plot);
-  const result = plots.map(() => -1);
+  return associateWithManeuvers(plots, covariances, tracks, minGapTicks, config).owners;
+}
+
+/**
+ * Association in two stages. First as `associate` describes, with the normal process noise.
+ * Then the plots no track took are tried against the confirmed tracks no plot updated, now
+ * predicted with the maneuver noise: a target that turned hard since its last echo lands there.
+ * `maneuvers[p]` tells which plots joined their track this second way.
+ */
+export function associateWithManeuvers(
+  plots: readonly Plot[],
+  covariances: readonly (readonly number[])[],
+  tracks: readonly Track[],
+  minGapTicks: number,
+  config: TrackerConfig = DEFAULT_TRACKER,
+): { owners: number[]; maneuvers: boolean[] } {
+  const owners = plots.map(() => -1);
+  const maneuvers = plots.map(() => false);
   const used = new Set<number>();
-  for (const pair of pairs) {
-    if (result[pair.plot] !== -1 || used.has(pair.track)) continue;
-    result[pair.plot] = pair.track;
-    used.add(pair.track);
-  }
-  return result;
+  const stage = (noise: ProcessNoise, maneuver: boolean) => {
+    const pairs: { plot: number; track: number; nis: number }[] = [];
+    tracks.forEach((track, t) => {
+      if (used.has(t) || (maneuver && track.confirmedTick === null)) return;
+      plots.forEach((plot, p) => {
+        if (owners[p] !== -1 || plot.tick - track.lastPaintTick < minGapTicks) return;
+        const predicted = predict(
+          track.estimate,
+          (plot.tick - track.lastPaintTick) * TICK_S,
+          noise,
+        );
+        const { nis } = innovation(predicted, toVector(plot.position), covariances[p] ?? []);
+        if (nis <= config.gate) pairs.push({ plot: p, track: t, nis });
+      });
+    });
+    pairs.sort((a, b) => a.nis - b.nis || a.track - b.track || a.plot - b.plot);
+    for (const pair of pairs) {
+      if (owners[pair.plot] !== -1 || used.has(pair.track)) continue;
+      owners[pair.plot] = pair.track;
+      maneuvers[pair.plot] = maneuver;
+      used.add(pair.track);
+    }
+  };
+  stage(config.processNoise, false);
+  if (config.maneuverNoise) stage(config.maneuverNoise, true);
+  return { owners, maneuvers };
 }

@@ -1,6 +1,7 @@
 import type { Identity, Rules } from './c2';
 import type { DefendedAsset } from './assets';
 import type { Vec3 } from './core/vec';
+import type { WindConfig } from './flight';
 import type { KalmanState } from './kalman';
 import type {
   Affiliation,
@@ -27,8 +28,20 @@ export interface Aircraft {
   radarSize: RadarSize;
   /** Metres, East-North-Up, origin at the battery. */
   position: Vec3;
-  /** Metres per second. */
+  /** Velocity over the ground (airspeed plus wind), metres per second. */
   velocity: Vec3;
+  /** Speed through the air, m/s. */
+  airspeedMps: number;
+  /** Direction it moves over the ground (its track), compass radians. */
+  trackRad: number;
+  /** Where its nose points, compass radians: turned a little into the wind to hold the track. */
+  headingRad: number;
+  /** Ground waypoints still ahead (the next one first); empty once it flies straight on. */
+  route: readonly Vec3[];
+  /** An evasive break turn in progress, if any. */
+  maneuver: Maneuver | null;
+  /** Interceptors it has already broken away from: it reacts once to each. */
+  evaded: readonly EntityId[];
   /** AGL: it follows the terrain at a set height above the ground; MSL: a set altitude. */
   altitudeRef: AltitudeReference;
   /** The height it flies at: above the ground (AGL) or above the datum (MSL), m. */
@@ -40,6 +53,15 @@ export interface Aircraft {
   trail: readonly Vec3[];
   /** A hostile that came within the leak radius of the battery: it got through. */
   leaked: boolean;
+}
+
+/** A hard turn away from an interceptor: held until `untilTick`, then back onto the route. */
+export interface Maneuver {
+  kind: 'break';
+  /** The ground track it turns to, compass radians. */
+  trackRad: number;
+  untilTick: number;
+  interceptorId: EntityId;
 }
 
 /** One radar detection: where the beam saw an echo, and when. */
@@ -82,6 +104,8 @@ export interface Track {
   position: Vec3;
   /** Filtered velocity; null until the second echo confirms the track. */
   velocity: Vec3 | null;
+  /** The last echo only fitted through the maneuver gate: the target is turning hard. */
+  maneuvering: boolean;
   /** The Kalman filter's state and covariance at the last echo. */
   estimate: KalmanState;
   confirmedTick: number | null;
@@ -207,6 +231,13 @@ export type SimEvent =
   | (EventBase & { kind: 'trafficEntered'; type: AircraftType; bearingRad: number; rangeM: number })
   | (EventBase & { kind: 'trafficLeft'; type: AircraftType })
   | (EventBase & { kind: 'threatLeaked'; type: AircraftType; assetId: number })
+  /** A fast jet breaks hard away from an interceptor closing on it (ground truth). */
+  | (EventBase & {
+      kind: 'evasiveTurn';
+      type: AircraftType;
+      interceptorId: EntityId;
+      loadFactor: number;
+    })
   | (TrackEventBase & { kind: 'contactNew'; bearingRad: number; rangeM: number })
   | (TrackEventBase & { kind: 'contactLost'; bearingRad: number; rangeM: number })
   /** A tentative track whose second echo never came: most often a false alarm. */
@@ -325,6 +356,8 @@ export interface Snapshot {
   channels: { used: number; total: number };
   rules: Rules;
   assets: readonly DefendedAsset[];
+  /** The wind 10 m above the ground; it grows with height (see `windSpeedAt`). */
+  wind: WindConfig;
   effects: readonly Effect[];
   stats: DefenseStats;
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { STANDARD_ATMOSPHERE } from './atmosphere';
 import { DEFAULT_ASSETS } from './assets';
 import {
   closestApproachTo,
@@ -56,10 +57,19 @@ describe('kill probability', () => {
 describe('engagement envelope', () => {
   it('reaches as far as the planned reach in the longest planned flight, minus the altitude', () => {
     const low = envelopeRangeM(0, DEFAULT_DEFENSE, DEFAULT_INTERCEPTOR);
-    expect(low).toBeCloseTo(0.9 * reachM(34, DEFAULT_INTERCEPTOR, 1.225), 3);
-    // Higher up the air is thinner, so it reaches farther, until the altitude itself eats it.
-    expect(envelopeRangeM(6_000, DEFAULT_DEFENSE, DEFAULT_INTERCEPTOR)).toBeGreaterThan(low);
-    expect(envelopeRangeM(40_000, DEFAULT_DEFENSE, DEFAULT_INTERCEPTOR)).toBe(0);
+    expect(low).toBeCloseTo(
+      0.9 * reachM(34, DEFAULT_INTERCEPTOR, STANDARD_ATMOSPHERE.densityKgM3(0)),
+      3,
+    );
+    // Higher up the air is thinner, so the interceptor flies farther in the same time...
+    const at = (altitudeM: number) =>
+      envelopeRangeM(altitudeM, DEFAULT_DEFENSE, DEFAULT_INTERCEPTOR);
+    expect(Math.hypot(at(6_000), 6_000)).toBeGreaterThan(low);
+    expect(Math.hypot(at(10_000), 10_000)).toBeGreaterThan(Math.hypot(at(6_000), 6_000));
+    // ...which wins over the climb up to about 3 km; above that, the altitude eats the range.
+    expect(at(3_000)).toBeGreaterThan(low);
+    expect(at(6_000)).toBeLessThan(at(3_000));
+    expect(at(40_000)).toBe(0);
   });
 });
 

@@ -5,6 +5,7 @@ import { TrafficIcon } from '../components/TrafficIcon';
 import { AFFILIATION_STYLE } from '../data/affiliation';
 import { TRAFFIC_BY_ID } from '../data/threatCatalog';
 import { compassPoint, formatBearing, formatIn, formatKm } from '../sim/narrator';
+import { useSimController } from '../sim/simContext';
 import { MAX_DROP_RANGE_M, placementFacts } from './placement';
 import { usePlacementStore } from './placementStore';
 import { usePlacementControls } from './usePlacement';
@@ -92,7 +93,9 @@ function Readout({
   target: NonNullable<ReturnType<typeof usePlacementStore.getState>['target']>;
 }) {
   const info = TRAFFIC_BY_ID[type];
-  const facts = placementFacts(type, target.at, altitudeM);
+  const wind = useSimController().getFrame().current.wind;
+  const facts = placementFacts(type, target.at, altitudeM, undefined, wind);
+  const dogLeg = facts.route.length > 1;
   const masked = facts.firstSeenM === null || facts.firstSeenM < facts.detectedFromM - 1_000;
   const tooFar = facts.rangeM > MAX_DROP_RANGE_M;
   // Keep the card on screen: flip to the left or above near the edges.
@@ -115,7 +118,8 @@ function Readout({
             {formatBearing(facts.bearingRad)} · {grouped.format(altitudeM)} m
           </p>
           <p className="mt-0.5">
-            Reaches the battery in {formatIn(facts.timeToBatteryS)} ·{' '}
+            {dogLeg ? 'Flies a dog-leg and reaches' : 'Reaches'} the battery in{' '}
+            {formatIn(facts.timeToBatteryS)} ·{' '}
             {facts.firstSeenM === null ? (
               'the radar never sees it on this route'
             ) : (

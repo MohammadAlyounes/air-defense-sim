@@ -3,7 +3,14 @@ import { Simulation, IDEAL_SEARCH_RADAR } from '../../sim';
 import { aircraftFacts } from './aircraftFacts';
 
 function jetFlyingAt(
-  sim = new Simulation({ seed: 1, autoTraffic: false, terrain: false, radar: IDEAL_SEARCH_RADAR }),
+  sim = new Simulation({
+    seed: 1,
+    autoTraffic: false,
+    terrain: false,
+    radar: IDEAL_SEARCH_RADAR,
+    wind: false,
+    evasiveTurns: false,
+  }),
 ) {
   sim.dispatch({ kind: 'spawnTraffic', type: 'jet', eastM: 0, northM: -30_000, headingRad: 0 });
   return sim;
@@ -52,6 +59,8 @@ describe('aircraftFacts', () => {
       autoTraffic: false,
       terrain: false,
       radar: IDEAL_SEARCH_RADAR,
+      wind: false,
+      evasiveTurns: false,
       interceptor: { certainKill: true },
     });
     sim.dispatch({
@@ -73,5 +82,18 @@ describe('aircraftFacts', () => {
     const sim = jetFlyingAt();
     sim.run(1);
     expect(aircraftFacts(sim.snapshot(), 99)).toBeNull();
+  });
+
+  it('notes a track whose last echo only fitted through the wider gate for hard turns', () => {
+    const sim = jetFlyingAt();
+    sim.run(9 * 50);
+    const snapshot = sim.snapshot();
+    const detail = (maneuvering: boolean) =>
+      aircraftFacts(
+        { ...snapshot, tracks: snapshot.tracks.map((track) => ({ ...track, maneuvering })) },
+        1,
+      )?.trackErrorDetail;
+    expect(detail(false)).toMatch(/echoes so far$/);
+    expect(detail(true)).toMatch(/echoes so far · caught up after a hard turn$/);
   });
 });

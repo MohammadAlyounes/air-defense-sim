@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { TICK_S } from './core/clock';
+import { vec3 } from './core/vec';
 import {
   antennaAzimuth,
+  closingSpeedMps,
   DEFAULT_SEARCH_RADAR,
   detectionProbability,
   detectionRangeM,
+  dopplerShiftHz,
   falseAlarmsPerTurn,
+  inDopplerNotch,
   lookProbability,
   signalToNoise,
   sweptOver,
@@ -30,6 +34,19 @@ describe('search radar sweep', () => {
     expect(sweptOver(deg(355), deg(5), deg(1))).toBe(true);
     expect(sweptOver(deg(355), deg(5), deg(358))).toBe(true);
     expect(sweptOver(deg(355), deg(5), deg(340))).toBe(false);
+  });
+
+  it('sweeps a bearing a hair past the start of the arc', () => {
+    // An aircraft flying due west along the x axis drifts to a bearing one rounding step past
+    // 90°. It must still fall in the arc that starts exactly at 90°, not in neither arc.
+    const hair = Math.PI / 2 + 2.220446049250313e-16;
+    expect(hair).toBeGreaterThan(Math.PI / 2);
+    expect(sweptOver(Math.PI / 2, Math.PI / 2 + deg(1.8), hair)).toBe(true);
+    expect(sweptOver(Math.PI / 2 - deg(1.8), Math.PI / 2, hair)).toBe(false);
+    // Just east of north, across the jump from 360° to 0°: painted once, not twice.
+    const tiny = 1e-18;
+    expect(sweptOver(2 * Math.PI - deg(1.8), 0, tiny)).toBe(false);
+    expect(sweptOver(0, deg(1.8), tiny)).toBe(true);
   });
 
   it('sweeps every bearing exactly once per turn', () => {
@@ -73,5 +90,33 @@ describe('detection probability', () => {
 
   it('expects λ = Pfa × cells false alarms per antenna turn', () => {
     expect(falseAlarmsPerTurn(DEFAULT_SEARCH_RADAR)).toBeCloseTo(0.6, 9);
+  });
+});
+
+describe('Doppler and the clutter notch', () => {
+  const antenna = vec3(0, 0, 12);
+  const north10km = vec3(0, 10_000, 12);
+
+  it('counts only the part of the velocity along the line of sight', () => {
+    expect(closingSpeedMps(antenna, north10km, vec3(0, -40, 0))).toBeCloseTo(40, 9);
+    expect(closingSpeedMps(antenna, north10km, vec3(0, 40, 0))).toBeCloseTo(-40, 9);
+    // Flying across the beam: no closing speed at all.
+    expect(closingSpeedMps(antenna, north10km, vec3(40, 0, 0))).toBeCloseTo(0, 9);
+    // 60° off the line of sight: 40 m/s × cos 60° = 20 m/s.
+    const v = vec3(40 * Math.sin(deg(60)), -40 * Math.cos(deg(60)), 0);
+    expect(closingSpeedMps(antenna, north10km, v)).toBeCloseTo(20, 9);
+  });
+
+  it('shifts the echo by f = 2v / λ', () => {
+    // λ = 10 cm: a 40 m/s drone shifts its echo by 800 Hz, a 340 m/s jet flying away by −6.8 kHz.
+    expect(dopplerShiftHz(40, DEFAULT_SEARCH_RADAR)).toBeCloseTo(800, 9);
+    expect(dopplerShiftHz(-340, DEFAULT_SEARCH_RADAR)).toBeCloseTo(-6_800, 9);
+  });
+
+  it('filters out echoes slower than the notch, coming or going', () => {
+    expect(inDopplerNotch(9.9, DEFAULT_SEARCH_RADAR)).toBe(true);
+    expect(inDopplerNotch(-9.9, DEFAULT_SEARCH_RADAR)).toBe(true);
+    expect(inDopplerNotch(10, DEFAULT_SEARCH_RADAR)).toBe(false);
+    expect(inDopplerNotch(0, { dopplerNotchMps: 0 })).toBe(false);
   });
 });

@@ -22,9 +22,10 @@ describe('parseViewOptions', () => {
     expect(parseViewOptions('?truth=0').state).toEqual({ compareTruth: false });
   });
 
-  it('reads the coverage overlay height', () => {
-    expect(parseViewOptions('?coverage=50').state).toEqual({ coverageAltM: 50 });
-    expect(parseViewOptions('?coverage=1000').state).toEqual({ coverageAltM: 1000 });
+  it('reads the coverage overlay: a target height, or the lit ground', () => {
+    expect(parseViewOptions('?coverage=50').state).toEqual({ coverage: 50 });
+    expect(parseViewOptions('?coverage=1000').state).toEqual({ coverage: 1000 });
+    expect(parseViewOptions('?coverage=clutter').state).toEqual({ coverage: 'clutter' });
   });
 
   it('ignores invalid values', () => {

@@ -49,6 +49,27 @@ describe('placement', () => {
     expect(deg(Math.atan2(keyboardSpot(1).eastM, keyboardSpot(1).northM))).toBeCloseTo(115);
   });
 
+  it('routes a cruise-missile-like target round a dog-leg, and a drone straight in', () => {
+    const cruise = placementFacts('cruise', { eastM: 0, northM: 30_000 });
+    expect(cruise.route).toHaveLength(2);
+    expect(cruise.route[1]?.x).toBeCloseTo(0, 6);
+    expect(cruise.route[1]?.y).toBeCloseTo(0, 6);
+    // 30 km direct, 33.5 km round the dog-leg (two legs of √(15² + 7.5²) km), at 240 m/s.
+    expect(cruise.timeToBatteryS).toBeCloseTo((2 * Math.hypot(15_000, 7_500)) / 240, 6);
+    expect(placementFacts('swarm', { eastM: 0, northM: 12_000 }).route).toHaveLength(1);
+  });
+
+  it('times the flight through the wind', () => {
+    // A north wind of 8 m/s: 13 m/s at a drone's 300 m. Dropped north of the battery, the
+    // drone flies south with it; dropped south, it flies into it.
+    const wind = { speedMps: 8, fromRad: 0 };
+    const world = { terrain: flatTerrain(), coverage: coverageMap(flatTerrain(), 12, 40_000) };
+    const downwind = placementFacts('drone', { eastM: 0, northM: 12_000 }, 300, world, wind);
+    const upwind = placementFacts('drone', { eastM: 0, northM: -12_000 }, 300, world, wind);
+    expect(downwind.timeToBatteryS).toBeCloseTo(12_000 / (40 + 13.005), 1);
+    expect(upwind.timeToBatteryS).toBeCloseTo(12_000 / (40 - 13.005), 1);
+  });
+
   it('tells how long it will take and when the radar will see it', () => {
     const facts = placementFacts('drone', { eastM: 0, northM: 12_000 });
     expect(facts.timeToBatteryS).toBeCloseTo(300); // 12 km at 40 m/s
@@ -75,7 +96,10 @@ describe('first sighting on the route', () => {
 
   it('behind a ridge, comes only once the target has crossed it', () => {
     const facts = placementFacts('cruise', { eastM: 0, northM: 30_000 }, 50, world(ridge));
-    expect(facts.firstSeenM).toBeLessThanOrEqual(9_000);
+    // Its dog-leg brings it back in from the north-west, over the ridge about 10 km out.
+    expect(facts.route).toHaveLength(2);
+    expect(facts.firstSeenM).toBeLessThanOrEqual(10_100);
+    expect(facts.firstSeenM).toBeGreaterThan(8_900);
     // A jet high above the ridge is in view at once: it is dropped inside its detection range.
     const jet = placementFacts('jet', { eastM: 0, northM: 30_000 }, 6_000, world(ridge));
     expect(jet.firstSeenM).toBe(30_000);

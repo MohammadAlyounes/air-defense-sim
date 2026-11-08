@@ -1,13 +1,22 @@
 import {
+  bearingTo,
+  CALM,
   coverageAt,
   DEFAULT_SEARCH_RADAR,
   detectionRangeM,
+  dropRoute,
   RADAR_CROSS_SECTION_M2,
   TRAFFIC,
+  vec3,
+  windTriangle,
+  windVelocityAt,
+  type AircraftType,
   type Command,
   type CoverageMap,
   type Terrain,
   type TrafficTypeId,
+  type Vec3,
+  type WindConfig,
 } from '../../sim';
 import { worldCoverage, worldTerrain } from '../world/world';
 
@@ -89,6 +98,17 @@ export function keyboardSpot(n: number): GroundPoint {
 /** Route samples for the first-seen estimate, m. */
 const ROUTE_STEP_M = 200;
 
+/** A swarm is placed as drones, so it flies a drone's route. */
+const aircraftTypeOf = (type: TrafficTypeId): AircraftType => (type === 'swarm' ? 'drone' : type);
+
+/**
+ * The ground waypoints the simulation will fly from `at`: straight at the battery, or for a
+ * cruise-missile-like target a dog-leg (off to one side, then back in) when there is room.
+ */
+export function placementRoute(type: TrafficTypeId, at: GroundPoint): Vec3[] {
+  return dropRoute(aircraftTypeOf(type), vec3(at.eastM, at.northM, 0), headingToBattery(at));
+}
+
 /** Numbers for the placement readout. */
 export function placementFacts(
   type: TrafficTypeId,
@@ -98,48 +118,88 @@ export function placementFacts(
     terrain: worldTerrain(),
     coverage: worldCoverage(),
   },
+  wind: WindConfig = CALM,
 ) {
   const performance = TRAFFIC[type];
   const detectedFromM = detectionRangeM(
     RADAR_CROSS_SECTION_M2[performance.radarSize],
     DEFAULT_SEARCH_RADAR,
   );
+  const route = placementRoute(type, at);
+  const start = vec3(at.eastM, at.northM, 0);
+  const aglM = (east: number, north: number) => {
+    const ground = world.terrain.heightAt(east, north);
+    return performance.altitudeRef === 'AGL'
+      ? altitudeM
+      : Math.max(altitudeM, ground + 150) - ground;
+  };
   return {
     rangeM: groundRangeOf(at),
     bearingRad: bearingOf(at),
-    /** Time to reach the battery flying straight at it, s. */
-    timeToBatteryS: groundRangeOf(at) / performance.speedMps,
+    /** The waypoints it will fly, ending at the battery. */
+    route,
+    /** Time to reach the battery along its route, through this run's wind, s. */
+    timeToBatteryS: flightTimeS(start, route, performance.speedMps, wind, aglM),
     /** Range at which the radar sees it on half of its looks, over open ground (the fourth-root law), m. */
     detectedFromM,
     /**
      * Range at which it first comes into view on its way to the battery: inside that range, and
      * not hidden by the terrain or below the horizon, m. Null if it is never in view.
      */
-    firstSeenM: firstSeenOnRoute(at, altitudeM, performance.altitudeRef, detectedFromM, world),
+    firstSeenM: firstSeenOnRoute(start, route, detectedFromM, world.coverage, aglM),
   };
 }
 
 /**
- * Walks the straight route to the battery and returns the ground range of the first point
- * where the radar could see it: within the 50% detection range, and above the lowest visible
- * height from the coverage map. Terrain followers keep their height above the ground; the
- * others keep their altitude (but stay above the hills).
+ * Time to fly a route at `airspeedMps` through the wind: each leg at the ground speed the wind
+ * triangle gives at the aircraft's height there (taken at the leg's start), s.
+ */
+function flightTimeS(
+  start: Vec3,
+  route: readonly Vec3[],
+  airspeedMps: number,
+  wind: WindConfig,
+  aglM: (east: number, north: number) => number,
+): number {
+  let total = 0;
+  let from = start;
+  for (const to of route) {
+    const leg = Math.hypot(to.x - from.x, to.y - from.y);
+    if (leg > 0) {
+      const air = windVelocityAt(wind, aglM(from.x, from.y));
+      const ground = windTriangle(bearingTo(from, to), airspeedMps, air).groundSpeedMps;
+      total += ground > 0 ? leg / ground : Number.POSITIVE_INFINITY;
+    }
+    from = to;
+  }
+  return total;
+}
+
+/**
+ * Walks the route from the drop point and returns the ground range of the first point where
+ * the radar could see it: within the 50% detection range, and above the lowest visible height
+ * from the coverage map. Terrain followers keep their height above the ground; the others keep
+ * their altitude (but stay above the hills).
  */
 function firstSeenOnRoute(
-  at: GroundPoint,
-  altitudeM: number,
-  ref: 'AGL' | 'MSL',
+  start: Vec3,
+  route: readonly Vec3[],
   detectedFromM: number,
-  { terrain, coverage }: { terrain: Terrain; coverage: CoverageMap },
+  coverage: CoverageMap,
+  aglM: (east: number, north: number) => number,
 ): number | null {
-  const range = groundRangeOf(at);
-  if (range === 0) return 0;
-  for (let r = Math.min(range, detectedFromM); r > 0; r -= ROUTE_STEP_M) {
-    const east = (at.eastM / range) * r;
-    const north = (at.northM / range) * r;
-    const ground = terrain.heightAt(east, north);
-    const agl = ref === 'AGL' ? altitudeM : Math.max(altitudeM, ground + 150) - ground;
-    if (agl >= coverageAt(coverage, east, north)) return r;
+  let from = start;
+  for (const to of route) {
+    const leg = Math.hypot(to.x - from.x, to.y - from.y);
+    const steps = Math.max(1, Math.ceil(leg / ROUTE_STEP_M));
+    for (let i = 0; i <= steps; i++) {
+      const east = from.x + ((to.x - from.x) * i) / steps;
+      const north = from.y + ((to.y - from.y) * i) / steps;
+      const range = Math.hypot(east, north);
+      if (range > detectedFromM) continue;
+      if (range < 1 || aglM(east, north) >= coverageAt(coverage, east, north)) return range;
+    }
+    from = to;
   }
   return null;
 }
