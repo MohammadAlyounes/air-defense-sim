@@ -72,6 +72,7 @@ export function InspectorPanel() {
             concept="proportionalNavigation"
             label="How an interceptor steers to its target"
           />
+          <ConceptPopover concept="turnRadius" label="Why fast things turn wide" />
         </>
       }
     >
@@ -180,6 +181,19 @@ function Details({ id }: { id: number }) {
           value={facts.defense}
           detail={facts.defenseDetail}
           tone={TONE[facts.defenseTone]}
+        />
+        <Fact label="Wind" value={facts.wind} detail={facts.windDetail} />
+        <Fact
+          label="Flight"
+          value={facts.flight}
+          detail={facts.flightDetail}
+          tone={TONE[facts.flightTone]}
+        />
+        <Fact
+          label="Doppler"
+          value={facts.doppler}
+          detail={facts.dopplerDetail}
+          tone={TONE[facts.dopplerTone]}
         />
         <Fact
           label="Radar view"

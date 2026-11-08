@@ -17,6 +17,7 @@ import {
   type Vec3,
 } from '../../sim';
 import type { RenderFrame } from '../sim/SimController';
+import { LIT_GROUND_AGL_M, type CoverageView } from '../world/world';
 
 /**
  * Draws the radar scope (a PPI: plan position indicator). The battery is at the centre,
@@ -148,14 +149,23 @@ function terrainImage(
   return image;
 }
 
+/** Blind zones are shaded orange; lit ground (clutter) is speckled sand, like ground echoes. */
+export const BLIND_RGB = [251, 146, 60] as const;
+export const CLUTTER_RGB = [214, 196, 150] as const;
+
+/** A fixed pseudo-random speckle for pixel (x, y), 0 to 63, in blocks of 2 × 2 pixels. */
+const speckle = (x: number, y: number) =>
+  (((x >> 1) * 73_856_093) ^ ((y >> 1) * 19_349_663)) >>> 26;
+
 /**
- * Where the radar cannot see a target flying `altitudeM` above the ground: a translucent
- * orange shade over the scope, from the coverage map. Drawn once per altitude and size.
+ * The coverage overlay, from the coverage map: where the radar cannot see a target flying at a
+ * given height above the ground (a translucent orange shade), or, for `clutter`, the ground it
+ * lights (a sandy speckle). Drawn once per view and size.
  */
 export function createCoverageLayer(
   layout: ScopeLayout,
   map: CoverageMap,
-  altitudeM: number,
+  view: CoverageView,
 ): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   const px = layout.staticLayer.width;
@@ -172,13 +182,16 @@ export function createCoverageLayer(
   for (let y = 0; y < px; y++) {
     for (let x = 0; x < px; x++) {
       if ((x - c) ** 2 + (y - c) ** 2 > r2) continue;
-      const blind = coverageAt(map, (x - c) * metresPerPx, (c - y) * metresPerPx) > altitudeM;
-      if (!blind) continue;
+      const minVisibleAglM = coverageAt(map, (x - c) * metresPerPx, (c - y) * metresPerPx);
+      const shaded =
+        view === 'clutter' ? minVisibleAglM <= LIT_GROUND_AGL_M : minVisibleAglM > view;
+      if (!shaded) continue;
+      const [red, green, blue] = view === 'clutter' ? CLUTTER_RGB : BLIND_RGB;
       const o = (y * px + x) * 4;
-      data[o] = 251;
-      data[o + 1] = 146;
-      data[o + 2] = 60;
-      data[o + 3] = 64;
+      data[o] = red;
+      data[o + 1] = green;
+      data[o + 2] = blue;
+      data[o + 3] = view === 'clutter' ? 22 + speckle(x, y) : 64;
     }
   }
   ctx.putImageData(image, 0, 0);
@@ -676,6 +689,8 @@ export interface ScopeGhost {
   valid: boolean;
   /** Time to reach the battery, s, shown next to the ghost. */
   timeToBatteryS: number;
+  /** The waypoints it will fly, ending at the battery (straight there when empty). */
+  route?: readonly Vec3[];
 }
 
 /**
@@ -700,7 +715,15 @@ export function drawPlacement(
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
-    ctx.lineTo(c, c);
+    const route = ghost.route && ghost.route.length > 0 ? ghost.route : null;
+    if (route) {
+      for (const point of route) {
+        const q = scopePoint(layout, point.x, point.y);
+        ctx.lineTo(q.x, q.y);
+      }
+    } else {
+      ctx.lineTo(c, c);
+    }
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;

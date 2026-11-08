@@ -6,13 +6,9 @@ import { placementFacts } from '../placement/placement';
 import { registerDropZone, usePlacementStore } from '../placement/placementStore';
 import { useSimController } from '../sim/simContext';
 import { useViewStore } from '../view/viewStore';
+import { COVERAGE_VIEWS, worldCoverage, worldTerrain, type CoverageView } from '../world/world';
 import {
-  COVERAGE_ALTITUDES_M,
-  worldCoverage,
-  worldTerrain,
-  type CoverageAltitude,
-} from '../world/world';
-import {
+  CLUTTER_RGB,
   createCoverageLayer,
   createScopeLayout,
   drawPlacement,
@@ -33,13 +29,13 @@ const RIPPLE_MS = 1_200;
 export function RadarScope() {
   const controller = useSimController();
   const selectedId = useViewStore((state) => state.selectedId);
-  const coverageAltM = useViewStore((state) => state.coverageAltM);
+  const coverage = useViewStore((state) => state.coverage);
   const compareTruth = useViewStore((state) => state.compareTruth);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layoutRef = useRef<ScopeLayout | null>(null);
-  /** Blind-zone layers for the current layout, one per target height. */
-  const coverageRef = useRef(new Map<CoverageAltitude, HTMLCanvasElement>());
+  /** Coverage layers for the current layout, one per target height (and one for clutter). */
+  const coverageRef = useRef(new Map<CoverageView, HTMLCanvasElement>());
 
   useEffect(() => {
     const container = containerRef.current;
@@ -47,12 +43,12 @@ export function RadarScope() {
     const ctx = canvas?.getContext('2d');
     if (!container || !canvas || !ctx) return;
 
-    const coverageLayer = (layout: ScopeLayout, altitudeM: CoverageAltitude | null) => {
-      if (altitudeM === null) return null;
-      let layer = coverageRef.current.get(altitudeM);
+    const coverageLayer = (layout: ScopeLayout, view: CoverageView | null) => {
+      if (view === null) return null;
+      let layer = coverageRef.current.get(view);
       if (!layer) {
-        layer = createCoverageLayer(layout, worldCoverage(), altitudeM);
-        coverageRef.current.set(altitudeM, layer);
+        layer = createCoverageLayer(layout, worldCoverage(), view);
+        coverageRef.current.set(view, layer);
       }
       return layer;
     };
@@ -65,17 +61,28 @@ export function RadarScope() {
         layout,
         controller.getFrame(),
         view.selectedId,
-        coverageLayer(layout, view.coverageAltM),
+        coverageLayer(layout, view.coverage),
         view.compareTruth,
       );
-      const { type, target, lastDrop } = usePlacementStore.getState();
-      const ghost =
+      const { type, target, lastDrop, altitudeM } = usePlacementStore.getState();
+      const facts =
         type && target
+          ? placementFacts(
+              type,
+              target.at,
+              altitudeM,
+              undefined,
+              controller.getFrame().current.wind,
+            )
+          : null;
+      const ghost =
+        type && target && facts
           ? {
               type,
               at: target.at,
               valid: target.valid,
-              timeToBatteryS: placementFacts(type, target.at).timeToBatteryS,
+              timeToBatteryS: facts.timeToBatteryS,
+              route: facts.route,
             }
           : null;
       const ripple = lastDrop
@@ -142,7 +149,7 @@ export function RadarScope() {
         ref={canvasRef}
         data-testid="radar-scope"
         data-selected={selectedId ?? ''}
-        data-coverage={coverageAltM ?? ''}
+        data-coverage={coverage ?? ''}
         data-truth={compareTruth ? 'on' : 'off'}
         data-drop-zone="scope"
         role="img"
@@ -172,23 +179,25 @@ const LEGEND = [
   },
 ] as const;
 
-const COVERAGE_LABEL: Readonly<Record<CoverageAltitude, string>> = {
+const COVERAGE_LABEL: Readonly<Record<CoverageView, string>> = {
   50: '50 m',
   300: '300 m',
   1000: '1 km',
+  clutter: 'clutter',
 };
 
 /**
  * The coverage overlay switch: shade where the radar cannot see a target flying at a chosen
- * height above the ground, behind hills or below the horizon. Shared with the 3D view.
+ * height above the ground, behind hills or below the horizon, or the ground it lights, where
+ * slow and crossing targets are filtered out with the clutter. Shared with the 3D view.
  */
 export function CoverageControl() {
-  const coverageAltM = useViewStore((state) => state.coverageAltM);
-  const setCoverageAlt = useViewStore((state) => state.setCoverageAlt);
-  const options: readonly (CoverageAltitude | null)[] = [null, ...COVERAGE_ALTITUDES_M];
+  const coverage = useViewStore((state) => state.coverage);
+  const setCoverage = useViewStore((state) => state.setCoverage);
+  const options: readonly (CoverageView | null)[] = [null, ...COVERAGE_VIEWS];
   return (
     <div className="flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-ink-300">
-      <Tooltip content="Shade where the radar cannot see a target flying this high above the ground: behind hills, or below the radar horizon. Also shown on the 3D terrain.">
+      <Tooltip content="Shade where the radar cannot see a target flying this high above the ground: behind hills, or below the radar horizon. 'clutter' shades the ground the radar lights instead: there a target closing or opening slower than 10 m/s is filtered out with the ground's echo. Also shown on the 3D terrain.">
         <span tabIndex={0} className="cursor-help font-medium text-ink-200">
           Blind zones
         </span>
@@ -199,7 +208,7 @@ export function CoverageControl() {
         className="flex rounded-md border border-ink-700 bg-ink-950/60 p-0.5"
       >
         {options.map((option) => {
-          const active = option === coverageAltM;
+          const active = option === coverage;
           return (
             <button
               key={option ?? 'off'}
@@ -207,7 +216,7 @@ export function CoverageControl() {
               role="radio"
               aria-checked={active}
               data-coverage-option={option ?? 'off'}
-              onClick={() => setCoverageAlt(option)}
+              onClick={() => setCoverage(option)}
               className={clsx(
                 'rounded px-1.5 py-0.5 font-mono text-[10.5px] transition-colors',
                 active ? 'bg-accent/20 text-accent' : 'text-ink-300 hover:text-ink-100',
@@ -218,7 +227,14 @@ export function CoverageControl() {
           );
         })}
       </div>
-      <ConceptPopover concept="terrainMasking" label="Why low flyers can hide behind hills" />
+      {coverage === 'clutter' ? (
+        <ConceptPopover
+          concept="clutterDoppler"
+          label="Why slow and crossing targets vanish over lit ground"
+        />
+      ) : (
+        <ConceptPopover concept="terrainMasking" label="Why low flyers can hide behind hills" />
+      )}
       <TruthToggle />
     </div>
   );
@@ -250,7 +266,7 @@ function TruthToggle() {
 
 /** What the scope's symbols mean, in one line. */
 export function ScopeLegend() {
-  const coverageAltM = useViewStore((state) => state.coverageAltM);
+  const coverage = useViewStore((state) => state.coverage);
   const compareTruth = useViewStore((state) => state.compareTruth);
   return (
     <ul className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10.5px] text-ink-300">
@@ -294,10 +310,20 @@ export function ScopeLegend() {
           true position
         </li>
       )}
-      {coverageAltM !== null && (
+      {coverage === 'clutter' && (
+        <li className="flex items-center gap-1">
+          <span
+            className="size-3 rounded-sm"
+            style={{ backgroundColor: `rgba(${CLUTTER_RGB.join(', ')}, 0.5)` }}
+            aria-hidden="true"
+          />
+          lit ground (clutter)
+        </li>
+      )}
+      {coverage !== null && coverage !== 'clutter' && (
         <li className="flex items-center gap-1">
           <span className="size-3 rounded-sm bg-[rgba(251,146,60,0.45)]" aria-hidden="true" />
-          blind below {COVERAGE_LABEL[coverageAltM]}
+          blind below {COVERAGE_LABEL[coverage]}
         </li>
       )}
     </ul>

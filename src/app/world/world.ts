@@ -1,4 +1,5 @@
 import {
+  coverageAt,
   coverageMap,
   createTerrain,
   DEFAULT_SEARCH_RADAR,
@@ -49,3 +50,17 @@ export function visibilityOf(position: Vec3): Visibility {
 /** Target heights offered by the coverage overlay: low flyer, drone, aircraft. */
 export const COVERAGE_ALTITUDES_M = [50, 300, 1_000] as const;
 export type CoverageAltitude = (typeof COVERAGE_ALTITUDES_M)[number];
+
+/**
+ * What the coverage overlay shades: the blind zones for a target flying at one of these heights,
+ * or (`clutter`) the ground the radar lights, where slow and crossing targets are filtered out.
+ */
+export type CoverageView = CoverageAltitude | 'clutter';
+export const COVERAGE_VIEWS: readonly CoverageView[] = [...COVERAGE_ALTITUDES_M, 'clutter'];
+
+/** Lowest visible height (m) below which the coverage map counts the ground itself as lit. */
+export const LIT_GROUND_AGL_M = 0.5;
+
+/** Does the radar light the ground at (east, north)? From the coverage map. */
+export const groundLitAt = (eastM: number, northM: number): boolean =>
+  coverageAt(worldCoverage(), eastM, northM) <= LIT_GROUND_AGL_M;

@@ -36,6 +36,12 @@ describe('parseConceptCard', () => {
   });
 
   it('parses every concept card in docs/concepts', () => {
+    const files = import.meta.glob<string>('../../../docs/concepts/[0-9][0-9]-*.md', {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    });
+    expect(Object.keys(files).length).toBeGreaterThanOrEqual(21);
     for (const markdown of [
       fixedTimeStep,
       antennaRotation,
@@ -43,6 +49,7 @@ describe('parseConceptCard', () => {
       seeingScale,
       detectionRange,
       proportionalNavigation,
+      ...Object.values(files),
     ]) {
       const card = parseConceptCard(markdown);
       expect(card.title.length).toBeGreaterThan(3);

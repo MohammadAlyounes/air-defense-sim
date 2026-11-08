@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { HeightScale } from '../views/3d/coords';
-import type { CoverageAltitude } from '../world/world';
+import type { CoverageView } from '../world/world';
 
 /**
  * View settings shared by the 3D view, the radar scope and the inspector. This is UI state
@@ -27,9 +27,9 @@ export interface ViewState {
   showLabels: boolean;
   /**
    * Coverage overlay: shade where the radar cannot see a target flying this high above the
-   * ground (null: off).
+   * ground, or the ground it lights (`clutter`); null: off.
    */
-  coverageAltM: CoverageAltitude | null;
+  coverage: CoverageView | null;
   /**
    * Truth vs. perception: show where aircraft really are next to the battery's tracks, with the
    * error between them (scope, 3D view and inspector).
@@ -41,7 +41,7 @@ export interface ViewState {
   setCameraMode: (mode: CameraMode) => void;
   setHeightScale: (scale: HeightScale) => void;
   setShowLabels: (show: boolean) => void;
-  setCoverageAlt: (altitudeM: CoverageAltitude | null) => void;
+  setCoverage: (coverage: CoverageView | null) => void;
   setCompareTruth: (compare: boolean) => void;
   setShowEnvelope: (show: boolean) => void;
 }
@@ -52,7 +52,7 @@ export const useViewStore = create<ViewState>()((set) => ({
   cameraRequest: 0,
   heightScale: 2,
   showLabels: true,
-  coverageAltM: null,
+  coverage: null,
   compareTruth: false,
   showEnvelope: false,
   select: (selectedId) =>
@@ -72,7 +72,7 @@ export const useViewStore = create<ViewState>()((set) => ({
     ),
   setHeightScale: (heightScale) => set({ heightScale }),
   setShowLabels: (showLabels) => set({ showLabels }),
-  setCoverageAlt: (coverageAltM) => set({ coverageAltM }),
+  setCoverage: (coverage) => set({ coverage }),
   setCompareTruth: (compareTruth) => set({ compareTruth }),
   setShowEnvelope: (showEnvelope) => set({ showEnvelope }),
 }));

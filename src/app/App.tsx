@@ -17,6 +17,7 @@ import { useSelectionGuard } from './view/useSelectionGuard';
 import { useViewShortcuts } from './view/useViewShortcuts';
 import { BattlespaceFallback } from './views/BattlespaceFallback';
 import { CoverageControl, RadarScope, ScopeLegend } from './views/RadarScope';
+import { WindIndicator } from './views/WindIndicator';
 import { ApprovalCard } from './views/ApprovalCard';
 import { ResultToasts } from './views/ResultToasts';
 
@@ -70,10 +71,14 @@ function Console() {
           className="area-scope"
           bodyClassName="flex flex-col items-center gap-2 p-3"
           actions={
-            <ConceptPopover
-              concept="antennaRotation"
-              label="Why radar blips jump instead of gliding"
-            />
+            <>
+              <WindIndicator />
+              <ConceptPopover concept="wind" label="Why a drone crabs sideways in the wind" />
+              <ConceptPopover
+                concept="antennaRotation"
+                label="Why radar blips jump instead of gliding"
+              />
+            </>
           }
         >
           <RadarScope />

@@ -21,23 +21,55 @@ Every model in the simulator: its equations, its assumptions and its limits. Thi
   - Normal samples use Box-Muller, with two uniform draws per sample and nothing cached, so the generator state alone determines what comes next.
 - **Determinism:** the same seed and the same commands at the same ticks give the same run, bit for bit, within one JavaScript engine. Different engines may round `Math.sin`, `Math.atan2` and similar functions differently in the last bit.
 
-## Kinematics (Step 1)
+## Kinematics (Steps 1 and 4)
 
-Aircraft fly at constant velocity:
+Each tick an aircraft moves at its velocity over the ground:
 
 ```
 p(t + Δt) = p(t) + v · Δt
 ```
 
-For constant velocity one Euler step per tick is exact. The test suite checks that a fast jet at 340 m/s moves exactly 340 m in 50 ticks.
+For a straight leg in steady wind one Euler step per tick is exact. The test suite checks that a fast jet at 340 m/s in calm air moves exactly 340 m in 50 ticks. Since Step 4 the velocity comes from the aircraft's airspeed, its track and the wind (see Flight), and the track turns toward the next waypoint.
 
-**Terrain following (Step 4):** ground speed and heading stay constant, and the height follows the terrain:
+**Terrain following (Step 4):** the height follows the terrain:
 
 - AGL traffic (drones, cruise-missile-like targets) aims for its set height above the highest ground at its position and 1.5 s and 3 s ahead.
 - MSL traffic (jets, friendly aircraft, airliners) keeps its altitude, but climbs to stay at least 150 m above the hills.
 - Height changes are limited by each type's climb rate (8 m/s for a drone, 60 m/s for a cruise-missile-like target, 150 m/s for a jet), and nothing flies lower than 10 m above the ground. The vertical speed is part of the aircraft's velocity.
 
-**Limitations:** no turns, wind or evasive manoeuvres yet (they come later in Step 4).
+## Atmosphere (Step 4)
+
+The International Standard Atmosphere, first three layers, heights above the battery's ground:
+
+| Layer              | Heights  | Temperature                    |
+| ------------------ | -------- | ------------------------------ |
+| Troposphere        | 0–11 km  | 288.15 K, falling 6.5 K per km |
+| Lower stratosphere | 11–20 km | 216.65 K (−56.5 °C), constant  |
+| Stratosphere       | 20–32 km | rising 1 K per km              |
+
+- **Pressure** from hydrostatic balance `dp/dh = −ρ g` (g₀ = 9.80665 m/s²) with the ideal gas law, layer by layer from 101,325 Pa at the ground: `p = p_b · (T / T_b)^(−g₀ / (L·R))` where the temperature changes at rate `L`, `p = p_b · e^(−g₀ (h − h_b) / (R·T))` where it is constant.
+- **Density** `ρ = p / (R·T)`, with `R = 287.053 J/(kg·K)`; **speed of sound** `a = √(γ·R·T)`, `γ = 1.4`.
+- Checked against the published table at 0, 5, 11, 15, 20 and 25 km (temperature, pressure, density, speed of sound). Above 32 km the 32 km values are used.
+- The exponential atmosphere `ρ = 1.225 · e^(−h / 8.5 km)` stays available behind the same interface, for comparison and tests.
+
+## Flight: wind, turns and routes (Step 4)
+
+- **Wind:** one direction over the whole area, steady, growing with height by the one-seventh power law `w(h) = w₁₀ · (max(h, 1 m) / 10 m)^(1/7)`, with `h` the height above the ground. Each run draws its own surface wind from the seed with a generator of its own (2–12 m/s, from any direction), so the wind never changes the other random numbers of a run.
+- **Wind triangle:** an aircraft holds its ground track `ψ` at its airspeed `V`. With the wind split along the track (`w∥`) and across it (`w⊥`), its velocity through the air is `−w⊥` across and `√(V² − w⊥²)` along, so its ground speed is `√(V² − w⊥²) + w∥`, and its heading (where the nose points) is turned into the wind by `asin(w⊥ / V)`. A crosswind stronger than the airspeed is only partly cancelled: the aircraft drifts.
+- **Turns:** level, coordinated turns at load factor `n`: rate `ω = g·√(n² − 1) / V`, radius `r = V / ω`. Each type turns at a routine bank angle `φ` (`n = 1 / cos φ`): drone and swarm 35°, cruise-missile-like 45°, fast jet 60°, friendly 30°, airliner 25°. The track turns toward the desired track by at most `ω·Δt` per tick.
+- **Routes:** waypoints over the ground. The aircraft turns onto the next leg `r · tan(Δψ / 2)` before the waypoint (`Δψ` the change of track, capped at 2 rad), or passes it within 300 m. A waypoint inside the turn circle (unreachable by turning) is given up, unless it is the last one, which the aircraft flies on from until it can turn back in. After the last waypoint it flies straight on.
+- **Dog-leg:** a cruise-missile-like target's route turns at a point half way along the direct line and a quarter of its length to one side, when the route is at least three turn radii long. Auto traffic draws the side from the route generator; traffic placed by hand takes it from the drop bearing (alternating every 45°), so the placement readout shows the same route.
+- **Evasive break:** a fast jet that an interceptor is guided at breaks once it is within 6 km: it turns at 6 g onto the track square to the line of sight to the interceptor (the side needing the smaller turn), holds it for 6 s, then goes back to its route. Once per interceptor.
+
+| Type                | Routine bank | Routine turn radius | Break       |
+| ------------------- | ------------ | ------------------- | ----------- |
+| Small drone         | 35°          | 233 m               | —           |
+| Cruise-missile-like | 45°          | 5.9 km              | —           |
+| Fast jet            | 60° (2 g)    | 6.8 km              | 6 g, 2.0 km |
+| Friendly aircraft   | 30°          | 7.1 km              | —           |
+| Airliner            | 25°          | 11.6 km             | —           |
+
+**Limitations:** no gusts or turbulence; turns are flat (no climbing turns), entered at once (no roll rate), at constant airspeed (no energy lost in a hard turn).
 
 ## Terrain (Step 4)
 
@@ -52,17 +84,18 @@ For constant velocity one Euler step per tick is exact. The test suite checks th
 - **Line of sight:** sample the straight line from the antenna (12 m above the site) to the target every 150 m of ground distance. With every height lowered by its curvature drop, the line is blocked if the ground rises above it anywhere. If the smooth Earth alone blocks it, the target is **below the horizon**; otherwise, if a hill blocks it, it is **masked by terrain**.
 - **Smooth-Earth horizon:** `d = √(2R·h₁) + √(2R·h₂) ≈ 4.12 km × (√h₁ + √h₂)`.
 - **Coverage map:** for each of 720 bearings, walk out in 200 m steps, keeping the steepest slope `(h − d²/2R − h_antenna) / d` seen so far. The lowest visible height at distance `d` is `h_antenna + slope_max · d + d²/2R`, minus the ground height there. The scope and the 3D view shade where that is above the chosen target height (50 m, 300 m or 1 km).
+- **Lit ground:** the coverage overlay's clutter view shades the ground the antenna can see (a point 0.5 m above the ground is in view): the places whose echo the Doppler filter has to remove (see Search radar).
 
 ## Scenario traffic (Steps 1 and 3)
 
-| Setting          | Value                                                                      |
-| ---------------- | -------------------------------------------------------------------------- |
-| At the start     | 4 aircraft, placed 15–65% of the way along their course                    |
-| Arrivals         | One new aircraft every 14–28 s while fewer than 7 are flying               |
-| Entry point      | 38 km from the battery, at a random bearing                                |
-| Course           | Straight: hostiles aim within 1.5 km of the battery, others within 14 km   |
-| Mix (weights)    | Drone 3 · cruise-missile-like 2 · fast jet 2 · airliner 1.5 · friendly 1.5 |
-| Leaving the area | Farther than 42 km from the battery and flying away                        |
+| Setting          | Value                                                                                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| At the start     | 4 aircraft, placed 15–65% of the way along their course                                                                                   |
+| Arrivals         | One new aircraft every 14–28 s while fewer than 7 are flying                                                                              |
+| Entry point      | 38 km from the battery, at a random bearing                                                                                               |
+| Course           | Hostiles aim within 800 m of a defended asset, others within 14 km of the battery; cruise-missile-like targets fly a dog-leg (see Flight) |
+| Mix (weights)    | Drone 3 · cruise-missile-like 2 · fast jet 2 · airliner 1.5 · friendly 1.5                                                                |
+| Leaving the area | Farther than 42 km from the battery and flying away                                                                                       |
 
 Aim points use `r = R·√u` (with `u` uniform), which spreads them evenly over the disc instead of bunching them near the centre.
 
@@ -105,7 +138,13 @@ Aim points use `r = R·√u` (with `u` uniform), which spreads them evenly over 
 - **Measurement noise (Step 4):** slant range, bearing and elevation each get Gaussian noise (σ = 30 m, 0.15°, 0.25°), then turn back into a position. The plot's position, bearing and range are the measured ones.
 - **False alarms (Step 4):** `λ = Pfa × 600,000 cells = 0.6` per antenna turn. In each tick, with probability `λ · Δt / T`, one false plot appears in the swept arc, uniform over the area between 1 km and 40 km, at an elevation of 0–15°.
 
-**Limitations:** no clutter, no Doppler processing, no jamming, no elevation limit to the beam. Detection does not depend on aspect or weather.
+- **Doppler shift (Step 4):** only the part of a target's velocity along the line of sight shifts its echo's frequency. The closing speed is `v_r = v · (p_antenna − p) / |p_antenna − p|`, and the shift is `f_D = 2 · v_r / λ`, with a fictional wavelength `λ = 0.1 m` (200 Hz for every 10 m/s).
+- **Clutter and the low-Doppler notch (Step 4):** the ground the beam lights returns a strong echo with no Doppler shift. The radar filters it out, and with it every echo closing or opening slower than 10 m/s, but only where there is clutter to remove: where the ground at the target's slant range, on the same bearing, is in view of the antenna. A target there that flies across the beam, or hovers, is not painted at all.
+  - Over flat ground, the 12 m antenna lights the ground out to its smooth-Earth horizon, 14.3 km. Hills light patches farther out and hide others.
+  - A high flyer at 12 km of slant range is judged by the ground at 12 km of ground range, not by the ground below it.
+  - The ideal radar used by some tests has no notch.
+
+**Limitations:** the notch is all or nothing (no clutter echoes on the scope, no sub-clutter visibility, no blind speeds); no jamming, no elevation limit to the beam. Detection does not depend on aspect or weather.
 
 ## Tracks (Steps 3 and 5)
 
@@ -120,9 +159,10 @@ Aim points use `r = R·√u` (with `u` uniform), which spreads them evenly over 
   - All pairs inside their gates are sorted by `d²` and taken greedily, each plot and each track once; a track updated within the last half turn cannot take another plot.
   - Plots are matched in batches covering 10 ticks (0.2 s, 18° of sweep) and committed when they are 10 ticks old, so close neighbours compete together. Leftover plots start tentative tracks.
   - The tracker never reads the truth. Each track keeps a link to the aircraft behind its last plot (null for a false alarm), used only by the truth overlay, the tests and the physics.
+- **Maneuver gate (Step 4):** a fast jet breaking at 6 g leaves the constant-velocity prediction behind: one antenna turn later its echo can be 760 m from where the track expected it, outside the gate. So plots still unassigned after the normal pass get a second chance against confirmed tracks that took no plot, predicted with a far larger process noise (q = 4,000 m²/s³ horizontally) and gated at the same 99.9%. A plot taken this way updates the track through that larger noise, so the estimate catches up at once; the inspector notes it for one antenna turn.
 - **Dropped:** a tentative track whose next look brings no plot (after 1.25 turns), most often a false alarm; a confirmed track after three antenna turns (12 s) without a plot, unless an interceptor is still being guided to it or has just hit it (it is then kept until the kill assessment).
 
-**Limitations:** constant-velocity model only (no turn models or interacting multiple models); nearest-neighbour association can swap tracks between targets closer than the gate, most visibly when a drone swarm first appears.
+**Limitations:** constant-velocity model only, with a second, wider gate for hard turns (no turn models or interacting multiple models); nearest-neighbour association can swap tracks between targets closer than the gate, most visibly when a drone swarm first appears.
 
 ## Defended assets (Step 5)
 
@@ -160,7 +200,7 @@ Scenario hostiles aim within 800 m of one of the three, picked at random. A host
 ## Weapon assignment (Steps 3 and 6)
 
 - **Predicted intercept point:** the earliest flight time `t` at which the interceptor can be where the track will be: `0.9 · reach(t) ≥ |p + v · t|`. It is found by scanning in 0.25 s steps, then bisecting. The 0.9 keeps a margin for turns, climbs and the drag during the boost. Since Step 4, `reach` includes drag at the air density halfway up to the target.
-- **Engagement envelope:** for a target at altitude `h`, the farthest ground range is `√(R² − h²)` with `R = 0.9 · reach(34 s, ρ(h/2))`: about 17 km at ground level, 17.1 km at 6 km, closing at 20 km up. The inner edge is the 1.5 km minimum range.
+- **Engagement envelope:** for a target at altitude `h`, the farthest ground range is `√(R² − h²)` with `R = 0.9 · reach(34 s, ρ(h/2))`: about 17 km at ground level, 17.2 km at 3 km (the widest), 16.9 km at 6 km, closing just below 20 km up. The inner edge is the 1.5 km minimum range.
 - **Rules:** assign only if the rules allow the track's identity, a fire channel is free, `t ≤ 34 s`, the point is at least 1.5 km from the launcher, and the track had a plot within the last 1.25 turns. The most urgent threat gets the next launch slot: 1.5 s to prepare, at least 2 s between launches.
 - **Fire channels (Step 6):** the tracking radar guides at most 3 engagements at once (proposed, waiting to launch or in flight). More threats than channels means the rest wait: saturation.
 - **Launcher:** 12 ready rounds; while not full, one round is reloaded every 30 s.
@@ -191,7 +231,7 @@ A generic, fictional interceptor, modelled as a point mass (round numbers chosen
 | Lethal radius   | 15 m                     |
 | Maximum flight  | 40 s                     |
 
-- **Air drag (Step 4):** `a_drag = −(ρ(h) · |v| / 2β) · v`, with the exponential atmosphere `ρ(h) = 1.225 kg/m³ · e^(−h / 8,500 m)`.
+- **Air drag (Step 4):** `a_drag = −(ρ(h) · |v_air| / 2β) · v_air`, with `ρ(h)` from the standard atmosphere (see Atmosphere) and `v_air = v − w(h)` the interceptor's velocity through the air (the wind at its height, see Flight).
 - **Reach** (straight line): `v₀ t + ½ a t²` during the boost (drag left out), then the coast with drag alone, `dv/dt = −k v²` with `k = ρ / 2β`:
 
   ```

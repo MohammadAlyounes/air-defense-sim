@@ -26,6 +26,7 @@ const SEGMENTS = 200;
 const COVERAGE_SIZE = 256;
 const ACCENT = new Color('#22d3ee');
 const BLIND = new Color('#fb923c');
+const CLUTTER = new Color('#d6c496');
 
 const VERTEX = /* glsl */ `
   attribute float aHeight;
@@ -47,7 +48,7 @@ const VERTEX = /* glsl */ `
 /**
  * Relief shading lit from the north-west, contour lines every 100 m, a faint 10 km grid, the
  * radar's sweep glowing on the ground behind the beam, and (when switched on) the blind zones
- * tinted orange.
+ * tinted orange, or the ground the radar lights tinted sand.
  */
 const FRAGMENT = /* glsl */ `
   uniform float uAzimuth;
@@ -108,7 +109,7 @@ const FRAGMENT = /* glsl */ `
 export function TerrainLayer() {
   const controller = useSimController();
   const heightScale = useViewStore((state) => state.heightScale);
-  const coverageAltM = useViewStore((state) => state.coverageAltM);
+  const coverage = useViewStore((state) => state.coverage);
   const material = useRef<ShaderMaterial>(null);
   const geometry = useMemo(() => buildTerrainGeometry(SEGMENTS, HALF_KM), []);
   const texture = useMemo(() => {
@@ -154,8 +155,8 @@ export function TerrainLayer() {
   }, [geometry, heightScale]);
 
   useEffect(() => {
-    if (coverageAltM !== null) fillCoverageTexture(texture, COVERAGE_SIZE, coverageAltM);
-  }, [coverageAltM, texture]);
+    if (coverage !== null) fillCoverageTexture(texture, COVERAGE_SIZE, coverage);
+  }, [coverage, texture]);
 
   useEffect(
     () => () => {
@@ -169,7 +170,7 @@ export function TerrainLayer() {
     const shader = material.current;
     if (!shader) return;
     const { previous, current, alpha } = controller.getFrame();
-    const { uAzimuth, uCoverageOn } = shader.uniforms;
+    const { uAzimuth, uCoverageOn, uBlind } = shader.uniforms;
     if (uAzimuth) {
       uAzimuth.value = interpolateAzimuth(
         previous.radar.azimuthRad,
@@ -177,7 +178,9 @@ export function TerrainLayer() {
         alpha,
       );
     }
-    if (uCoverageOn) uCoverageOn.value = useViewStore.getState().coverageAltM === null ? 0 : 1;
+    const { coverage: view } = useViewStore.getState();
+    if (uCoverageOn) uCoverageOn.value = view === null ? 0 : 1;
+    if (uBlind) uBlind.value = view === 'clutter' ? CLUTTER : BLIND;
   });
 
   return (

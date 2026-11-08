@@ -6,7 +6,7 @@ import type { AircraftType, Vec3 } from '../../../sim';
 import { useSimController } from '../../sim/simContext';
 import { useViewStore } from '../../view/viewStore';
 import { AFFILIATION_COLOR, aircraftGeometry, aircraftMaterial } from './aircraftModels';
-import { headingOf, toScene, worldSizeForPixels, yawForHeading } from './coords';
+import { toScene, worldSizeForPixels, yawForHeading } from './coords';
 import { interpolated, useAircraftRoster, type RosterEntry } from './frame';
 import { Polyline } from './polyline';
 import { groundSceneY } from './terrainGeometry';
@@ -88,7 +88,8 @@ const AircraftMarker = memo(function AircraftMarker({
     const { heightScale } = useViewStore.getState();
     const [x, y, z] = toScene(entry.position, heightScale);
     group.position.set(x, y, z);
-    if (yaw.current) yaw.current.rotation.y = yawForHeading(headingOf(entry.aircraft.velocity));
+    // The nose points along the heading, turned into the wind, not along the ground track.
+    if (yaw.current) yaw.current.rotation.y = yawForHeading(entry.aircraft.headingRad);
 
     const { fov, zoom } = camera as PerspectiveCamera;
     const pixels = MODEL_PX[type] * (selected ? SELECTED_GROWTH : 1);

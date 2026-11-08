@@ -4,6 +4,63 @@ One short entry per step, newest first: what was built, the decisions behind it,
 
 > **Roadmap compressed (2026-11-08).** The eleven remaining steps were merged into six, so v1.0 is now Step 9 instead of Step 14 ([PROJECT_PLAN.md](PROJECT_PLAN.md), Section 16). Older entries may still name steps by their old numbers: old Steps 4 + 5 are now Step 4, 6 + 7 are Step 5, 8 + 9 are Step 6, 10 + 12 are Step 7, 11 is Step 8, and 13 + 14 are Step 9.
 
+## Step 4 · Environment & radar (2026-11-08)
+
+The battlespace gets a landscape and weather, threats fly real routes, and the radar learns what it cannot see. Part 1 (terrain and radar) was built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08 in the new numbering; part 2 (the atmosphere, wind, routes, clutter and Doppler) completes the step.
+
+**Built: terrain and radar (part 1)**
+
+- **Procedural terrain (`src/sim/terrain.ts`):** seeded value noise with rotated octaves and one ridged octave, flat within 3 km of the battery, rising to about 750 m. A 257 × 257 grid, sampled bilinearly, generated once and shared by everything.
+- **Line of sight, horizon and coverage (`src/sim/propagation.ts`):** the 4/3 Earth model, a sampled line of sight that tells "below the horizon" from "masked by terrain", and a radial-sweep coverage map of the lowest visible height at every bearing and range.
+- **Radar realism (`src/sim/radar.ts`):**
+  - Swerling 1 detection probability from the SNR (`Pd = Pfa^(1/(1+SNR))`), with the old ranges now meaning "seen on half the looks".
+  - Gaussian noise on range, bearing and elevation.
+  - False alarms at `λ = Pfa × cells = 0.6` per turn.
+- **Tracks:** a tentative track is dropped if the next look brings nothing (the log says "dropped", usually a false alarm); confirmed tracks survive three silent turns. The command node only fires at tracks seen within the last look.
+- **Terrain following:** drones and cruise-missile-like targets hold their height above the ground ahead, jets keep their altitude but clear the hills, all within a climb rate per type.
+- **Air drag:** a ballistic coefficient and the air density slow the coasting interceptor. The planner's reach uses the closed form `s = ln(1 + k·v₀·t)/k`, at the air density halfway up to the target.
+- **Guidance out of sight:** while terrain hides the target, the interceptor steers toward the track's extrapolated position; it can now hit the ground.
+- **Views:**
+  - The 3D terrain mesh is drawn by one shader: relief, contours, a 10 km grid, the sweep's glow and the blind zones. Range rings follow the ground, and drops land where the pointer's ray meets the terrain.
+  - The scope gets a faint relief layer and the blind-zone overlay. The switch (off, 50 m, 300 m, 1 km) is shared with 3D and the URL (`?coverage=50`).
+  - The placement readout predicts where on its route the radar first sees the threat and warns when the terrain hides it. The inspector gains a "Radar view" row: in view (with the chance per look), hidden by terrain (and from what height it would show), or below the horizon.
+- **Tests:** 31 new unit tests and 3 new browser tests, 152 unit and 23 browser tests in all.
+  - The physics is checked against hand-computed values: the horizon, curvature drop, ridge shadows, Pd, the 50% range, λ, air density, drag deceleration and the analytic coast (including step-by-step integration against it).
+  - Simulation-level tests cover masking behind a ridge, terrain following, the noise level, false alarms that never confirm, detection odds near and far, the full loop over terrain, and replay.
+  - Browser tests switch the blind zones on and off, open them from a link, check the inspector's radar view and the placement warning.
+
+**Built: atmosphere, wind, routes, clutter (part 2)**
+
+- **Standard atmosphere (`src/sim/atmosphere.ts`):** the International Standard Atmosphere's first three layers (to 32 km), from hydrostatic balance and the ideal gas law, checked against the published table. Interceptor drag and the planner's reach use it; the exponential model stays for comparison.
+- **Wind (`src/sim/flight.ts`):** one steady wind per run, drawn from the seed (2–12 m/s at 10 m, any direction), growing with height by the one-seventh power law. Aircraft hold their ground track by the wind triangle, nose crabbed into the wind; the interceptor's drag acts on its velocity through the air.
+- **Turns and routes:** coordinated turns at each type's routine bank angle, `r = V² / (g·√(n² − 1))`; routes of waypoints flown with lead turns; a dog-leg for cruise-missile-like targets on long routes; and a 6 g evasive break for fast jets when an interceptor guided at them comes within 6 km.
+- **Clutter and Doppler (`src/sim/radar.ts`, `src/sim/propagation.ts`):** the closing speed and its Doppler shift `f = 2v/λ`, and a low-Doppler notch (under 10 m/s) that applies only where the ground at the target's slant range is lit. A target crossing the beam over lit ground is not painted.
+- **Maneuver gate (`src/sim/tracker.ts`):** a second association pass, with a far larger process noise, for confirmed tracks left without a plot, so a jet breaking at 6 g keeps its track.
+- **Views:**
+  - A wind arrow by the scope. The coverage switch gains a "clutter" view that shades the lit ground on the scope and the 3D terrain (`?coverage=clutter`).
+  - The placement ghost draws the route a threat will fly, dog-leg included, on the scope and in 3D; its time to the battery accounts for the wind, and its "first seen" estimate walks the route.
+  - The inspector adds Wind (headwind, tailwind or crosswind, and the crab), Flight (turn radius and bank, dog-leg, break) and Doppler (closing speed, shift, notch), and its radar view can say "Lost in clutter". 3D models point their nose along the heading, not the track.
+- **Concept cards:** radar horizon, terrain masking, detection probability and air drag (part 1); the standard atmosphere, wind, turn radius, radar cross section, and clutter and Doppler (part 2).
+- **Tests:** part 2 adds 43 unit tests and 3 browser tests, 230 unit and 31 browser tests in all.
+  - The physics is checked against known values: the standard atmosphere table, the wind profile, the wind triangle (head, tail and crosswind, and drift), turn radii, the dog-leg geometry, Doppler shifts, and the lit ground of a 12 m antenna over flat ground ending at its 14.3 km horizon.
+  - Simulation-level tests fly a dog-leg to the battery, a break and the return, a track kept through the break (and lost without the maneuver gate), drones in a head, tail and crosswind, and a crossing drone lost in the clutter while an inbound one is painted.
+  - Browser tests check the wind arrow and the inspector's wind, flight and Doppler lines, the clutter view (also from a link), and the dog-leg in the placement readout.
+
+**Decisions**
+
+- **An "ideal" radar for exact tests.** `IDEAL_SEARCH_RADAR` (threshold detection, no noise, no false alarms) with `terrain: false` keeps the Step 3 tests exact. New tests cover the realistic radar separately.
+- **The terrain has its own seed.** Every run uses the same map, so a scenario's geometry doesn't change when you press "New seed", and the app builds the terrain and coverage once.
+- **Masking where it matters.** A first landscape hid little inside 17 km (the cruise-missile-like target's detection range). The hills now start 6 km out, so the south and west hide low flyers until 7 to 10 km out, while the north and east stay open. The contrast is the lesson.
+- **False alarms are honest.** They start real tentative tracks, which the M-of-N rule (here: two echoes in a row) drops. The tracker never "knows" which echoes are false.
+- **Kill assessment survives masking.** A hit target's track is kept until the beam comes round, even if the target was last seen several turns earlier. Without that, kills behind a ridge went unconfirmed.
+- **Weather with its own dice.** The wind and the dog-leg sides come from random generators of their own, seeded from the run's seed, so every other random draw stays as it was: an old seed still brings the same aircraft at the same times, now flown through the wind.
+- **Clutter at the target's own range.** The clutter that competes with a target comes from the ground at the same range in the same beam. A first version tested the ground below the aircraft instead, which wrongly buried high flyers in clutter.
+- **A lesson on demand.** Scenario traffic heads for the battery or an asset and closes fast, so the notch hides only 0.3 to 0.6% of its looks. The effect is shown where you look for it: the clutter view, the inspector's Doppler line and the card.
+- **A wider gate, not a new filter.** A 6 g break moves the echo about 760 m off the straight-line prediction in one antenna turn, outside the gate. A second pass with a wider gate, for confirmed tracks only and after the normal pass, keeps the track without letting it steal a neighbour's echo. Interacting multiple models would be more precise, at the cost of a much harder explanation.
+- **Back to the target after a break.** An aim point that ends up inside the turn circle is kept: the jet flies on until it can turn back in, instead of flying away.
+
+**Next:** the rest of Step 5: a kinematic classifier, air corridors and the identification friend-or-foe card.
+
 ## Steps 5 and 6 · Decide & engage (2026-11-07)
 
 Built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08, in the new numbering. Identification, defended assets and threat evaluation complete most of Step 5; the rules of engagement, fire channels, kill probability and the envelope are the first part of Step 6.
@@ -73,43 +130,6 @@ Built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08, in t
 - **σ, not Σ.** CSS upper-casing turned the column header's σ into Σ; that header opts out.
 
 **Next:** identification mistakes, defended assets and a "Why?" for every decision (the rest of Step 5), with the first engagement rules from Step 6.
-
-## Step 4 · Environment & radar, part 1: terrain and radar (2026-11-07)
-
-Built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08, in the new numbering. Wind, threat routes and evasive turns, the standard atmosphere, and clutter and Doppler come in part 2.
-
-**Built**
-
-- **Procedural terrain (`src/sim/terrain.ts`):** seeded value noise with rotated octaves and one ridged octave, flat within 3 km of the battery, rising to about 750 m. A 257 × 257 grid, sampled bilinearly, generated once and shared by everything.
-- **Line of sight, horizon and coverage (`src/sim/propagation.ts`):** the 4/3 Earth model, a sampled line of sight that tells "below the horizon" from "masked by terrain", and a radial-sweep coverage map of the lowest visible height at every bearing and range.
-- **Radar realism (`src/sim/radar.ts`):**
-  - Swerling 1 detection probability from the SNR (`Pd = Pfa^(1/(1+SNR))`), with the old ranges now meaning "seen on half the looks".
-  - Gaussian noise on range, bearing and elevation.
-  - False alarms at `λ = Pfa × cells = 0.6` per turn.
-- **Tracks:** a tentative track is dropped if the next look brings nothing (the log says "dropped", usually a false alarm); confirmed tracks survive three silent turns. The command node only fires at tracks seen within the last look.
-- **Terrain following:** drones and cruise-missile-like targets hold their height above the ground ahead, jets keep their altitude but clear the hills, all within a climb rate per type.
-- **Air drag:** an exponential atmosphere and a ballistic coefficient slow the coasting interceptor. The planner's reach uses the closed form `s = ln(1 + k·v₀·t)/k`, at the air density halfway up to the target.
-- **Guidance out of sight:** while terrain hides the target, the interceptor steers toward the track's extrapolated position; it can now hit the ground.
-- **Views:**
-  - The 3D terrain mesh is drawn by one shader: relief, contours, a 10 km grid, the sweep's glow and the blind zones. Range rings follow the ground, and drops land where the pointer's ray meets the terrain.
-  - The scope gets a faint relief layer and the blind-zone overlay. The switch (off, 50 m, 300 m, 1 km) is shared with 3D and the URL (`?coverage=50`).
-  - The placement readout predicts where on its route the radar first sees the threat and warns when the terrain hides it. The inspector gains a "Radar view" row: in view (with the chance per look), hidden by terrain (and from what height it would show), or below the horizon.
-- **Concept cards:** radar horizon, terrain masking, detection probability, air drag.
-- **Tests:** 31 new unit tests and 3 new browser tests, 152 unit and 23 browser tests in all.
-  - The physics is checked against hand-computed values: the horizon, curvature drop, ridge shadows, Pd, the 50% range, λ, air density, drag deceleration and the analytic coast (including step-by-step integration against it).
-  - Simulation-level tests cover masking behind a ridge, terrain following, the noise level, false alarms that never confirm, detection odds near and far, the full loop over terrain, and replay.
-  - Browser tests switch the blind zones on and off, open them from a link, check the inspector's radar view and the placement warning.
-
-**Decisions**
-
-- **An "ideal" radar for exact tests.** `IDEAL_SEARCH_RADAR` (threshold detection, no noise, no false alarms) with `terrain: false` keeps the Step 3 tests exact. New tests cover the realistic radar separately.
-- **The terrain has its own seed.** Every run uses the same map, so a scenario's geometry doesn't change when you press "New seed", and the app builds the terrain and coverage once.
-- **Masking where it matters.** A first landscape hid little inside 17 km (the cruise-missile-like target's detection range). The hills now start 6 km out, so the south and west hide low flyers until 7 to 10 km out, while the north and east stay open. The contrast is the lesson.
-- **False alarms are honest.** They start real tentative tracks, which the M-of-N rule (here: two echoes in a row) drops. The tracker never "knows" which echoes are false.
-- **Kill assessment survives masking.** A hit target's track is kept until the beam comes round, even if the target was last seen several turns earlier. Without that, kills behind a ridge went unconfirmed.
-- **No screenshots for this step.** The owner will capture all media in one pass once the v1.0 features are in.
-
-**Next:** tracking with a Kalman filter, the first part of Step 5. Part 2 of Step 4 (wind, threat routes and evasive turns, the standard atmosphere, and clutter and Doppler) follows once this work is on `main`.
 
 ## Step 3 · First intercept (2026-11-07)
 

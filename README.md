@@ -13,7 +13,7 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 
 [![CI](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml)
 ![Status: building in public](https://img.shields.io/badge/status-building_in_public-fbbf24)
-![Progress: step 3 of 9](https://img.shields.io/badge/progress-step_3_of_9-22d3ee)
+![Progress: step 4 of 9](https://img.shields.io/badge/progress-step_4_of_9-22d3ee)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34d399)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
@@ -29,7 +29,7 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 - **Drag threats onto the map.** Small drones, drone swarms, cruise-missile-like targets and fast jets, plus friendly and civil aircraft that must _not_ be engaged.
 - **Watch the whole defense loop.** A live analysis bar follows every track through **Detect → Track → Identify → Evaluate → Assign → Engage → Assess**, with a plain-language "Now" line.
 - **Ask "Why?"** Click any decision to see the reasoning: the evidence, the threat score, the intercept geometry and the chance of a hit.
-- **See the physics, not magic.** Radar horizon, terrain masking, detection probability, air drag, Kalman filtering and proportional navigation, each explained in three sentences and one formula.
+- **See the physics, not magic.** Radar horizon, terrain masking, clutter and Doppler, wind, turn radius, air drag, Kalman filtering and proportional navigation, each explained in three sentences and one formula.
 - **Experiment.** Tune parameters, save and share scenarios, rewind and try a different decision, or run a scenario hundreds of times to see the odds.
 
 ## Quick start
@@ -171,13 +171,63 @@ A radar decides "target or not" by checking whether the echo rises above a thres
 
 ### Air drag — why an interceptor's reach depends on altitude
 
-Once its motor burns out, an interceptor coasts and the air slows it down. Drag grows with the square of speed and with air density, and the air thins out with height, halving about every 6 km. So the same interceptor reaches farther, and arrives faster, against a high target than against a low one.
+Once its motor burns out, an interceptor coasts and the air slows it down. Drag grows with the square of speed and with air density, and the air thins out with height: at 6.6 km it is half as dense as at sea level. So the same interceptor reaches farther, and arrives faster, against a high target than against a low one.
 
-- **Formula:** `a_drag = ρ(h) · v² / (2β)`, with `ρ(h) = 1.225 kg/m³ × e^(−h / 8.5 km)` and ballistic coefficient `β = 20,000 kg/m²`
+- **Formula:** `a_drag = ρ(h) · v² / (2β)`, with the density `ρ(h)` of the standard atmosphere (1.225 kg/m³ at sea level) and the ballistic coefficient `β = 20,000 kg/m²`
 - **Example:** at sea level and 760 m/s, drag slows it by 17.7 m/s² (almost 2 g); after 10 s of coasting it is down to 617 m/s and has flown 6.8 km instead of 7.6 km.
 - **See it:** drop a fast jet high and a cruise-missile-like target low at the same distance: the low one is intercepted closer in, after a slower flight.
 
 [Going deeper →](docs/concepts/04-4-air-drag.md)
+
+### Standard atmosphere — why the air thins and cools with height
+
+The air near the ground is squeezed by the weight of all the air above it, so it is densest at the bottom and thins out with height. It also cools by 6.5 °C for every kilometre up to 11 km, then stays at −56.5 °C. Thinner air means less drag, so the same interceptor flies farther and arrives faster against a high target.
+
+- **Formula:** `ρ = p / (R · T)`, with `T = 15 °C − 6.5 °C/km × h` and the pressure `p` set by the weight of the air above
+- **Example:** at 5 km the air is at −17.5 °C and 540 hPa, with 60% of its sea-level density (0.736 kg/m³); at 11 km it is down to 30% (0.364 kg/m³).
+- **See it:** switch on the engagement envelope in the 3D view: for the first 3 km its edge leans outward, because the interceptor flies through thinner air.
+
+[Going deeper →](docs/concepts/04-5-standard-atmosphere.md)
+
+### Wind — why a drone crabs sideways
+
+Aircraft fly through the air, and the air itself moves, so their path over the ground is their own velocity plus the wind's. To hold a track, an aircraft turns its nose partly into the wind; what is left of its airspeed, plus the wind along its track, is its speed over the ground. Near the ground the wind is slowed by friction, so it grows with height.
+
+- **Formula:** `ground speed = √(V² − w⊥²) + w∥`, with the wind at height h `w(h) = w₁₀ · (h / 10 m)^(1/7)`
+- **Example:** an 8 m/s surface wind blows at 13 m/s at a drone's 300 m. Flying into it, a 40 m/s drone covers the ground at 27 m/s, a third slower; a 240 m/s cruise-missile-like target at 50 m loses only 4%.
+- **See it:** the wind arrow on the radar scope shows this run's wind. Select a drone: the inspector shows its airspeed, the wind it meets and how far its nose is turned into it.
+
+[Going deeper →](docs/concepts/04-6-wind.md)
+
+### Turn radius — why fast things turn wide
+
+To turn, an aircraft banks and tilts its lift sideways, and the sideways part of the lift bends its path into a circle. At the same bank, the circle grows with the square of the speed, so fast aircraft turn wide. Pulling a higher load factor (the lift divided by the weight, counted in g) tightens the turn.
+
+- **Formula:** `r = V² / (g · √(n² − 1))`, with the load factor `n = 1 / cos(bank)` in a level turn
+- **Example:** at 340 m/s a fast jet's routine 60° bank (2 g) turns on a 6.8 km radius and a hard 6 g break on 2.0 km; a 40 m/s drone banked at 35° turns on 233 m.
+- **See it:** drop a cruise-missile-like target 30 km out: it flies a dog-leg and rounds the corner on a 5.9 km arc. Drop a fast jet: when an interceptor closes to 6 km, it breaks hard away at 6 g.
+
+[Going deeper →](docs/concepts/04-7-turn-radius.md)
+
+### Radar cross section — why a hundred times smaller is only three times closer
+
+The radar cross section (RCS, written σ) is how big an object looks to radar: the area of an ideal reflector that would send back the same echo. It depends on shape, material and the angle it is seen from, not just on size: flat panels facing the radar flash brightly, rounded or angled shapes scatter the energy elsewhere. Because the echo weakens with the fourth power of range, even large changes in σ move the detection range surprisingly little.
+
+- **Formula:** `P_received = P_t · G² · λ² · σ / ((4π)³ · R⁴)`, so the detection range grows as `(P_t · σ)^(1/4)`
+- **Example:** doubling the transmitter power buys only 19% more range (2^¼ = 1.19). To see a 0.01 m² drone as far out as a 2 m² jet, the radar would need 200 times the power.
+- **See it:** each palette card shows its radar size; while you place one, the readout says from how far the radar should see it: about 9.5 km for a drone, 36 km for a fast jet.
+
+[Going deeper →](docs/concepts/04-8-radar-cross-section.md)
+
+### Clutter and Doppler — why a crossing drone vanishes
+
+The radar's beam lights the ground as well as the sky, and the ground sends back an echo, called clutter, far stronger than a small drone's. The radar tells them apart by the Doppler shift: the echo of anything moving toward or away from the radar comes back at a slightly changed frequency, and the ground's does not. Filtering out the unshifted echoes removes the clutter, but also any target whose speed along the line of sight is too small, like one flying across the beam.
+
+- **Formula:** `f_D = 2 · v_r / λ`, with the radial speed `v_r = v · cos(angle between its path and the line of sight)`
+- **Example:** with a 10 cm wavelength, a drone flying straight at the radar at 40 m/s shifts its echo by 800 Hz. Flying across the beam 6 km out, it stays inside the ±10 m/s notch for 78 s, long enough for its track to be lost.
+- **See it:** set Blind zones to "clutter" to see the ground the radar lights. Select any aircraft: the inspector's Doppler line shows its radial speed and whether the notch hides it.
+
+[Going deeper →](docs/concepts/04-9-clutter-doppler.md)
 
 ### Kalman filter — how the tracker sees through the noise
 
@@ -214,7 +264,7 @@ A hostile aircraft is only a threat if its course will bring it close to somethi
 An interceptor can only meet a target it can reach in time, before its motor's energy is spent and air drag has slowed it down. The set of places it can reach within its longest planned flight forms a dome over the battery: the engagement envelope. A threat outside it must wait until it flies in; a threat inside the 1.5 km minimum range is already too close.
 
 - **Formula:** `R_max(h) = √(reach(t_max, ρ(h/2))² − h²)`, where `reach` is the interceptor's straight-line reach with drag in air of density ρ, with a 10% margin
-- **Example:** with a 34 s planned flight, the dome reaches about 17 km at ground level and a little farther at 6 km up, where the thinner air saps less speed; it closes over the top at about 20 km.
+- **Example:** with a 34 s planned flight, the dome reaches about 17 km at ground level and a little farther, 17.2 km, at 3 km up, where the thinner air saps less speed; it closes over the top just below 20 km.
 - **See it:** press the umbrella button in the 3D view to show the dome. Drop a jet 35 km out: the command node waits ("out of reach for now") until the jet enters it.
 
 [Going deeper →](docs/concepts/06-1-engagement-envelope.md)
@@ -241,11 +291,11 @@ Before firing, the battery must decide what a track is. It interrogates it with 
 
 <!-- concepts:end -->
 
-**Coming next:** wind, turn radius, the radar equation and RCS, clutter and Doppler (Step 4) · identification friend-or-foe (Step 5) · missile energy, kill assessment and saturation (Step 6).
+**Coming next:** identification friend-or-foe, the kinematic classifier and air corridors (Step 5) · missile energy, kill assessment and saturation (Step 6).
 
 ## Build log
 
-Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first. Steps 4 to 6 are still in progress, so their entries are not tagged yet.
+Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first. Steps 5 and 6 are still in progress, so their entries are not tagged yet.
 
 ### Steps 5 and 6 · Decide & engage (the rest of Step 5, the start of Step 6)
 
@@ -275,20 +325,31 @@ The battery's picture of the sky becomes a real estimate, with an honest measure
 
 _Screenshots and a clip for this step come with the v1.0 media pass._
 
-### Step 4 · Environment & radar (part 1: terrain and radar)
+### Step 4 · Environment & radar
 
-The battlespace gets a landscape, and the radar becomes honest about what it can and cannot see.
+<p align="center"><img src="docs/media/step-04-environment-radar.webp" alt="The 3D view seen from above, with the ground the radar lights shaded in sand. A cruise-missile-like threat is dragged onto the map: its ghost draws the dog-leg it will fly and says how long it needs through the wind. Once dropped, it flies out to one side, turns in toward the battery and is destroyed by an interceptor." width="100%" /></p>
+
+The battlespace gets a landscape and weather, threats fly real routes, and the radar becomes honest about what it can and cannot see.
 
 - **Procedural terrain:** fictional hills and ridges around a flat valley, generated from a seed, in 3D (with relief shading and contour lines) and as a faint relief on the scope. Drones and cruise-missile-like targets follow the ground; jets climb over it.
+- **Air and wind:** the standard atmosphere sets the air density at every height, and each run draws its own wind, stronger higher up. Aircraft crab into it to hold their track: a 40 m/s drone flying into a 12 m/s headwind makes only 28 m/s over the ground.
+- **Routes and turns:** every type turns at its own bank angle, a drone on a 233 m circle, a fast jet on a 6.8 km one. Cruise-missile-like targets fly a dog-leg, and a fast jet breaks away at 6 g when an interceptor closes in, then turns back. A second, wider gate keeps its track through the break.
 - **Radar horizon and terrain masking:** the radar sees only along clear lines of sight over the curved Earth. Low flyers hide behind the ridges to the south and west until they are 7 to 10 km out.
-- **Blind zones:** one switch under the scope shades, on the scope and on the 3D terrain, where the radar cannot see a target at 50 m, 300 m or 1 km above the ground.
 - **Detection probability, noise and false alarms:** echoes flicker near the edge of range, every measurement is a little off, and noise sometimes makes a ghost blip. A single echo never becomes a track on its own, so ghosts are dropped and never engaged.
+- **Clutter and Doppler:** where the beam lights the ground, the radar filters out the ground's echo by its missing Doppler shift, and with it anything that closes too slowly. A drone crossing the beam over lit ground simply vanishes.
+- **Coverage maps:** one switch under the scope shades, on the scope and on the 3D terrain, where the radar cannot see a target at 50 m, 300 m or 1 km above the ground, or which ground it lights.
 - **Air drag:** interceptors slow down as they coast, more in the thick air near the ground, and the command node plans with it.
-- **Readouts that explain:** the placement card warns when the terrain will hide a threat, and the inspector says whether the radar can see the selected aircraft, and why not.
+- **Readouts that explain:** a wind arrow on the scope; the placement ghost draws the route a threat will fly, with its flight time through the wind; the inspector shows the wind, the turn, the Doppler shift and whether the radar can see the selected aircraft, and why not.
 
-> **Engineering note: one terrain, many readers.** The landscape is generated once from its own seed and shared by the simulation, the scope, the 3D mesh and the placement readout, so the blind zones you see are exactly the ones the radar uses. A radial sweep builds the whole coverage map in a few milliseconds.
+> **Engineering note: one terrain, many readers; weather with its own dice.** The landscape is generated once and shared by the simulation, the scope, the 3D mesh and the placement readout, so the blind zones and lit ground you see are exactly the ones the radar uses. The wind and the dog-legs come from random generators of their own, seeded from the run's seed, so adding them changed no other random number: an old seed still brings the same aircraft at the same times.
 
-_Screenshots and a clip for this step come with the v1.0 media pass._
+<img src="docs/media/step-04-environment-radar.png" alt="The console with the ground the radar lights shaded on the radar scope and the 3D terrain, the wind arrow above the scope, the header at Step 4 of 9, and the inspector following a small drone" width="100%" />
+
+<details>
+<summary>Phone layout</summary>
+<br />
+<img src="docs/media/step-04-environment-radar-mobile.png" alt="The Step 4 console on a phone, with the lit ground shaded on the 3D terrain" width="320" />
+</details>
 
 ### Step 3 · First intercept
 
@@ -382,9 +443,7 @@ The foundation everything else builds on.
 - [x] **Step 1 · Simulation core:** deterministic clock, play/pause/step/speed, live radar scope
 - [x] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
 - [x] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
-- [ ] **Step 4 · Environment & radar:** terrain, atmosphere, wind and drag, threat routes; radar equation, noise, horizon, terrain masking, clutter and coverage maps
-  - In: terrain, terrain following, drag, detection probability, noise, false alarms, horizon, masking and the coverage map
-  - Still to come: wind, threat routes and evasive turns, the standard atmosphere, clutter and Doppler
+- [x] **Step 4 · Environment & radar:** terrain, atmosphere, wind and drag, threat routes; radar equation, noise, horizon, terrain masking, clutter and coverage maps
 - [ ] **Step 5 · Track & identify:** Kalman tracking, uncertainty ellipses, truth vs. perception; identification, civil traffic, defended assets, threat ranking with "Why?"
   - In: Kalman tracking, gating and association, uncertainty ellipses, track quality, truth vs. perception, identification with transponder failures, defended assets, threat ranking with "Why?"
   - Still to come: the kinematic classifier and air corridors
