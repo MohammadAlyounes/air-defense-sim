@@ -245,7 +245,7 @@ Before firing, the battery must decide what a track is. It interrogates it with 
 
 ## Build log
 
-Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first.
+Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first. Steps 4 to 6 are still in progress, so their entries are not tagged yet.
 
 ### Steps 5 and 6 · Decide & engage (the rest of Step 5, the start of Step 6)
 

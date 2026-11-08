@@ -443,6 +443,8 @@ npm run dev
 
 Each step ends with a working demo, passing tests, at least one README concept card (where there is new physics) and a git tag. Steps 0–3 are done. In v0.3 the remaining eleven steps were merged into six: neighbouring steps that change the same models and panels now ship together, and nothing was dropped.
 
+Work from Steps 4, 5 and 6 that was first built on a side branch (terrain and radar, Kalman tracking, identification, defended assets and the first engagement rules) is on `main` since 2026-11-08. Each step still ships, and is tagged, only when everything in its row is in. The README roadmap lists what each unfinished step already has and what is still to come.
+
 | Step | Tag                         | What you will see                                                                                                                                                            | Concepts added to the README                                                                                      | Was     |
 | ---- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------- |
 | 0 ✓  | `step-00-launchpad`         | Repo, tooling, CI, live demo URL (app shell), README skeleton, CLAUDE.md, Codespaces                                                                                         | —                                                                                                                 | 0       |
