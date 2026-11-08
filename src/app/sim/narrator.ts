@@ -115,6 +115,11 @@ export function describeEvent(event: SimEvent): LogLine {
         source: 'scenario',
         text: `${capitalize(withArticle(TRAFFIC_NOUN[event.type]))} reached ${assetPhrase(event.assetId)}: it got through.`,
       };
+    case 'evasiveTurn':
+      return {
+        source: 'scenario',
+        text: `The ${TRAFFIC_NOUN[event.type]} sees ${interceptorName(event.interceptorId)} coming and breaks hard away in a ${event.loadFactor} g turn.`,
+      };
     case 'contactNew':
       return {
         source: 'radar',

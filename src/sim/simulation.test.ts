@@ -7,7 +7,14 @@ import { Simulation } from './simulation';
  * alarms, sure detection inside the 50% range), for tests that place their own traffic.
  */
 const emptySky = (seed = 1) =>
-  new Simulation({ seed, autoTraffic: false, terrain: false, radar: IDEAL_SEARCH_RADAR });
+  new Simulation({
+    seed,
+    autoTraffic: false,
+    terrain: false,
+    radar: IDEAL_SEARCH_RADAR,
+    wind: false,
+    evasiveTurns: false,
+  });
 
 describe('Simulation: determinism', () => {
   it('produces identical runs for the same seed', () => {
