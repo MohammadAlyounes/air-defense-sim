@@ -33,8 +33,8 @@ export const WIND_SHEAR_EXPONENT = 1 / 7;
 export const WIND_SPEED_RANGE_MPS: readonly [number, number] = [2, 12];
 
 /**
- * The wind for a run, drawn from its seed with a generator of its own, so it never changes the
- * random numbers of anything else in the run.
+ * The wind for a run, drawn from its seed with a generator of its own: a seed always brings the
+ * same wind, and drawing it leaves the run's main random sequence alone.
  */
 export function windFromSeed(seed: number): WindConfig {
   const rng = new Rng((seed ^ 0x5bd1e995) >>> 0);

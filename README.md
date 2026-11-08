@@ -341,7 +341,7 @@ The battlespace gets a landscape and weather, threats fly real routes, and the r
 - **Air drag:** interceptors slow down as they coast, more in the thick air near the ground, and the command node plans with it.
 - **Readouts that explain:** a wind arrow on the scope; the placement ghost draws the route a threat will fly, with its flight time through the wind; the inspector shows the wind, the turn, the Doppler shift and whether the radar can see the selected aircraft, and why not.
 
-> **Engineering note: one terrain, many readers; weather with its own dice.** The landscape is generated once and shared by the simulation, the scope, the 3D mesh and the placement readout, so the blind zones and lit ground you see are exactly the ones the radar uses. The wind and the dog-legs come from random generators of their own, seeded from the run's seed, so adding them changed no other random number: an old seed still brings the same aircraft at the same times.
+> **Engineering note: one terrain, many readers.** The landscape is generated once and shared by the simulation, the scope, the 3D mesh and the placement readout. The blind zones and lit ground you see are exactly the ones the radar uses, and a dropped threat flies exactly the route its ghost showed.
 
 <img src="docs/media/step-04-environment-radar.png" alt="The console with the ground the radar lights shaded on the radar scope and the 3D terrain, the wind arrow above the scope, the header at Step 4 of 9, and the inspector following a small drone" width="100%" />
 

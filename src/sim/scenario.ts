@@ -52,7 +52,7 @@ const TWO_PI = 2 * Math.PI;
  * Picks a type, an entry point on the edge of the area and a route across it: hostiles head for
  * a defended asset, other traffic for a point near the battery. Most fly straight; a
  * cruise-missile-like target flies a dog-leg, to a side chosen by `routeRng` (a generator of
- * its own, so routes never change the run's other random numbers). Aircraft that are already
+ * its own, so drawing a side leaves the main random sequence alone). Aircraft that are already
  * flying when the run starts are placed part-way along their route.
  */
 export function planFlight(
