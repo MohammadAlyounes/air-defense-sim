@@ -32,6 +32,19 @@ describe('search radar sweep', () => {
     expect(sweptOver(deg(355), deg(5), deg(340))).toBe(false);
   });
 
+  it('sweeps a bearing a hair past the start of the arc', () => {
+    // An aircraft flying due west along the x axis drifts to a bearing one rounding step past
+    // 90°. It must still fall in the arc that starts exactly at 90°, not in neither arc.
+    const hair = Math.PI / 2 + 2.220446049250313e-16;
+    expect(hair).toBeGreaterThan(Math.PI / 2);
+    expect(sweptOver(Math.PI / 2, Math.PI / 2 + deg(1.8), hair)).toBe(true);
+    expect(sweptOver(Math.PI / 2 - deg(1.8), Math.PI / 2, hair)).toBe(false);
+    // Just east of north, across the jump from 360° to 0°: painted once, not twice.
+    const tiny = 1e-18;
+    expect(sweptOver(2 * Math.PI - deg(1.8), 0, tiny)).toBe(false);
+    expect(sweptOver(0, deg(1.8), tiny)).toBe(true);
+  });
+
   it('sweeps every bearing exactly once per turn', () => {
     const ticksPerTurn = Math.round(4 / TICK_S);
     for (const bearingRad of [0.001, 1.234, Math.PI, 6.2]) {
