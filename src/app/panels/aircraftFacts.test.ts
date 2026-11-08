@@ -83,4 +83,17 @@ describe('aircraftFacts', () => {
     sim.run(1);
     expect(aircraftFacts(sim.snapshot(), 99)).toBeNull();
   });
+
+  it('notes a track whose last echo only fitted through the wider gate for hard turns', () => {
+    const sim = jetFlyingAt();
+    sim.run(9 * 50);
+    const snapshot = sim.snapshot();
+    const detail = (maneuvering: boolean) =>
+      aircraftFacts(
+        { ...snapshot, tracks: snapshot.tracks.map((track) => ({ ...track, maneuvering })) },
+        1,
+      )?.trackErrorDetail;
+    expect(detail(false)).toMatch(/echoes so far$/);
+    expect(detail(true)).toMatch(/echoes so far · caught up after a hard turn$/);
+  });
 });

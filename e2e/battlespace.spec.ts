@@ -101,7 +101,8 @@ test('camera presets switch, and following needs a selected aircraft', async ({ 
   await page.keyboard.press('2');
   await expect(camera(page, 'top')).toHaveAttribute('aria-pressed', 'true');
 
-  await tagButton(page).click();
+  // Select from the event log: seen from above, a tag near the north edge can sit under the toolbar.
+  await page.getByTestId('event-log').getByRole('button').first().click();
   await camera(page, 'follow').click();
   await expect(camera(page, 'follow')).toHaveAttribute('aria-pressed', 'true');
 

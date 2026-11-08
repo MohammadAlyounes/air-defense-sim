@@ -10,6 +10,11 @@ import radarHorizon from '../../../docs/concepts/04-1-radar-horizon.md?raw';
 import terrainMasking from '../../../docs/concepts/04-2-terrain-masking.md?raw';
 import detectionProbability from '../../../docs/concepts/04-3-detection-probability.md?raw';
 import airDrag from '../../../docs/concepts/04-4-air-drag.md?raw';
+import standardAtmosphere from '../../../docs/concepts/04-5-standard-atmosphere.md?raw';
+import wind from '../../../docs/concepts/04-6-wind.md?raw';
+import turnRadius from '../../../docs/concepts/04-7-turn-radius.md?raw';
+import radarCrossSection from '../../../docs/concepts/04-8-radar-cross-section.md?raw';
+import clutterDoppler from '../../../docs/concepts/04-9-clutter-doppler.md?raw';
 import kalmanFilter from '../../../docs/concepts/05-1-kalman-filter.md?raw';
 import gatingAssociation from '../../../docs/concepts/05-2-gating-association.md?raw';
 import closestApproach from '../../../docs/concepts/05-3-closest-point-of-approach.md?raw';
@@ -34,6 +39,11 @@ const CONCEPTS = {
   terrainMasking: { markdown: terrainMasking, file: '04-2-terrain-masking.md' },
   detectionProbability: { markdown: detectionProbability, file: '04-3-detection-probability.md' },
   airDrag: { markdown: airDrag, file: '04-4-air-drag.md' },
+  standardAtmosphere: { markdown: standardAtmosphere, file: '04-5-standard-atmosphere.md' },
+  wind: { markdown: wind, file: '04-6-wind.md' },
+  turnRadius: { markdown: turnRadius, file: '04-7-turn-radius.md' },
+  radarCrossSection: { markdown: radarCrossSection, file: '04-8-radar-cross-section.md' },
+  clutterDoppler: { markdown: clutterDoppler, file: '04-9-clutter-doppler.md' },
   kalmanFilter: { markdown: kalmanFilter, file: '05-1-kalman-filter.md' },
   gatingAssociation: { markdown: gatingAssociation, file: '05-2-gating-association.md' },
   closestApproach: { markdown: closestApproach, file: '05-3-closest-point-of-approach.md' },

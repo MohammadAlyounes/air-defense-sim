@@ -1,6 +1,8 @@
 import {
+  angleDiff,
   bearing,
   closestApproachToOrigin,
+  closingSpeedMps,
   DEFAULT_ASSETS,
   coverageAt,
   DEFAULT_DEFENSE,
@@ -8,19 +10,28 @@ import {
   DEFAULT_SEARCH_RADAR,
   detectionRangeM,
   distance,
+  dopplerShiftHz,
   groundRange,
+  inClutter,
+  inDopplerNotch,
   lookProbability,
   radarHorizonM,
   planIntercept,
   RADAR_CROSS_SECTION_M2,
+  routineLoadFactor,
   TICK_S,
   trackEllipseAt,
   trackPositionAt,
+  TRAFFIC,
+  turnRadiusM,
+  windVelocityAt,
   type Affiliation,
+  type Aircraft,
   type AircraftType,
   type Snapshot,
   type Track,
   type Vec3,
+  type WindConfig,
 } from '../../sim';
 import { formatSpeed } from '../lib/format';
 import {
@@ -44,8 +55,20 @@ export interface AircraftFacts {
   speedKmh: string;
   altitude: string;
   altitudeRef: string;
+  /** Where the nose points; the detail adds the track over the ground when it crabs. */
   heading: string;
   headingPoint: string;
+  /** The wind it meets: headwind, tailwind or crosswind, and its own airspeed. */
+  wind: string;
+  windDetail: string;
+  /** How it flies: an evasive break, a dog-leg, or its routine turns. */
+  flight: string;
+  flightDetail: string;
+  flightTone: FactTone;
+  /** Its speed along the radar's line of sight, which sets the echo's Doppler shift. */
+  doppler: string;
+  dopplerDetail: string;
+  dopplerTone: FactTone;
   range: string;
   bearing: string;
   /** Can the radar see it right now: in view, hidden by terrain or below the horizon. */
@@ -86,7 +109,9 @@ export function aircraftFacts(snapshot: Snapshot, id: number): AircraftFacts | n
   if (!aircraft) return null;
   const { position, velocity } = aircraft;
   const speedMps = Math.hypot(velocity.x, velocity.y, velocity.z);
-  const heading = headingOf(velocity);
+  const heading = aircraft.headingRad;
+  const groundTrack = headingOf(velocity);
+  const crabDeg = Math.round((angleDiff(groundTrack, heading) * 180) / Math.PI);
   const track = snapshot.tracks.find((t) => t.truthId === id);
 
   return {
@@ -104,10 +129,14 @@ export function aircraftFacts(snapshot: Snapshot, id: number): AircraftFacts | n
     )} m`,
     altitudeRef: aircraft.altitudeRef === 'AGL' ? 'above ground' : 'above sea level',
     heading: formatBearing(heading),
-    headingPoint: compassPoint(heading),
+    headingPoint:
+      Math.abs(crabDeg) >= 1 ? `track ${formatBearing(groundTrack)}` : compassPoint(heading),
+    ...windFacts(snapshot.wind, aircraft, Math.abs(crabDeg)),
+    ...flightFacts(aircraft),
+    ...dopplerFacts(aircraft),
     range: `${formatKm(groundRange(position))} ${compassPoint(bearing(position))}`,
     bearing: `bearing ${formatBearing(bearing(position))}`,
-    ...radarView(position, RADAR_CROSS_SECTION_M2[aircraft.radarSize]),
+    ...radarView(position, RADAR_CROSS_SECTION_M2[aircraft.radarSize], velocity),
     track: track ? `${trackName(track.id)} · ${IDENTITY_WORD[track.identity]}` : 'Not detected',
     trackDetail: track
       ? `painted ${seconds(snapshot.timeS - track.lastPaintTick * TICK_S)} ago`
@@ -225,19 +254,97 @@ function trackError(
   const at = trackPositionAt(track, snapshot.tick);
   const errorM = Math.hypot(at.x - position.x, at.y - position.y);
   const sigmaM = trackEllipseAt(track, snapshot.tick).majorM;
+  // The last echo only fitted through the wider gate kept for hard turns.
+  const turn = track.maneuvering ? ' · caught up after a hard turn' : '';
   return {
     trackError: `${formatMetres(errorM)} off`,
-    trackErrorDetail: `the filter expects ±${formatMetres(sigmaM)} (1σ) · ${track.paints} echoes so far`,
+    trackErrorDetail: `the filter expects ±${formatMetres(sigmaM)} (1σ) · ${track.paints} echoes so far${turn}`,
   };
 }
 
 const formatMetres = (m: number) =>
   m < 1000 ? `${grouped.format(Math.round(m))} m` : `${(m / 1000).toFixed(1)} km`;
 
+/** The wind at the aircraft, split along and across its track. */
+function windFacts(
+  wind: WindConfig,
+  aircraft: Aircraft,
+  crabDeg: number,
+): Pick<AircraftFacts, 'wind' | 'windDetail'> {
+  const { position, trackRad, airspeedMps } = aircraft;
+  const agl = position.z - worldTerrain().heightAt(position.x, position.y);
+  const w = windVelocityAt(wind, agl);
+  const along = w.x * Math.sin(trackRad) + w.y * Math.cos(trackRad);
+  const across = w.x * Math.cos(trackRad) - w.y * Math.sin(trackRad);
+  const airspeed = `airspeed ${formatSpeed(airspeedMps)}`;
+  if (Math.hypot(w.x, w.y) < 0.5) return { wind: 'Calm', windDetail: airspeed };
+  const value =
+    Math.abs(along) >= Math.abs(across)
+      ? `${along < 0 ? 'Headwind' : 'Tailwind'} ${formatSpeed(Math.abs(along))}`
+      : `Crosswind ${formatSpeed(Math.abs(across))}`;
+  return {
+    wind: value,
+    windDetail: crabDeg >= 1 ? `${airspeed} · nose ${crabDeg}° into it` : airspeed,
+  };
+}
+
+/** How the aircraft is flying its route: breaking away, on a dog-leg, or straight on. */
+function flightFacts(
+  aircraft: Aircraft,
+): Pick<AircraftFacts, 'flight' | 'flightDetail' | 'flightTone'> {
+  const performance = TRAFFIC[aircraft.type];
+  if (aircraft.maneuver) {
+    return {
+      flight: `Breaking at ${performance.breakLoadFactor} g`,
+      flightDetail: `away from ${interceptorName(aircraft.maneuver.interceptorId)}`,
+      flightTone: 'warn',
+    };
+  }
+  const next = aircraft.route[0];
+  if (aircraft.route.length > 1 && next) {
+    return {
+      flight: 'Dog-leg',
+      flightDetail: `turn point in ${formatKm(Math.hypot(next.x - aircraft.position.x, next.y - aircraft.position.y))}`,
+      flightTone: 'plain',
+    };
+  }
+  const radius = turnRadiusM(aircraft.airspeedMps, routineLoadFactor(performance));
+  return {
+    flight: `Turns on ${formatMetres(radius)}`,
+    flightDetail: `at ${performance.bankDeg}° of bank`,
+    flightTone: 'plain',
+  };
+}
+
+/** Its speed along the line of sight, the Doppler shift that gives, and the clutter notch. */
+function dopplerFacts(
+  aircraft: Aircraft,
+): Pick<AircraftFacts, 'doppler' | 'dopplerDetail' | 'dopplerTone'> {
+  const radar = DEFAULT_SEARCH_RADAR;
+  const closing = closingSpeedMps(radarAntenna(), aircraft.position, aircraft.velocity);
+  const value = `${closing >= 0 ? 'Closing' : 'Opening'} ${formatSpeed(Math.abs(closing))}`;
+  if (!inDopplerNotch(closing, radar)) {
+    const shift = `${grouped.format(Math.abs(dopplerShiftHz(closing, radar)))} Hz`;
+    return {
+      doppler: value,
+      dopplerDetail: `${shift} shift · clear of the notch`,
+      dopplerTone: 'plain',
+    };
+  }
+  return inClutter(worldTerrain(), radarAntenna(), aircraft.position)
+    ? {
+        doppler: value,
+        dopplerDetail: 'in the notch: filtered out with the clutter',
+        dopplerTone: 'warn',
+      }
+    : { doppler: value, dopplerDetail: 'in the notch, but no clutter here', dopplerTone: 'plain' };
+}
+
 /** Whether the search radar has a clear line of sight to it, and its chance of being seen. */
 function radarView(
   position: Vec3,
   rcsM2: number,
+  velocity: Vec3,
 ): Pick<AircraftFacts, 'radarView' | 'radarViewDetail' | 'radarViewTone'> {
   const radar = DEFAULT_SEARCH_RADAR;
   if (groundRange(position) > radar.rangeM) {
@@ -262,6 +369,14 @@ function radarView(
       };
     }
     case 'visible': {
+      const closing = closingSpeedMps(radarAntenna(), position, velocity);
+      if (inDopplerNotch(closing, radar) && inClutter(worldTerrain(), radarAntenna(), position)) {
+        return {
+          radarView: 'Lost in clutter',
+          radarViewDetail: `only ${formatSpeed(Math.abs(closing))} along the line of sight: no Doppler shift to tell it from the ground`,
+          radarViewTone: 'warn',
+        };
+      }
       const chance = lookProbability(rcsM2, distance(radarAntenna(), position), radar);
       return {
         radarView: 'In view',

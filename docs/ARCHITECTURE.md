@@ -82,22 +82,25 @@ A URL can preset the view (`?select=3&camera=follow&heights=4`), next to the sim
 
 The landscape is generated once from its own seed (`src/sim/terrain.ts`), independent of the run's seed, so every run shares the same map. The app builds it on first use (`src/app/world/world.ts`) and hands the same object to every `Simulation`, the scope's relief layer, the 3D terrain mesh and the placement readout. The radar's coverage map (`src/sim/propagation.ts`) is computed from it once, on first use, for the blind-zone overlay and the placement readout's "first seen" estimate.
 
-## Current state (Steps 4 to 6 in progress)
+The weather is per run instead: each run draws its wind from its seed with a generator of its own (`windFromSeed` in `src/sim/flight.ts`), and so do the cruise-missile-like targets' dog-legs, so adding them left every other random number of a run unchanged. The wind is part of every snapshot, which is how the wind indicator, the inspector and the placement readout see it.
+
+## Current state (Step 4 done, Steps 5 and 6 in progress)
 
 | Path                     | Contents                                                                                         |
 | ------------------------ | ------------------------------------------------------------------------------------------------ |
 | `src/sim/core`           | `FixedStepClock`, seeded `Rng` (sfc32), vectors, state hash.                                     |
 | `src/sim/traffic.ts`     | Flight performance of every traffic type (single source for the palette too).                    |
-| `src/sim/radar.ts`       | Search radar: sweep, SNR and detection probability (Swerling 1), false alarms, noise levels.     |
+| `src/sim/radar.ts`       | Search radar: sweep, SNR and detection probability (Swerling 1), false alarms, noise, Doppler.   |
 | `src/sim/terrain.ts`     | Procedural, fictional terrain: a seeded height grid with bilinear sampling.                      |
-| `src/sim/propagation.ts` | Earth curvature (4/3 model), line of sight, radar horizon, coverage map.                         |
-| `src/sim/atmosphere.ts`  | Air density with height (exponential atmosphere), behind a small interface.                      |
+| `src/sim/propagation.ts` | Earth curvature (4/3 model), line of sight, radar horizon, coverage map, lit ground (clutter).   |
+| `src/sim/atmosphere.ts`  | International Standard Atmosphere (exponential model kept), behind a small interface.            |
+| `src/sim/flight.ts`      | Wind and the wind triangle, turn radius and rate, routes and dog-legs, evasive breaks.           |
 | `src/sim/kalman.ts`      | Constant-velocity Kalman filter, measurement covariance, uncertainty ellipse.                    |
-| `src/sim/tracker.ts`     | Tracker: gating, global nearest-neighbour association, track estimates.                          |
+| `src/sim/tracker.ts`     | Tracker: gating (with a maneuver gate), global nearest-neighbour association, track estimates.   |
 | `src/sim/c2.ts`          | Command node: IFF, rules of engagement, CPA threat evaluation, intercept planning, Pk, envelope. |
 | `src/sim/assets.ts`      | Defended assets: positions, threat rings and leak radii.                                         |
 | `src/sim/interceptor.ts` | Interceptor point mass: boost and coast with drag, proportional navigation, fuze.                |
-| `src/sim/scenario.ts`    | Scenario traffic: entry points, straight courses, arrival times.                                 |
+| `src/sim/scenario.ts`    | Scenario traffic: entry points, routes, arrival times.                                           |
 | `src/sim/simulation.ts`  | The engine: commands, the defense loop each tick, events, snapshots, state hash, replay.         |
 | `src/app/sim`            | Driver, store, provider, URL options, narrator, defense summary, keyboard shortcuts.             |
 | `src/app/placement`      | Drag-and-drop: drop zones, placement store, card gestures, ghost readout.                        |

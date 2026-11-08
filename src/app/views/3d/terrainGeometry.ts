@@ -1,6 +1,11 @@
 import { BufferAttribute, BufferGeometry, Vector3, type DataTexture, type Ray } from 'three';
 import { coverageAt } from '../../../sim';
-import { worldCoverage, worldTerrain } from '../../world/world';
+import {
+  LIT_GROUND_AGL_M,
+  worldCoverage,
+  worldTerrain,
+  type CoverageView,
+} from '../../world/world';
 import { SCENE_UNITS_PER_M } from './coords';
 import { RADAR_RANGE_KM } from './sceneConstants';
 
@@ -47,8 +52,11 @@ export function buildTerrainGeometry(segments: number, halfKm: number): BufferGe
   return geometry;
 }
 
-/** 1 where the radar cannot see a target `altitudeM` above the ground, else 0. */
-export function fillCoverageTexture(texture: DataTexture, size: number, altitudeM: number) {
+/**
+ * 255 where the overlay shades the ground, else 0: where the radar cannot see a target flying at
+ * the chosen height, or (`clutter`) where it lights the ground itself.
+ */
+export function fillCoverageTexture(texture: DataTexture, size: number, view: CoverageView) {
   const map = worldCoverage();
   const data = texture.image.data as Uint8Array;
   const half = RADAR_RANGE_KM * 1000;
@@ -56,7 +64,10 @@ export function fillCoverageTexture(texture: DataTexture, size: number, altitude
     const north = ((row + 0.5) / size) * 2 * half - half;
     for (let col = 0; col < size; col++) {
       const east = ((col + 0.5) / size) * 2 * half - half;
-      data[row * size + col] = coverageAt(map, east, north) > altitudeM ? 255 : 0;
+      const minVisibleAglM = coverageAt(map, east, north);
+      const shaded =
+        view === 'clutter' ? minVisibleAglM <= LIT_GROUND_AGL_M : minVisibleAglM > view;
+      data[row * size + col] = shaded ? 255 : 0;
     }
   }
   texture.needsUpdate = true;
