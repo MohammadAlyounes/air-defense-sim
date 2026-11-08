@@ -35,7 +35,7 @@ export const ROADMAP: readonly RoadmapStep[] = [
     step: 5,
     title: 'Track & identify',
     summary:
-      'Kalman tracking, uncertainty ellipses, truth vs. perception; identification, civil traffic, assets, threat ranking with "Why?".',
+      'Kalman tracking, uncertainty ellipses, truth vs. perception; identification, classifier, civil corridors, assets, threat ranking with "Why?".',
   },
   {
     step: 6,
@@ -63,7 +63,7 @@ export const ROADMAP: readonly RoadmapStep[] = [
 ];
 
 /** The step the repository is currently on. Bump this when a step ships. */
-export const CURRENT_STEP = 4;
+export const CURRENT_STEP = 5;
 
 export const LAST_STEP = ROADMAP[ROADMAP.length - 1]?.step ?? 0;
 

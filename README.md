@@ -13,7 +13,7 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 
 [![CI](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml)
 ![Status: building in public](https://img.shields.io/badge/status-building_in_public-fbbf24)
-![Progress: step 4 of 9](https://img.shields.io/badge/progress-step_4_of_9-22d3ee)
+![Progress: step 5 of 9](https://img.shields.io/badge/progress-step_5_of_9-22d3ee)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34d399)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
@@ -301,39 +301,49 @@ Before firing, the battery must decide what a track is. It interrogates it with 
 
 <!-- concepts:end -->
 
-**Coming next:** identification friend-or-foe, the kinematic classifier and air corridors (Step 5) · missile energy, kill assessment and saturation (Step 6).
+**Coming next:** missile energy, kill assessment and saturation (Step 6) · Monte Carlo and probability (Step 7).
 
 ## Build log
 
-Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first. Steps 5 and 6 are still in progress, so their entries are not tagged yet.
+Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first. Step 6 is still in progress, so its entry is not tagged yet.
 
-### Steps 5 and 6 · Decide & engage (the rest of Step 5, the start of Step 6)
+### Step 6 · Engage & assess (in progress)
 
-The command node gets things worth defending, rules to follow, limits to live with, and a reason for every decision.
+The command node gets rules to follow, limits to live with, and odds to beat.
 
-- **Defended assets:** a town and a power plant join the battery, each with a threat ring. Threats are ranked by the closest point of approach to the asset they will reach soonest, and leaks are counted where they happen.
-- **Identification that can go wrong:** friendly transponders fail one check in ten. A silent track is "unknown" after one check and "hostile" after two, so a friend with a dead transponder can be shot down: an identification error, counted as a failure.
 - **Rules of engagement:** click the header badges to switch weapons control (TIGHT, FREE, HOLD) and the operator mode (AUTO, SEMI-AUTO). In SEMI-AUTO the battery proposes each shot with its evidence; approve with A, hold fire with H.
 - **Kill probability:** a burst inside the lethal radius destroys the target only with the chance Pk, lower against fast, agile targets and with a tired interceptor. The battery looks again and fires again.
 - **Fire channels and saturation:** three engagements at a time. A swarm fills them, and the NOW line says when the defense is saturated.
-- **"Why?" for every decision:** the inspector explains the identity, the threatened asset, what the rules allow, and the shot and its chance of a kill. The engagement envelope can be shown as a dome in 3D.
+- **Engagement envelope:** where the battery can reach, shown as a dome in 3D (the umbrella button).
 
 > **Engineering note: the rules are commands too.** Rule changes, approvals and holds are recorded like drops, so a run where a friendly was shot down under weapons FREE replays exactly, ready to be studied.
 
-_Screenshots and a clip for this step come with the v1.0 media pass._
+_Screenshots and a clip come when the step is complete._
 
-### Step 5 · Track & identify (part 1: tracking)
+### Step 5 · Track & identify
 
-The battery's picture of the sky becomes a real estimate, with an honest measure of how sure it is.
+<p align="center"><img src="docs/media/step-05-track-identify.webp" alt="The 3D view, the radar scope and the track table side by side, with the two civil corridors drawn as green lanes and airliners flying inside them. A cruise-missile-like target heading for the battery is tracked: identifying at first, then suspect (an orange diamond), then hostile (red) after a second silent identification check. An interceptor destroys it and a result card sums up the engagement, while a new airliner entering a corridor turns civil." width="100%" /></p>
+
+The battery's picture of the sky becomes an honest estimate, and every identity it gives a track comes with its evidence.
 
 - **Kalman filter:** every track blends its prediction with each new echo, weighted by how much it trusts each. Positions jitter less than the raw echoes and velocities settle within a few m/s.
 - **Association without the truth:** echoes join tracks by gating and global nearest neighbour, matched in 0.2 s batches so close neighbours like a drone swarm compete fairly. The tracker never knows which aircraft made an echo.
-- **Uncertainty you can see:** a faint 2σ ellipse around each track on the scope, stretched sideways far out where bearing errors dominate, and a ±1σ column in the track table.
-- **Truth vs. perception:** press T (or "truth" under the scope) to see where aircraft really are: grey crosses and error lines on the scope, the battery's tracks as rings next to the real aircraft in 3D, and the tracking error in the inspector.
+- **Uncertainty you can see:** a faint 2σ ellipse around each track on the scope, stretched sideways far out where bearing errors dominate, and a ±1σ column in the track table. Press T (or "truth" under the scope) to see where the aircraft really are.
+- **Defended assets:** a town and a power plant join the battery, each with a threat ring. Threats are ranked by the closest point of approach to the asset they will reach soonest, and leaks are counted where they happen.
+- **Identification that can go wrong:** friendly transponders fail one check in ten. A silent track is "unknown" after one check and "hostile" after two, so a friend with a dead transponder can be shot down: an identification error, counted as a failure.
+- **What it flies like:** a kinematic classifier sorts every track by its speed and height: drone-like, cruise-missile-like, jet-like, airliner-like or an ordinary aircraft. Silent and flying like one of the first three, which no friend or airliner here does, a track is "suspect" at the first check.
+- **Civil air corridors:** two lanes, 8 to 13 km up, in green on the scope and in 3D. Airliners fly them, and a silent track flying one like an airliner stays "unknown" instead of turning hostile. An airliner dropped anywhere joins the nearest lane.
+- **A shape and a reason for every identity:** a diamond for hostile (red) and suspect (orange), a quatrefoil for unknown (yellow), a circle for friend (blue) and a square for civil (green). The inspector says what the track flies like, how many checks it has failed and what that makes it; the event log and the approval card give the same evidence.
 
-> **Engineering note: a filter that checks its own honesty.** The unit tests feed the filter noisy measurements and check that its normalized innovation averages 3, the value a chi-square law with three degrees of freedom predicts. A filter that claimed to be surer than it is would fail.
+> **Engineering note: tests that keep perception honest.** The tracker, the classifier and the corridor check read only echoes and filtered tracks, never the truth, and the tests check what that costs. The filter's normalized innovation must average 3, as a chi-square law with three degrees of freedom predicts, and a silent airliner flown off the corridors at the battery must be shot down and counted as an identification error.
 
-_Screenshots and a clip for this step come with the v1.0 media pass._
+<img src="docs/media/step-05-track-identify.png" alt="The console at Step 5 of 9: the civil corridors as green lanes on the radar scope and as boxes in 3D with airliners inside, a suspect cruise-missile-like target selected and heading for the town, a hostile drone being engaged, the track table listing suspect, hostile, friendly and civil tracks, and the event log explaining why the target is suspect" width="100%" />
+
+<details>
+<summary>Phone layout</summary>
+<br />
+<img src="docs/media/step-05-track-identify-mobile.png" alt="The Step 5 console on a phone, with the civil corridors over the 3D terrain" width="320" />
+</details>
 
 ### Step 4 · Environment & radar
 
@@ -454,9 +464,7 @@ The foundation everything else builds on.
 - [x] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
 - [x] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
 - [x] **Step 4 · Environment & radar:** terrain, atmosphere, wind and drag, threat routes; radar equation, noise, horizon, terrain masking, clutter and coverage maps
-- [ ] **Step 5 · Track & identify:** Kalman tracking, uncertainty ellipses, truth vs. perception; identification, civil traffic, defended assets, threat ranking with "Why?"
-  - In: Kalman tracking, gating and association, uncertainty ellipses, track quality, truth vs. perception, identification with transponder failures, defended assets, threat ranking with "Why?"
-  - Still to come: the kinematic classifier and air corridors
+- [x] **Step 5 · Track & identify:** Kalman tracking, uncertainty ellipses, truth vs. perception; identification, the kinematic classifier, civil air corridors, defended assets, threat ranking with "Why?"
 - [ ] **Step 6 · Engage & assess:** fire channels, engagement envelopes, kill probability, doctrine and operator approval; kill assessment, saturation, telemetry and the full analysis bar
   - In: fire channels, the engagement envelope, kill probability, rules of engagement and operator approval
 - [ ] **Step 7 · Scenarios & replay:** save, load and share, editor and raid generator; timeline scrubbing, rewind and branch, Monte Carlo, CSV export

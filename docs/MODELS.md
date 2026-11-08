@@ -86,18 +86,18 @@ The International Standard Atmosphere, first three layers, heights above the bat
 - **Coverage map:** for each of 720 bearings, walk out in 200 m steps, keeping the steepest slope `(h − d²/2R − h_antenna) / d` seen so far. The lowest visible height at distance `d` is `h_antenna + slope_max · d + d²/2R`, minus the ground height there. The scope and the 3D view shade where that is above the chosen target height (50 m, 300 m or 1 km).
 - **Lit ground:** the coverage overlay's clutter view shades the ground the antenna can see (a point 0.5 m above the ground is in view): the places whose echo the Doppler filter has to remove (see Search radar).
 
-## Scenario traffic (Steps 1 and 3)
+## Scenario traffic (Steps 1, 3 and 5)
 
-| Setting          | Value                                                                                                                                     |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| At the start     | 4 aircraft, placed 15–65% of the way along their course                                                                                   |
-| Arrivals         | One new aircraft every 14–28 s while fewer than 7 are flying                                                                              |
-| Entry point      | 38 km from the battery, at a random bearing                                                                                               |
-| Course           | Hostiles aim within 800 m of a defended asset, others within 14 km of the battery; cruise-missile-like targets fly a dog-leg (see Flight) |
-| Mix (weights)    | Drone 3 · cruise-missile-like 2 · fast jet 2 · airliner 1.5 · friendly 1.5                                                                |
-| Leaving the area | Farther than 42 km from the battery and flying away                                                                                       |
+| Setting          | Value                                                                                                                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| At the start     | 4 aircraft, placed 15–65% of the way along their course                                                                                                                                      |
+| Arrivals         | One new aircraft every 14–28 s while fewer than 7 are flying                                                                                                                                 |
+| Entry point      | 38 km from the battery, at a random bearing; an airliner at the end of a civil corridor nearest that bearing                                                                                 |
+| Course           | Hostiles aim within 800 m of a defended asset, airliners fly their corridor to its other end, others aim within 14 km of the battery; cruise-missile-like targets fly a dog-leg (see Flight) |
+| Mix (weights)    | Drone 3 · cruise-missile-like 2 · fast jet 2 · airliner 1.5 · friendly 1.5                                                                                                                   |
+| Leaving the area | Farther than 42 km from the battery and flying away                                                                                                                                          |
 
-Aim points use `r = R·√u` (with `u` uniform), which spreads them evenly over the disc instead of bunching them near the centre.
+Aim points use `r = R·√u` (with `u` uniform), which spreads them evenly over the disc instead of bunching them near the centre. Airliners keep a random offset from the corridor's centreline, up to half of its half-width (2.5 km), all the way along it.
 
 ## Search radar (Steps 1, 3 and 4)
 
@@ -174,11 +174,47 @@ Aim points use `r = R·√u` (with `u` uniform), which spreads them evenly over 
 
 Scenario hostiles aim within 800 m of one of the three, picked at random. A hostile inside any asset's leak radius has got through (counted once per aircraft).
 
+## Air corridors (Step 5)
+
+Two fictional civil lanes, straight, 10 km wide and 8 to 13 km up, each square to the bearing at which it passes closest to the battery:
+
+| Lane                | Closest to the battery | Direction   | Width | Heights |
+| ------------------- | ---------------------- | ----------- | ----- | ------- |
+| North corridor      | 18 km at bearing 10°   | 100° / 280° | 10 km | 8–13 km |
+| South-west corridor | 22 km at bearing 215°  | 305° / 125° | 10 km | 8–13 km |
+
+- **Flying a corridor:** inside the lane's width and height band, with a ground track within 30° of its direction, either way. The command node judges it from the track's filtered position and velocity.
+- **Clear of the assets:** the lanes' edges stay at least 7.7 km outside every threat ring (the north lane and the town are closest), so a course along a lane never threatens an asset. The unit tests try every course within 10° of a lane's direction; at the full 30° allowed for flying it, a course from a lane's far end can point at the battery, and is evaluated like any other.
+- **Scenario airliners** enter at the end of a lane nearest their entry bearing, on the 38 km circle, and fly it to its other end, 44 km out.
+- **Placed airliners:** an airliner dropped without a heading joins the nearest lane at 45° and flies it toward its farther end, out of the area. Within 500 m of the centreline, or too close to that end to join first, it heads straight for the end. Its 11.6 km turn radius carries it at most 3.4 km past the centreline, still inside the lane.
+
 ## Identification (Steps 3 and 5)
 
-- **Checks (IFF):** the first 2 s after a track is confirmed, then every 4 s while it stays silent, at most two.
+- **Kinematic classifier (Step 5):** every tick, each confirmed track gets a flight profile from its filtered ground speed `v`, its height above the ground below it `h_AGL` (from the terrain map) and its altitude `h`. The tests run in this order, and the first that holds wins:
+
+  | Profile             | Test                              | Traffic here that flies it        |
+  | ------------------- | --------------------------------- | --------------------------------- |
+  | Drone-like          | `v < 80 m/s`                      | drones (40 m/s)                   |
+  | Cruise-missile-like | `v ≥ 120 m/s` and `h_AGL < 300 m` | cruise-missile-like (240 m/s)     |
+  | Jet-like            | `v ≥ 290 m/s`                     | fast jets (340 m/s)               |
+  | Airliner-like       | `v ≥ 180 m/s` and `h ≥ 8 km`      | airliners (230 m/s at 11 km)      |
+  | Ordinary aircraft   | anything else                     | friendly aircraft (200 m/s, 4 km) |
+
+  The first three are the threat profiles: no friendly or civil aircraft here flies them.
+
+- **Corridor (Step 5):** whether the track flies a civil corridor (see Air corridors), from the same filtered state.
+- **Checks (IFF):** the first 2 s after a track is confirmed, then every 4 s until it is settled (friend, civil or hostile).
 - **Answers:** a friendly aircraft answers each check with probability 0.9 (its transponder can fail); a civil aircraft's code is received with probability 0.98; a hostile never answers. One random draw per check.
-- **Identity:** an answer settles it (friend or civil). Silence on the first check makes the track **unknown**; silence on both makes it **hostile**. A friendly aircraft silent on both checks (probability 0.1² = 1%) is declared hostile: the identification mistake the rules must guard against. A false track has nothing behind it to answer.
+- **Identity:** a track is **pending** ("identifying") until its first check, and an answer settles it (friend or civil). After a silent check, counting every check so far:
+  1. a track flying a corridor with the airliner-like profile is assumed civil: **unknown**, never hostile on silence alone, checked again every 4 s;
+  2. otherwise, after two silent checks, **hostile**;
+  3. otherwise (one silent check) **suspect** with a threat profile, **unknown** without one.
+
+  A friendly aircraft silent on two checks (probability 0.1² = 1%) is declared hostile: the identification mistake the rules must guard against. A false track has nothing behind it to answer.
+
+- **Odds:** silence has probability 1 from a hostile and 0.1 from a friend, so each silent check multiplies the odds that a track is hostile by 10 (by 50 against civil traffic). The checks are drawn independently; a real transponder that is broken stays broken.
+
+**Limitations:** the classifier uses only speed and height, judged afresh at every tick (no history, no climb or turn behaviour, no radar signature). A hostile flying exactly like an airliner along a corridor stays unknown; its course is still evaluated, and under weapons FREE an unknown that threatens an asset can be engaged.
 
 ## Threat evaluation (Steps 3 and 5)
 
@@ -188,11 +224,11 @@ Scenario hostiles aim within 800 m of one of the three, picked at random. A host
   t_cpa = −(r · v) / |v|²        d_cpa = |r + v · t_cpa|
   ```
 
-- A hostile or unknown track is a threat to an asset if `d_cpa` is inside the asset's threat ring and `t_cpa > 0`. It is assigned to the asset it reaches soonest, and threats are ranked by `t_cpa` (the header's "next impact").
+- An unknown, suspect or hostile track is a threat to an asset if `d_cpa` is inside the asset's threat ring and `t_cpa > 0`. It is assigned to the asset it reaches soonest, and threats are ranked by `t_cpa` (the header's "next impact").
 
 ## Rules of engagement (Step 6)
 
-- **Weapons control status:** HOLD (never fire), TIGHT (hostile tracks only; the default), FREE (hostile and unknown tracks).
+- **Weapons control status:** HOLD (never fire), TIGHT (hostile tracks only; the default), FREE (hostile, suspect and unknown tracks; never one still being identified).
 - **Operator mode:** AUTO (the command node fires on its own) or SEMI-AUTO (each shot is proposed and waits for the operator's approval; a proposal lapses when the shot becomes impossible or no longer allowed; holding fire blocks new proposals for that track for 20 s). Switching to AUTO approves waiting proposals.
 - **Commands:** `setRules`, `approveEngagement` and `holdFire` are recorded like every other command, so runs with rule changes replay exactly.
 - **Identification errors:** a friendly or civil aircraft destroyed by an interceptor is counted in `idErrors` and reported as a failure.
@@ -268,6 +304,7 @@ A generic, fictional interceptor, modelled as a point mass (round numbers chosen
 - **Kill assessed:** after a hit, the next time the beam sweeps over the track's predicted position and finds no echo, the kill is confirmed and the track dropped (at most one turn, 4 s, later).
 - **Target survived:** if the beam finds the target again after a miss, the engagement closes and the track can be assigned again.
 - **Leak:** a hostile inside any defended asset's leak radius got through (2 km for the battery).
+- **Score (Step 5):** "threats down" counts the confirmed kills of real hostiles, whatever the track's identity at the time (a suspect shot down under FREE counts); a friendly or civil aircraft destroyed counts as an identification error instead.
 
 ## Drawing the 3D view (Step 2)
 
