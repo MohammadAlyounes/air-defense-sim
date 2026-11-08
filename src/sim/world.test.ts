@@ -173,7 +173,14 @@ describe('Step 4 world: a noisy radar', () => {
           terrain: false,
           radar: { falseAlarmProbability: 1e-6, resolutionCells: 0 },
         });
-        sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM, northM: 0, headingRad: 0 });
+        // Flying in toward the radar, so the clutter notch never hides it.
+        sim.dispatch({
+          kind: 'spawnTraffic',
+          type: 'drone',
+          eastM,
+          northM: 0,
+          headingRad: -Math.PI / 2,
+        });
         sim.run(60); // one look, ~1 s in
         const seen = sim.snapshot().plots.length > 0;
         if (seen && counter === 'far') far++;
@@ -352,5 +359,67 @@ describe('Step 4 world: wind, routes and evasive turns', () => {
       sim.snapshot().aircraft.map((a) => [a.type, a.position.x, a.position.y, a.trackRad]);
     expect(where(windy)).toEqual(where(calm));
     expect(where(windy).length).toBeGreaterThan(0);
+  });
+});
+
+describe('Step 4 world: clutter and Doppler', () => {
+  // The ideal radar with the clutter notch, reaching far enough to see a drone at 32 km.
+  const radar = { ...IDEAL_SEARCH_RADAR, dopplerNotchMps: 10, referenceRangeM: 100_000 };
+
+  /** How often the radar paints a drone dropped at (east, north) in a minute, over flat land. */
+  function paintsInAMinute(eastM: number, northM: number, headingRad: number): number {
+    const sim = new Simulation({
+      seed: 6,
+      autoTraffic: false,
+      terrain: false,
+      radar,
+      wind: false,
+      evasiveTurns: false,
+    });
+    sim.dispatch({ kind: 'setRules', rules: { weaponsControl: 'HOLD' } });
+    sim.dispatch({ kind: 'spawnTraffic', type: 'drone', eastM, northM, headingRad });
+    const paints = new Set<number>();
+    for (let s = 0; s < 60; s++) {
+      sim.run(50);
+      const tick = sim.snapshot().aircraft[0]?.lastPaint?.tick;
+      if (tick !== undefined) paints.add(tick);
+    }
+    return paints.size;
+  }
+
+  it('loses a drone flying across the beam over lit ground', () => {
+    // 6 km north, flying east: closing slower than 10 m/s while within 1.55 km of due north.
+    expect(paintsInAMinute(-1_500, 6_000, Math.PI / 2)).toBe(0);
+  });
+
+  it('still sees it flying straight at the radar over the same ground', () => {
+    expect(paintsInAMinute(0, 6_000, Math.PI)).toBe(15);
+  });
+
+  it('sees an airliner crossing high above, where the ground at its distance is in shadow', () => {
+    const sim = new Simulation({
+      seed: 6,
+      autoTraffic: false,
+      terrain: false,
+      radar: { ...radar, dopplerNotchMps: 300 },
+      wind: false,
+      evasiveTurns: false,
+    });
+    // 12 km north at 10 km: 15.6 km away. Every echo is inside a 300 m/s notch, yet it is seen.
+    sim.dispatch({
+      kind: 'spawnTraffic',
+      type: 'airliner',
+      eastM: -1_000,
+      northM: 12_000,
+      headingRad: Math.PI / 2,
+      altitudeM: 10_000,
+    });
+    sim.run(50 * 9);
+    expect(sim.snapshot().aircraft[0]?.lastPaint).not.toBeNull();
+  });
+
+  it('sees the crossing drone where the ground is in shadow, beyond the 14 km ground horizon', () => {
+    // Every turn: 14 or 15 paints in a minute, as it crosses north between two of them.
+    expect(paintsInAMinute(-1_500, 20_000, Math.PI / 2)).toBeGreaterThanOrEqual(14);
   });
 });

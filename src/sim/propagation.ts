@@ -66,6 +66,33 @@ export function lineOfSight(terrain: Terrain, antenna: Vec3, target: Vec3): Visi
   return blockedByTerrain ? 'terrain' : 'visible';
 }
 
+/**
+ * Does the radar light the ground at (east, north)? Where it does, the ground sends back its own
+ * echo (clutter) from the same range as a target flying over it, far stronger than a small
+ * target's, and only the Doppler filter can tell the two apart. Ground behind a hill or below
+ * the radar horizon is in shadow and sends nothing back.
+ */
+export function groundLit(terrain: Terrain, antenna: Vec3, eastM: number, northM: number): boolean {
+  const ground = { x: eastM, y: northM, z: terrain.heightAt(eastM, northM) };
+  return lineOfSight(terrain, antenna, ground) === 'visible';
+}
+
+/**
+ * Does the echo of a target at `position` arrive together with clutter? The search radar's beam
+ * is a tall fan, so it also lights the ground at the target's distance on the same bearing,
+ * and that ground's echo comes back at the same time. For a low flyer this is the ground just
+ * below it; for a high one, ground farther out.
+ */
+export function inClutter(terrain: Terrain, antenna: Vec3, position: Vec3): boolean {
+  const dx = position.x - antenna.x;
+  const dy = position.y - antenna.y;
+  const groundM = Math.hypot(dx, dy);
+  // Straight above the radar: the ground all around it is lit.
+  if (groundM < 1) return true;
+  const scale = Math.hypot(groundM, position.z - antenna.z) / groundM;
+  return groundLit(terrain, antenna, antenna.x + dx * scale, antenna.y + dy * scale);
+}
+
 /** For each bearing and range, the lowest height above the ground at which the radar sees a target. */
 export interface CoverageMap {
   /** Number of bearings, evenly spaced clockwise from north. */
