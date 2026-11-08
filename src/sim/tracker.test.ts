@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { vec3, type Vec3 } from './core/vec';
 import { initialState } from './kalman';
-import { associate, trackPositionAt } from './tracker';
+import { associate, associateWithManeuvers, DEFAULT_TRACKER, trackPositionAt } from './tracker';
 import type { Plot, Track } from './types';
 
 const R = [100, 0, 0, 0, 100, 0, 0, 0, 100];
@@ -20,6 +20,7 @@ function track(id: number, position: Vec3, velocity: Vec3): Track {
     lastPaintTick: 0,
     position,
     velocity,
+    maneuvering: false,
     estimate: {
       ...estimate,
       x: [position.x, position.y, position.z, velocity.x, velocity.y, velocity.z],
@@ -67,6 +68,23 @@ describe('association', () => {
     const fresh = { ...a, lastPaintTick: 90 };
     const owners = associate([plot(100, vec3(100, 0, 1000))], [R], [fresh], 50);
     expect(owners).toEqual([-1]);
+  });
+
+  it('lets a plot join a confirmed track through the maneuver gate after a hard turn', () => {
+    // Flying east at 300 m/s, then 4 s of a 6 g turn: the echo lands about 460 m off the
+    // straight-line prediction (1,200 m east), too far for the normal gate.
+    const fast = track(1, vec3(0, 0, 1000), vec3(300, 0, 0));
+    const turned = [plot(200, vec3(1_150, 460, 1000))];
+    expect(associate(turned, [R], [fast], 50)).toEqual([0]);
+    expect(associateWithManeuvers(turned, [R], [fast], 50).maneuvers).toEqual([true]);
+    const normalOnly = { ...DEFAULT_TRACKER, maneuverNoise: null };
+    expect(associate(turned, [R], [fast], 50, normalOnly)).toEqual([-1]);
+    // A plot that fits the normal gate is no maneuver.
+    const straight = [plot(200, vec3(1_203, 2, 1000))];
+    expect(associateWithManeuvers(straight, [R], [fast], 50).maneuvers).toEqual([false]);
+    // Tentative tracks, with no velocity yet, get no maneuver gate.
+    const tentative = { ...fast, confirmedTick: null };
+    expect(associate(turned, [R], [tentative], 50)).toEqual([-1]);
   });
 
   it('extrapolates a track at its filtered velocity', () => {

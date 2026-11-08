@@ -8,6 +8,7 @@ import {
   dropRoute,
   dropSide,
   GRAVITY_MPS2,
+  insideTurnCircle,
   loadFactorForBank,
   planRoute,
   routeLengthM,
@@ -105,6 +106,18 @@ describe('turns', () => {
     expect(angleDiff(deg(350), deg(10))).toBeCloseTo(deg(-20), 9);
     expect(turnToward(deg(350), deg(10), deg(5))).toBeCloseTo(deg(355), 9);
     expect(turnToward(deg(350), deg(10), deg(50))).toBeCloseTo(deg(10), 9);
+  });
+
+  it('knows a point inside its turn circle cannot be reached by turning', () => {
+    // Flying north at the origin with a 1 km turn radius: the right circle is centred 1 km east.
+    const here = vec3(0, 0, 0);
+    expect(insideTurnCircle(here, 0, vec3(1_500, 0, 0), 1_000)).toBe(true);
+    expect(insideTurnCircle(here, 0, vec3(-1_500, 0, 0), 1_000)).toBe(true);
+    expect(insideTurnCircle(here, 0, vec3(2_500, 0, 0), 1_000)).toBe(false);
+    // Straight ahead or far behind: reachable.
+    expect(insideTurnCircle(here, 0, vec3(0, 3_000, 0), 1_000)).toBe(false);
+    expect(insideTurnCircle(here, 0, vec3(500, -3_000, 0), 1_000)).toBe(false);
+    expect(insideTurnCircle(here, 0, vec3(500, 0, 0), Number.POSITIVE_INFINITY)).toBe(false);
   });
 
   it('breaks square to the interceptor, on the side that needs the smaller turn', () => {

@@ -329,6 +329,38 @@ describe('Step 4 world: wind, routes and evasive turns', () => {
     expect(ofKind(run(false).events, 'evasiveTurn')).toHaveLength(0);
   });
 
+  it("keeps the jet's track through its 6 g break, through the tracker's maneuver gate", () => {
+    const fly = (maneuverGate: boolean) => {
+      const sim = new Simulation({
+        seed: 2026,
+        autoTraffic: false,
+        tracker: maneuverGate ? {} : { maneuverNoise: null },
+      });
+      sim.dispatch({
+        kind: 'spawnTraffic',
+        type: 'jet',
+        eastM: 0,
+        northM: 28_000,
+        headingRad: Math.PI,
+        altitudeM: 1_000,
+      });
+      const events: SimEvent[] = [];
+      let maneuvering = false;
+      for (let s = 0; s < 60 * 5; s++) {
+        events.push(...sim.run(10));
+        if (sim.snapshot().tracks.some((t) => t.truthId === 1 && t.maneuvering)) maneuvering = true;
+      }
+      const first = ofKind(events, 'trackConfirmed').find((e) => e.id === 1)?.trackId;
+      const lost = ofKind(events, 'contactLost').filter((e) => e.trackId === first);
+      return { breaks: ofKind(events, 'evasiveTurn').length, maneuvering, lost: lost.length };
+    };
+    // Its first track lives on through the break, so the battery never has to identify it again.
+    expect(fly(true)).toEqual({ breaks: expect.any(Number), maneuvering: true, lost: 0 });
+    expect(fly(true).breaks).toBeGreaterThan(0);
+    // With the normal gate alone, the break throws the echoes out of it: the track is lost.
+    expect(fly(false).lost).toBe(1);
+  });
+
   it('flies slower over the ground into a headwind, faster downwind, and crabs in a crosswind', () => {
     // A north wind of 8 m/s at 10 m: at a drone's 300 m it is 8 × 30^(1/7) = 13 m/s.
     const wind = { speedMps: 8, fromRad: 0 };
