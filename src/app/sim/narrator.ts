@@ -1,5 +1,14 @@
-import { DEFAULT_ASSETS, TICK_S, type AircraftType, type SimEvent, type Snapshot } from '../../sim';
+import {
+  DEFAULT_ASSETS,
+  engageable,
+  looksLikeThreat,
+  TICK_S,
+  type AircraftType,
+  type SimEvent,
+  type Snapshot,
+} from '../../sim';
 import { formatSimClock } from '../lib/format';
+import { assumedCivilReason, IDENTITY_WORD, PROFILE_TEXT } from './identityText';
 
 /**
  * Turns simulation data into plain language: event-log lines and the header's NOW line.
@@ -93,9 +102,22 @@ function describeIdentified(event: Extract<SimEvent, { kind: 'identified' }>): s
   if (event.evidence === 'civilCode') {
     return `${t} identified as civil: it broadcasts a civil transponder code.`;
   }
-  return event.identity === 'unknown'
-    ? `${t} is unknown: no answer to identification check ${event.checks}. Checking again in 4 s.`
-    : `${t} identified as hostile: no answer to ${event.checks} identification checks.`;
+  const n = event.checks;
+  const like = event.profile ? PROFILE_TEXT[event.profile].like : null;
+  switch (event.identity) {
+    case 'suspect':
+      return `${t} is suspect: no answer to identification check ${n}, and it flies like ${like ?? 'a threat'}. Checking again in 4 s.`;
+    case 'unknown': {
+      const civil = assumedCivilReason(event.profile, event.corridorId);
+      return civil
+        ? `${t} is unknown: no answer to identification check ${n}, but ${civil}, so silence alone does not make it hostile. Checking again in 4 s.`
+        : `${t} is unknown: no answer to identification check ${n}. Checking again in 4 s.`;
+    }
+    default: {
+      const flies = like && looksLikeThreat(event.profile) ? `, and it flies like ${like}` : '';
+      return `${t} identified as hostile: no answer to ${n} identification checks${flies}.`;
+    }
+  }
 }
 
 export function describeEvent(event: SimEvent): LogLine {
@@ -275,7 +297,8 @@ function describeSituation(snapshot: Snapshot, recent: readonly SimEvent[]): str
     return `Your call: fire at ${trackName(proposal.trackId)}${heading}? Chance of a kill ${percent(proposal.pk)}. Press A to approve or H to hold fire.`;
   }
   const waiting = snapshot.tracks.filter(
-    (t) => t.threat && t.engagementId === null && t.identity === 'hostile',
+    (t) =>
+      t.threat && t.engagementId === null && engageable(t.identity, snapshot.rules.weaponsControl),
   ).length;
   const saturated =
     snapshot.channels.used >= snapshot.channels.total && waiting > 0
@@ -299,12 +322,17 @@ function describeSituation(snapshot: Snapshot, recent: readonly SimEvent[]): str
     .filter((t) => t.threat && t.engagementId === null)
     .sort((a, b) => (a.threat?.timeToClosestS ?? 0) - (b.threat?.timeToClosestS ?? 0))[0];
   if (threat?.threat) {
-    const who =
-      threat.identity === 'unknown' ? `Unknown ${trackName(threat.id)}` : trackName(threat.id);
+    const unsure = threat.identity === 'unknown' || threat.identity === 'suspect';
+    const who = unsure
+      ? `${capitalize(IDENTITY_WORD[threat.identity])} ${trackName(threat.id)}`
+      : trackName(threat.id);
     const head = `${who} is heading for ${assetPhrase(threat.threat.assetId)} (closest approach in ${formatIn(threat.threat.timeToClosestS)})`;
     if (snapshot.rules.weaponsControl === 'HOLD') return `${head}, but weapons are on HOLD.`;
-    if (threat.identity === 'unknown' && snapshot.rules.weaponsControl === 'TIGHT') {
-      return `${head}: weapons TIGHT, so the battery waits for the next identification check.`;
+    if (unsure && snapshot.rules.weaponsControl === 'TIGHT') {
+      const civil = assumedCivilReason(threat.profile, threat.corridorId);
+      return civil
+        ? `${head}: weapons TIGHT, and ${civil}, so its silence alone does not make it hostile.`
+        : `${head}: weapons TIGHT, so the battery waits for the next identification check.`;
     }
     if (saturated) return `${head}.${saturated}`;
     return snapshot.launcher.ready === 0
@@ -324,6 +352,7 @@ function describePicture(snapshot: Snapshot): string {
   const unconfirmed = tracks.filter((t) => t.confirmedTick === null).length;
   const parts = [
     [count('hostile'), 'hostile'],
+    [count('suspect'), 'suspect'],
     [count('unknown'), 'unknown'],
     [count('friend'), 'friendly'],
     [count('neutral'), 'civil'],

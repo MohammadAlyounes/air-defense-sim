@@ -1,3 +1,4 @@
+import { corridorFlown, DEFAULT_CORRIDORS, type AirCorridor } from './airspace';
 import { STANDARD_ATMOSPHERE } from './atmosphere';
 import { DEFAULT_ASSETS, type DefendedAsset } from './assets';
 import {
@@ -6,13 +7,16 @@ import {
   engageable,
   evaluateThreat,
   iffAnswer,
+  identityAfterSilence,
   killProbability,
   LAUNCHER_POSITION,
+  mayThreaten,
   planIntercept,
   type DefenseConfig,
   type Identity,
   type Rules,
 } from './c2';
+import { flightProfile } from './classify';
 import { TICK_S } from './core/clock';
 import { fnv1a } from './core/hash';
 import { Rng } from './core/rng';
@@ -116,6 +120,8 @@ export interface SimConfig {
   tracker?: Partial<TrackerConfig>;
   /** What the battery defends; the battery itself should be one of them. */
   assets?: readonly DefendedAsset[];
+  /** Civil air corridors that airliners fly (default: two lanes clear of the assets). */
+  corridors?: readonly AirCorridor[];
   /** Rules of engagement at the start (they can change with `setRules` commands). */
   rules?: Partial<Rules>;
   /**
@@ -187,6 +193,7 @@ export class Simulation {
   private readonly interceptorConfig: InterceptorConfig;
   private readonly tracker: TrackerConfig;
   private readonly assets: readonly DefendedAsset[];
+  private readonly corridors: readonly AirCorridor[];
   private rules: Rules;
   private readonly areaRadiusM: number;
   private readonly traffic: AutoTrafficConfig | null;
@@ -236,6 +243,7 @@ export class Simulation {
     this.interceptorConfig = { ...DEFAULT_INTERCEPTOR, ...config.interceptor };
     this.tracker = { ...DEFAULT_TRACKER, ...config.tracker };
     this.assets = config.assets ?? DEFAULT_ASSETS;
+    this.corridors = config.corridors ?? DEFAULT_CORRIDORS;
     this.rules = { ...DEFAULT_RULES, ...config.rules };
     this.areaRadiusM = config.areaRadiusM ?? this.radar.rangeM + 2_000;
     this.traffic =
@@ -252,7 +260,14 @@ export class Simulation {
 
     if (this.traffic) {
       for (let i = 0; i < this.traffic.initialCount; i++) {
-        const flight = planFlight(this.rng, this.traffic, true, this.assets, this.routeRng);
+        const flight = planFlight(
+          this.rng,
+          this.traffic,
+          true,
+          this.assets,
+          this.routeRng,
+          this.corridors,
+        );
         this.addAircraft(
           flight.type,
           flight.position,
@@ -355,6 +370,7 @@ export class Simulation {
       channels: { used: this.channelsInUse(), total: this.defense.fireChannels },
       rules: { ...this.rules },
       assets: this.assets,
+      corridors: this.corridors,
       wind: { ...this.wind },
       effects: [...this.effects],
       stats: { ...this.stats },
@@ -410,12 +426,12 @@ export class Simulation {
                   this.rng.range(-50, 50),
                 );
           const start = vec3(command.eastM + offset.x, command.northM + offset.y, 0);
-          const route = dropRoute(type, start, command.headingRad);
+          const route = dropRoute(type, start, command.headingRad, this.corridors);
           const first = route[0];
           this.addAircraft(
             type,
             start,
-            first ? bearingTo(start, first) : command.headingRad,
+            first ? bearingTo(start, first) : (command.headingRad ?? 0),
             route,
             events,
             altitudeM + offset.z,
@@ -441,7 +457,14 @@ export class Simulation {
   private scenarioArrivals(tick: number, events: SimEvent[]): void {
     if (!this.traffic || this.nextArrival === null || tick < this.nextArrival) return;
     if (this.aircraft.length < this.traffic.maxAircraft) {
-      const flight = planFlight(this.rng, this.traffic, false, this.assets, this.routeRng);
+      const flight = planFlight(
+        this.rng,
+        this.traffic,
+        false,
+        this.assets,
+        this.routeRng,
+        this.corridors,
+      );
       this.addAircraft(
         flight.type,
         flight.position,
@@ -808,6 +831,8 @@ export class Simulation {
           maneuvering: false,
           estimate,
           confirmedTick: null,
+          profile: null,
+          corridorId: null,
           identity: 'pending',
           iffChecks: 0,
           nextIffTick: null,
@@ -909,7 +934,8 @@ export class Simulation {
 
   /** The radar looked where the target should be and found nothing: the kill is confirmed. */
   private assessKill(track: Track, engagement: Engagement, tick: number, events: SimEvent[]) {
-    if (track.identity === 'hostile') this.stats.threatsDown += 1;
+    // The score counts what the target really was (a friendly or civil one is an ID error).
+    if (TRAFFIC[engagement.targetType].affiliation === 'hostile') this.stats.threatsDown += 1;
     this.engagements = this.engagements.filter((e) => e.id !== engagement.id);
     events.push({
       kind: 'killAssessed',
@@ -927,17 +953,26 @@ export class Simulation {
   // ── Identify and evaluate ───────────────────────────────────────────────────────────────
 
   /**
-   * Identification checks: the first 2 s after a track is confirmed, then every 4 s while it
-   * stays silent. An answer settles it (friend or civil); silence makes it 'unknown', and
-   * silence on every check makes it 'hostile'. A friendly aircraft whose transponder fails
-   * every time is declared hostile: an identification mistake waiting to happen.
+   * Identification, every tick for each confirmed track. The kinematic classifier says what it
+   * flies like (`flightProfile`) and whether it flies a civil corridor, from its filtered state.
+   * The identification checks come 2 s after the track is confirmed, then every 4 s while it
+   * stays silent. An answer settles it (friend or civil). Silence makes it 'suspect' if it flies
+   * like a threat and 'unknown' otherwise, and silence on every check makes it 'hostile', except
+   * for an airliner flying a corridor, which stays 'unknown' (see `identityAfterSilence`). A
+   * friendly aircraft whose transponder fails every time is declared hostile: an identification
+   * mistake waiting to happen.
    */
   private identify(tick: number, events: SimEvent[]): void {
     const firstDelay = ticks(this.defense.iffDelayS);
-    this.tracks = this.tracks.map((track) => {
-      if (track.confirmedTick === null) return track;
-      if (track.identity !== 'pending' && track.identity !== 'unknown') return track;
-      if (tick < (track.nextIffTick ?? track.confirmedTick + firstDelay)) return track;
+    this.tracks = this.tracks.map((current) => {
+      const confirmedTick = current.confirmedTick;
+      if (confirmedTick === null) return current;
+      const track = this.classify(current, tick);
+      const open =
+        track.identity === 'pending' ||
+        track.identity === 'unknown' ||
+        track.identity === 'suspect';
+      if (!open || tick < (track.nextIffTick ?? confirmedTick + firstDelay)) return track;
       // The check is answered by the real aircraft behind the track, if there is one: a false
       // track has nothing to answer.
       const aircraft = this.aircraft.find((a) => a.id === track.truthId);
@@ -946,7 +981,7 @@ export class Simulation {
         : null;
       const checks = track.iffChecks + 1;
       const identity: Exclude<Identity, 'pending'> =
-        answer ?? (checks >= this.defense.iffChecks ? 'hostile' : 'unknown');
+        answer ?? identityAfterSilence(checks, this.defense, track.profile, track.corridorId);
       events.push({
         kind: 'identified',
         tick,
@@ -957,25 +992,47 @@ export class Simulation {
         evidence:
           answer === 'friend' ? 'friendReply' : answer === 'neutral' ? 'civilCode' : 'noReply',
         checks,
+        profile: track.profile,
+        corridorId: track.corridorId,
       });
+      const settled = identity === 'friend' || identity === 'neutral' || identity === 'hostile';
       return {
         ...track,
         identity,
         iffChecks: checks,
-        nextIffTick: identity === 'unknown' ? tick + ticks(this.defense.iffRecheckS) : null,
+        nextIffTick: settled ? null : tick + ticks(this.defense.iffRecheckS),
       };
     });
   }
 
   /**
-   * Threat evaluation: a hostile or unknown track whose course passes inside a defended asset's
-   * threat radius, still approaching, is a threat to the asset it reaches soonest.
+   * The kinematic classifier and the corridor check for a track, from its filtered state at
+   * `tick`: speed over the ground, height above the battery's own terrain map, and course.
+   */
+  private classify(track: Track, tick: number): Track {
+    const v = track.velocity;
+    if (!v) return track;
+    const at = trackPositionAt(track, tick);
+    const profile = flightProfile(
+      Math.hypot(v.x, v.y),
+      at.z - this.terrain.heightAt(at.x, at.y),
+      at.z,
+    );
+    const corridorId = corridorFlown(this.corridors, at, Math.atan2(v.x, v.y))?.id ?? null;
+    return profile === track.profile && corridorId === track.corridorId
+      ? track
+      : { ...track, profile, corridorId };
+  }
+
+  /**
+   * Threat evaluation: an unknown, suspect or hostile track whose course passes inside a
+   * defended asset's threat radius, still approaching, is a threat to the asset it reaches
+   * soonest.
    */
   private evaluateThreats(tick: number, events: SimEvent[]): void {
     this.tracks = this.tracks.map((track) => {
-      const suspect = track.identity === 'hostile' || track.identity === 'unknown';
       const threat =
-        suspect && track.velocity
+        mayThreaten(track.identity) && track.velocity
           ? evaluateThreat(trackPositionAt(track, tick), track.velocity, this.assets)
           : null;
       if (!threat) return track.threat ? { ...track, threat: null } : track;

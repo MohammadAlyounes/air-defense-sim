@@ -10,7 +10,7 @@ Before firing, the battery must decide what a track is. It interrogates it with 
 
 ## Going deeper
 
-**Weapons control status.** HOLD: do not fire. TIGHT: fire only at tracks identified as hostile, here after two unanswered checks 4 s apart. FREE: fire at anything not identified as friendly or civil, including "unknown" tracks that have missed only one check.
+**Weapons control status.** HOLD: do not fire. TIGHT: fire only at tracks identified as hostile, here after two unanswered checks 4 s apart. FREE: fire at anything not identified as friendly or civil, including "unknown" and "suspect" tracks that have missed only one check, and an airliner in a corridor whose code was not received, if its course threatens an asset.
 
 **Operator modes.** In AUTO the command node fires on its own within the rules. In SEMI-AUTO it proposes each shot with the evidence (identity, threatened asset, intercept point, chance of a kill) and waits; the proposal lapses if the shot becomes impossible. Holding fire keeps the track from being proposed again for 20 s.
 

@@ -26,6 +26,8 @@ function track(id: number, position: Vec3, velocity: Vec3): Track {
       x: [position.x, position.y, position.z, velocity.x, velocity.y, velocity.z],
     },
     confirmedTick: 0,
+    profile: null,
+    corridorId: null,
     identity: 'pending',
     iffChecks: 0,
     nextIffTick: null,

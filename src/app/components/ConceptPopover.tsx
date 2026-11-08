@@ -18,6 +18,7 @@ import clutterDoppler from '../../../docs/concepts/04-9-clutter-doppler.md?raw';
 import kalmanFilter from '../../../docs/concepts/05-1-kalman-filter.md?raw';
 import gatingAssociation from '../../../docs/concepts/05-2-gating-association.md?raw';
 import closestApproach from '../../../docs/concepts/05-3-closest-point-of-approach.md?raw';
+import identification from '../../../docs/concepts/05-4-identification-friend-or-foe.md?raw';
 import engagementEnvelope from '../../../docs/concepts/06-1-engagement-envelope.md?raw';
 import killProbability from '../../../docs/concepts/06-2-kill-probability.md?raw';
 import rulesOfEngagement from '../../../docs/concepts/06-3-rules-of-engagement.md?raw';
@@ -47,6 +48,7 @@ const CONCEPTS = {
   kalmanFilter: { markdown: kalmanFilter, file: '05-1-kalman-filter.md' },
   gatingAssociation: { markdown: gatingAssociation, file: '05-2-gating-association.md' },
   closestApproach: { markdown: closestApproach, file: '05-3-closest-point-of-approach.md' },
+  identification: { markdown: identification, file: '05-4-identification-friend-or-foe.md' },
   engagementEnvelope: { markdown: engagementEnvelope, file: '06-1-engagement-envelope.md' },
   killProbability: { markdown: killProbability, file: '06-2-kill-probability.md' },
   rulesOfEngagement: { markdown: rulesOfEngagement, file: '06-3-rules-of-engagement.md' },

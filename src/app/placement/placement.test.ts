@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { coverageMap, flatTerrain } from '../../sim';
+import {
+  corridorFrame,
+  coverageMap,
+  DEFAULT_CORRIDORS,
+  fliesCorridor,
+  flatTerrain,
+  vec3,
+  type AirCorridor,
+} from '../../sim';
 import {
   headingToBattery,
   isValidDrop,
@@ -40,6 +48,38 @@ describe('placement', () => {
       headingRad: headingToBattery({ eastM: 12_000.4, northM: -5_000 }),
       altitudeM: 50,
     });
+  });
+
+  it('lets a placed airliner choose its own way: no heading, so it joins a civil corridor', () => {
+    const command = spawnCommand('airliner', { eastM: 0, northM: 10_000 }, 11_000);
+    expect(command).toEqual({
+      kind: 'spawnTraffic',
+      type: 'airliner',
+      eastM: 0,
+      northM: 10_000,
+      altitudeM: 11_000,
+    });
+    expect('headingRad' in command).toBe(false);
+  });
+
+  it('sends an airliner to the nearest corridor at 45°, then along it out of the area', () => {
+    const north = DEFAULT_CORRIDORS[0] as AirCorridor;
+    const at = { eastM: 0, northM: 10_000 };
+    const facts = placementFacts('airliner', at);
+    expect(facts.timeToBatteryS).toBeNull();
+    // 18 km − 10 km × cos 10° = 8.15 km south of the north lane: a 45° join of 8.15 km × √2,
+    // at 230 m/s.
+    const { acrossM } = corridorFrame(north, at.eastM, at.northM);
+    expect(acrossM).toBeCloseTo(18_000 - 10_000 * Math.cos((10 * Math.PI) / 180), 6);
+    expect(facts.corridor?.name).toBe('North corridor');
+    expect(facts.corridor?.joinInS).toBeCloseTo((acrossM * Math.SQRT2) / 230, 6);
+    const [join, end] = facts.route;
+    expect(corridorFrame(north, join?.x ?? 0, join?.y ?? 0).acrossM).toBeCloseTo(0, 6);
+    const exit = vec3(end?.x ?? 0, end?.y ?? 0, 11_000);
+    expect(Math.hypot(exit.x, exit.y)).toBeCloseTo(44_000, 6);
+    expect(fliesCorridor(north, exit, north.axisRad)).toBe(true);
+    // Other traffic still heads for the battery.
+    expect(placementFacts('jet', at).corridor).toBeNull();
   });
 
   it('places keyboard threats 30 km out, further round each time', () => {

@@ -1,4 +1,5 @@
 import { STANDARD_ATMOSPHERE, type Atmosphere } from './atmosphere';
+import { looksLikeThreat, type FlightProfile } from './classify';
 import { add, distance, dot, scale, vec3, type Vec3 } from './core/vec';
 import { reachM, speedAfterMps, type InterceptorConfig } from './interceptor';
 import { trackPositionAt } from './tracker';
@@ -63,12 +64,20 @@ export const DEFAULT_DEFENSE: DefenseConfig = {
 
 /**
  * What the battery believes a track is. 'pending' until the identification check has been
- * tried; 'unknown' while a track has not answered but has checks left; 'hostile' once it has
- * failed every check.
+ * tried; 'friend' or 'neutral' (civil) once it answers. A silent track with checks left is
+ * 'suspect' if it flies like a threat (see `flightProfile`) and 'unknown' otherwise; silence on
+ * every check makes it 'hostile', unless it is assumed civil (see `assumedCivil`).
  */
-export type Identity = 'pending' | 'unknown' | 'friend' | 'neutral' | 'hostile';
+export type Identity = 'pending' | 'unknown' | 'suspect' | 'friend' | 'neutral' | 'hostile';
 
-/** Weapons control status: HOLD (do not fire), TIGHT (hostile only), FREE (anything not friendly). */
+/** Checked and not identified as friend or civil: the command node weighs it as a possible threat. */
+export const mayThreaten = (identity: Identity): boolean =>
+  identity === 'unknown' || identity === 'suspect' || identity === 'hostile';
+
+/**
+ * Weapons control status: HOLD (do not fire), TIGHT (hostile only), FREE (anything checked and
+ * not identified as friend or civil: unknown and suspect tracks too).
+ */
 export type WeaponsControl = 'HOLD' | 'TIGHT' | 'FREE';
 /** AUTO: the battery fires on its own; SEMI: it proposes each shot and the operator approves. */
 export type OperatorMode = 'AUTO' | 'SEMI';
@@ -84,7 +93,30 @@ export const DEFAULT_RULES: Rules = { weaponsControl: 'TIGHT', operatorMode: 'AU
 export function engageable(identity: Identity, weaponsControl: WeaponsControl): boolean {
   if (weaponsControl === 'HOLD') return false;
   if (identity === 'hostile') return true;
-  return weaponsControl === 'FREE' && identity === 'unknown';
+  return weaponsControl === 'FREE' && mayThreaten(identity);
+}
+
+/**
+ * A silent track that flies like an airliner along a civil air corridor is taken for an
+ * airliner whose transponder code was not received: silence alone does not make it hostile.
+ */
+export const assumedCivil = (profile: FlightProfile | null, corridorId: number | null): boolean =>
+  profile === 'airliner' && corridorId !== null;
+
+/**
+ * The identity a track earns after `checks` identification checks without an answer: 'hostile'
+ * once it has failed `iffChecks` of them; before that 'suspect' if it flies like a threat, and
+ * 'unknown' otherwise. A track assumed civil (an airliner flying a corridor) stays 'unknown'.
+ */
+export function identityAfterSilence(
+  checks: number,
+  config: Pick<DefenseConfig, 'iffChecks'>,
+  profile: FlightProfile | null,
+  corridorId: number | null,
+): 'unknown' | 'suspect' | 'hostile' {
+  if (assumedCivil(profile, corridorId)) return 'unknown';
+  if (checks >= config.iffChecks) return 'hostile';
+  return looksLikeThreat(profile) ? 'suspect' : 'unknown';
 }
 
 /**

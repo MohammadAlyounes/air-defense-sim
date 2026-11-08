@@ -5,6 +5,7 @@ import { Panel } from '../components/Panel';
 import { Tooltip } from '../components/Tooltip';
 import { STAGES } from '../data/stages';
 import { formatSimClock } from '../lib/format';
+import { IDENTITY_WORD } from '../sim/identityText';
 import { formatKm } from '../sim/narrator';
 import { useSimState } from '../sim/simContext';
 import { useViewStore } from '../view/viewStore';
@@ -17,11 +18,12 @@ const COLUMN_HINT: Partial<Record<(typeof TRACK_COLUMNS)[number], string>> = {
 };
 
 const IDENTITY_TEXT = {
-  pending: { label: 'identifying', className: 'text-unknown' },
-  unknown: { label: 'unknown', className: 'text-suspect' },
-  hostile: { label: 'hostile', className: 'text-hostile' },
-  friend: { label: 'friendly', className: 'text-friend' },
-  neutral: { label: 'civil', className: 'text-neutral' },
+  pending: { label: IDENTITY_WORD.pending, className: 'text-unknown/70' },
+  unknown: { label: IDENTITY_WORD.unknown, className: 'text-unknown' },
+  suspect: { label: IDENTITY_WORD.suspect, className: 'text-suspect' },
+  hostile: { label: IDENTITY_WORD.hostile, className: 'text-hostile' },
+  friend: { label: IDENTITY_WORD.friend, className: 'text-friend' },
+  neutral: { label: IDENTITY_WORD.neutral, className: 'text-neutral' },
 } as const;
 
 /** "±45 m", "±1.2 km". */
@@ -52,6 +54,7 @@ export function TrackTablePanel({ className }: { className?: string }) {
         <>
           <ConceptPopover concept="gatingAssociation" label="How echoes are matched to tracks" />
           <ConceptPopover concept="kalmanFilter" label="How the tracker sees through the noise" />
+          <ConceptPopover concept="identification" label="How the battery tells friend from foe" />
         </>
       }
     >

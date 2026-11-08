@@ -44,7 +44,7 @@ describe('the defense loop', () => {
     expect(loop).toEqual([
       'contactNew',
       'trackConfirmed',
-      'identified', // unknown: no answer to the first check
+      'identified', // suspect: no answer to the first check, and it flies like a jet
       'threatEvaluated',
       'identified', // hostile: no answer to the second check either
       'engagementAssigned',
@@ -54,7 +54,13 @@ describe('the defense loop', () => {
     ]);
 
     const [first, second] = ofKind(events, 'identified');
-    expect(first).toMatchObject({ identity: 'unknown', evidence: 'noReply', checks: 1 });
+    expect(first).toMatchObject({
+      identity: 'suspect',
+      evidence: 'noReply',
+      checks: 1,
+      profile: 'fast',
+      corridorId: null,
+    });
     expect(second).toMatchObject({ identity: 'hostile', evidence: 'noReply', checks: 2 });
     // Assigned, then launched once the launcher is ready: 1.5 s later.
     const [assigned] = ofKind(events, 'engagementAssigned');
@@ -130,7 +136,7 @@ describe('the defense loop', () => {
       headingRad: 0,
     });
     const events = sim.run(50 * 120);
-    expect(ofKind(events, 'identified').map((e) => e.identity)).toEqual(['unknown', 'hostile']);
+    expect(ofKind(events, 'identified').map((e) => e.identity)).toEqual(['suspect', 'hostile']);
     expect(ofKind(events, 'interceptorLaunched')).toHaveLength(0);
   });
 

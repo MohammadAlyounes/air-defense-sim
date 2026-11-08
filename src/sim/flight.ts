@@ -1,3 +1,4 @@
+import { corridorRoute, DEFAULT_CORRIDORS, type AirCorridor } from './airspace';
 import { Rng } from './core/rng';
 import { headingVector, vec3, type Vec3 } from './core/vec';
 import { TRAFFIC, type AircraftType, type TrafficPerformance } from './traffic';
@@ -224,11 +225,21 @@ export function dropSide(start: Vec3): 1 | -1 {
 }
 
 /**
- * The route of traffic placed by hand at `start`, heading `headingRad`: it aims at the point
- * of its heading line closest to the battery (the battery itself, for a drop aimed at it).
+ * The route of traffic placed by hand at `start`. With a heading, it aims at the point of its
+ * heading line closest to the battery (the battery itself, for a drop aimed at it). Without
+ * one, an airliner joins the nearest civil corridor and flies it out of the area (see
+ * `corridorRoute`), and other traffic heads for the battery.
  */
-export function dropRoute(type: AircraftType, start: Vec3, headingRad: number): Vec3[] {
-  const dir = headingVector(headingRad);
+export function dropRoute(
+  type: AircraftType,
+  start: Vec3,
+  headingRad?: number,
+  corridors: readonly AirCorridor[] = DEFAULT_CORRIDORS,
+): Vec3[] {
+  if (headingRad === undefined && type === 'airliner' && corridors.length > 0) {
+    return corridorRoute(start, corridors);
+  }
+  const dir = headingVector(headingRad ?? bearingTo(start, vec3(0, 0, 0)));
   const along = Math.max(0, -(start.x * dir.x + start.y * dir.y));
   const aim = vec3(start.x + dir.x * along, start.y + dir.y * along, 0);
   if (along === 0) return [];

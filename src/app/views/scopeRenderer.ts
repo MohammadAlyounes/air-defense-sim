@@ -1,10 +1,15 @@
 import {
+  corridorFrame,
+  corridorHalfLengthM,
+  corridorPoint,
   coverageAt,
   DEFAULT_ASSETS,
+  DEFAULT_CORRIDORS,
   TICK_S,
   trackEllipseAt,
   trackPositionAt,
   TRAFFIC,
+  type AirCorridor,
   type CoverageMap,
   type DefendedAsset,
   type Effect,
@@ -55,14 +60,23 @@ export const PICK_RADIUS_PX = 14;
 /** Velocity leaders show where each track will be in this many seconds. */
 const LEADER_S = 30;
 
-/** Track symbol colours: the same colour language as the rest of the console. */
+/**
+ * Track symbol colours: the same colour language as the rest of the console. Each comes with
+ * its own shape (see `traceIdentityShape`), so colour is never the only cue.
+ */
 export const IDENTITY_COLOR: Readonly<Record<Identity, string>> = {
   pending: '#facc15',
-  unknown: '#fb923c',
+  unknown: '#facc15',
+  suspect: '#fb923c',
   hostile: '#f87171',
   friend: '#60a5fa',
   neutral: '#4ade80',
 };
+
+/** Civil corridors: drawn in the civil (neutral) green, faintly, under everything else. */
+const CORRIDOR_RGB = '74, 222, 128';
+/** A corridor's name sits this far outside its far edge, CSS pixels. */
+const CORRIDOR_LABEL_GAP_PX = 7;
 
 const EFFECT_STYLE: Readonly<Record<Effect['kind'], { color: string; seconds: number }>> = {
   launch: { color: '34, 211, 238', seconds: 0.8 },
@@ -79,6 +93,8 @@ export function createScopeLayout(
   assets: readonly DefendedAsset[] = DEFAULT_ASSETS,
   /** Drawn as a faint relief map under the rings. */
   terrain: Terrain | null = null,
+  /** Civil air corridors: faint lanes with their names. */
+  corridors: readonly AirCorridor[] = DEFAULT_CORRIDORS,
 ): ScopeLayout {
   const radiusPx = size / 2 - 4;
   const staticLayer = document.createElement('canvas');
@@ -87,7 +103,7 @@ export function createScopeLayout(
   const ctx = staticLayer.getContext('2d');
   if (ctx) {
     ctx.scale(dpr, dpr);
-    drawStatic(ctx, size, radiusPx, rangeM, assets, terrain);
+    drawStatic(ctx, size, radiusPx, rangeM, assets, terrain, corridors);
   }
   return { size, dpr, radiusPx, rangeM, staticLayer };
 }
@@ -260,6 +276,7 @@ function drawStatic(
   rangeM: number,
   assets: readonly DefendedAsset[],
   terrain: Terrain | null,
+  corridors: readonly AirCorridor[],
 ) {
   const c = size / 2;
 
@@ -334,6 +351,8 @@ function drawStatic(
     ctx.fillText(label, p.x, p.y);
   }
 
+  drawCorridors(ctx, size, radius, rangeM, corridors);
+
   // Defended assets: hostiles whose course passes inside a dashed ring are threats to it.
   const scale = radius / rangeM;
   ctx.save();
@@ -365,6 +384,76 @@ function drawStatic(
   ctx.lineTo(c - 4.5, c + 3.5);
   ctx.closePath();
   ctx.fill();
+}
+
+/**
+ * Civil air corridors: each lane as a faint green band between dashed edges, clipped to the
+ * scope, with its name and height band along the centreline where it passes the battery.
+ */
+function drawCorridors(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  radius: number,
+  rangeM: number,
+  corridors: readonly AirCorridor[],
+) {
+  const c = size / 2;
+  const scale = radius / rangeM;
+  const at = (lane: AirCorridor, alongM: number, acrossM: number) => {
+    const p = corridorPoint(lane, alongM, acrossM);
+    return { x: c + p.x * scale, y: c - p.y * scale };
+  };
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(c, c, radius, 0, TWO_PI);
+  ctx.clip();
+  for (const lane of corridors) {
+    // Long enough to cross the whole scope, even off the lane's centreline.
+    const half = corridorHalfLengthM(lane, rangeM * 1.5);
+    if (half <= 0) continue;
+    const w = lane.halfWidthM;
+    const corners = [
+      at(lane, -half, -w),
+      at(lane, half, -w),
+      at(lane, half, w),
+      at(lane, -half, w),
+    ];
+    ctx.fillStyle = `rgba(${CORRIDOR_RGB}, 0.05)`;
+    ctx.beginPath();
+    corners.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${CORRIDOR_RGB}, 0.32)`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 5]);
+    for (const side of [-w, w]) {
+      const from = at(lane, -half, side);
+      const to = at(lane, half, side);
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // The name, along the lane's far edge (away from the battery, where traffic is thinner),
+    // written along it and never upside down.
+    let angle = lane.axisRad - Math.PI / 2;
+    angle = ((angle % TWO_PI) + TWO_PI) % TWO_PI;
+    if (angle > Math.PI / 2 && angle < (3 * Math.PI) / 2) angle -= Math.PI;
+    const awaySide = corridorFrame(lane, 0, 0).acrossM > 0 ? -1 : 1;
+    const label = at(lane, 0, awaySide * (w + CORRIDOR_LABEL_GAP_PX / scale));
+    ctx.save();
+    ctx.translate(label.x, label.y);
+    ctx.rotate(angle);
+    ctx.font = '600 8.5px Inter Variable, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = `rgba(${CORRIDOR_RGB}, 0.7)`;
+    ctx.fillText(lane.name, 0, 0);
+    ctx.restore();
+  }
+  ctx.restore();
 }
 
 /** Blends two antenna angles, always moving forward (clockwise). */
@@ -453,6 +542,48 @@ export function drawScope(
   }
 }
 
+/**
+ * The outline of an identity symbol, standard style: a diamond for hostile and suspect, a
+ * circle for friend, a square for civil (neutral), and a four-lobed quatrefoil for unknown and
+ * pending. `r` is the half-size, pixels.
+ */
+export function traceIdentityShape(
+  ctx: CanvasRenderingContext2D,
+  identity: Identity,
+  x: number,
+  y: number,
+  r: number,
+) {
+  ctx.beginPath();
+  switch (identity) {
+    case 'hostile':
+    case 'suspect':
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x + r, y);
+      ctx.lineTo(x, y + r);
+      ctx.lineTo(x - r, y);
+      ctx.closePath();
+      break;
+    case 'friend':
+      ctx.arc(x, y, r, 0, TWO_PI);
+      break;
+    case 'neutral':
+      ctx.rect(x - r * 0.85, y - r * 0.85, r * 1.7, r * 1.7);
+      break;
+    case 'unknown':
+    case 'pending': {
+      // Four half-circle lobes, top, right, bottom and left, each from one corner to the next.
+      const d = r / 2;
+      ctx.arc(x, y - d, d, Math.PI, TWO_PI);
+      ctx.arc(x + d, y, d, -Math.PI / 2, Math.PI / 2);
+      ctx.arc(x, y + d, d, 0, Math.PI);
+      ctx.arc(x - d, y, d, Math.PI / 2, (3 * Math.PI) / 2);
+      ctx.closePath();
+      break;
+    }
+  }
+}
+
 /** One track: its identity symbol, a velocity leader and its number. */
 function drawTrack(ctx: CanvasRenderingContext2D, layout: ScopeLayout, track: Track, tick: number) {
   const at = trackPositionAt(track, tick);
@@ -498,26 +629,9 @@ function drawTrack(ctx: CanvasRenderingContext2D, layout: ScopeLayout, track: Tr
   }
 
   const r = confirmed ? 5 : 4;
-  ctx.beginPath();
-  switch (track.identity) {
-    case 'hostile':
-      ctx.moveTo(x, y - r);
-      ctx.lineTo(x + r, y);
-      ctx.lineTo(x, y + r);
-      ctx.lineTo(x - r, y);
-      ctx.closePath();
-      break;
-    case 'friend':
-      ctx.arc(x, y, r, 0, TWO_PI);
-      break;
-    case 'neutral':
-      ctx.rect(x - r * 0.85, y - r * 0.85, r * 1.7, r * 1.7);
-      break;
-    case 'pending':
-      ctx.setLineDash([2, 2]);
-      ctx.arc(x, y, r, 0, TWO_PI);
-      break;
-  }
+  // Pending and suspect symbols are dashed: not yet settled.
+  if (track.identity === 'pending' || track.identity === 'suspect') ctx.setLineDash([2, 2]);
+  traceIdentityShape(ctx, track.identity, x, y, r);
   ctx.stroke();
   ctx.setLineDash([]);
 
@@ -687,8 +801,10 @@ export interface ScopeGhost {
   type: TrafficTypeId;
   at: { eastM: number; northM: number };
   valid: boolean;
-  /** Time to reach the battery, s, shown next to the ghost. */
-  timeToBatteryS: number;
+  /** Time to reach the battery, s, shown next to the ghost (null for an airliner). */
+  timeToBatteryS: number | null;
+  /** The civil corridor a placed airliner joins, named next to the ghost instead. */
+  corridorName?: string | null;
   /** The waypoints it will fly, ending at the battery (straight there when empty). */
   route?: readonly Vec3[];
 }
@@ -736,11 +852,18 @@ export function drawPlacement(
     if (ghost.valid) {
       ctx.globalAlpha = 1;
       ctx.font = '600 10px "JetBrains Mono Variable", ui-monospace, monospace';
-      ctx.textAlign = 'left';
+      // Written toward the middle of the scope, so it is never cut off at the edge.
+      const right = p.x <= c;
+      ctx.textAlign = right ? 'left' : 'right';
       ctx.textBaseline = 'middle';
-      const s = Math.round(ghost.timeToBatteryS);
-      const time = s < 60 ? `${s} s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-      ctx.fillText(time, p.x + 10, p.y - 10);
+      const textX = right ? p.x + 10 : p.x - 10;
+      if (ghost.timeToBatteryS !== null) {
+        const s = Math.round(ghost.timeToBatteryS);
+        const time = s < 60 ? `${s} s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+        ctx.fillText(time, textX, p.y - 10);
+      } else if (ghost.corridorName) {
+        ctx.fillText(`→ ${ghost.corridorName}`, textX, p.y - 10);
+      }
     }
     ctx.restore();
   }

@@ -1,9 +1,12 @@
 import {
   DEFAULT_ASSETS,
+  engageable,
   groundRange,
+  mayThreaten,
   trackEllipseAt,
   trackPositionAt,
   type Engagement,
+  type FlightProfile,
   type Identity,
   type Rules,
   type Snapshot,
@@ -23,7 +26,7 @@ export interface DefenseSummary {
   interceptors: { ready: number; flying: number; used: number };
   /** Fire channels in use and in all. */
   channels: { used: number; total: number };
-  /** Hostile or unknown threats waiting for a fire channel while every channel is busy. */
+  /** Threats the rules allow firing at, waiting for a fire channel while every channel is busy. */
   waiting: number;
   rules: Rules;
   /** SEMI mode: shots waiting for the operator, oldest first. */
@@ -41,6 +44,8 @@ export interface Proposal {
   /** Ground-truth link, so the card can select the aircraft. */
   aircraftId: number;
   identity: Identity;
+  /** What the track flies like (the kinematic classifier), if known. */
+  profile: FlightProfile | null;
   /** The defended asset it threatens, if any. */
   assetId: number | null;
   timeToClosestS: number | null;
@@ -71,13 +76,23 @@ export interface TrackRow {
   threatInS: number | null;
 }
 
+/** Among tracks equally urgent, hostile ones are listed first, then suspect, then unknown. */
+const SEVERITY: Readonly<Record<Identity, number>> = {
+  hostile: 3,
+  suspect: 2,
+  unknown: 1,
+  pending: 0,
+  friend: 0,
+  neutral: 0,
+};
+
 /** The furthest stage of the loop a track has reached (the same rule as the header's funnel). */
 export function trackStage(track: Track, engagement: Engagement | undefined): StageId {
   if (engagement?.state === 'hit' || engagement?.state === 'missed') return 'assess';
   if (engagement?.state === 'flying') return 'engage';
-  const suspect = track.identity === 'hostile' || track.identity === 'unknown';
-  if (suspect && (engagement || track.threat)) return 'assign';
-  if (suspect) return 'evaluate';
+  const weighed = mayThreaten(track.identity);
+  if (weighed && (engagement || track.threat)) return 'assign';
+  if (weighed) return 'evaluate';
   if (track.identity !== 'pending') return 'identify';
   return track.confirmedTick !== null ? 'track' : 'detect';
 }
@@ -96,8 +111,8 @@ export function summarizeDefense(snapshot: Snapshot): DefenseSummary {
   for (const t of tracks) {
     if (t.confirmedTick !== null) track += 1;
     if (t.identity !== 'pending') identify += 1;
-    // Hostile and unknown tracks are evaluated as possible threats.
-    if (t.identity !== 'hostile' && t.identity !== 'unknown') continue;
+    // Unknown, suspect and hostile tracks are evaluated as possible threats.
+    if (!mayThreaten(t.identity)) continue;
     evaluate += 1;
     const engagement = engagementOf(t.engagementId);
     if (t.threat || engagement) assign += 1;
@@ -126,7 +141,7 @@ export function summarizeDefense(snapshot: Snapshot): DefenseSummary {
   rows.sort(
     (a, b) =>
       (a.threatInS ?? Infinity) - (b.threatInS ?? Infinity) ||
-      Number(b.identity === 'hostile') - Number(a.identity === 'hostile') ||
+      SEVERITY[b.identity] - SEVERITY[a.identity] ||
       a.rangeM - b.rangeM,
   );
 
@@ -141,8 +156,10 @@ export function summarizeDefense(snapshot: Snapshot): DefenseSummary {
     channels,
     waiting:
       channels.used >= channels.total
-        ? tracks.filter((t) => t.threat && t.engagementId === null && t.identity === 'hostile')
-            .length
+        ? tracks.filter(
+            (t) =>
+              t.threat && t.engagementId === null && engageable(t.identity, rules.weaponsControl),
+          ).length
         : 0,
     rules,
     proposals: engagements
@@ -154,6 +171,7 @@ export function summarizeDefense(snapshot: Snapshot): DefenseSummary {
           trackId: e.trackId,
           aircraftId: e.targetId,
           identity: track?.identity ?? 'hostile',
+          profile: track?.profile ?? null,
           assetId: track?.threat?.assetId ?? null,
           timeToClosestS: track?.threat?.timeToClosestS ?? null,
           predictedTimeS: e.predictedTimeS,
