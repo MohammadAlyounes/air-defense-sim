@@ -16,6 +16,6 @@ The simulation advances in identical 20 ms ticks (50 per second), no matter how 
 
 **No freezing after a stall.** If the tab sleeps for a while, the app processes at most a quarter of a second of real time per frame. The simulation briefly runs slower than real time instead of trying to catch up thousands of ticks at once.
 
-**Seeded randomness.** Scenario traffic is "random", but every random number comes from one seeded generator (sfc32). It produces the same sequence for the same seed, and its whole state is four 32-bit numbers, so a run can be saved and replayed exactly. The simulation core is not allowed to use `Math.random()` or read the clock; the linter rejects both.
+**Seeded randomness.** Scenario traffic is "random", but every random number comes from a seeded generator (sfc32): one for the run, and since Step 4 two small ones of their own for the wind and the dog-leg routes, all started from the run's seed. Each produces the same sequence for the same seed, and its whole state is four 32-bit numbers, so a run can be saved and replayed exactly. The simulation core is not allowed to use `Math.random()` or read the clock; the linter rejects both.
 
 **Commands, not edits.** The interface never changes the simulation directly. It sends commands (such as "spawn a drone here"), which are applied at the start of the next tick and logged with that tick number. Seed plus command log is a complete recording of a run.
