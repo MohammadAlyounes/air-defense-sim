@@ -1,5 +1,5 @@
 import { ShieldCheck } from 'lucide-react';
-import { AUTHOR, PLAN_URL, REPO_URL, SAFETY_URL } from '../data/links';
+import { AUTHOR, DESIGN_URL, REPO_URL, SAFETY_URL } from '../data/links';
 
 export function Footer() {
   return (
@@ -11,8 +11,8 @@ export function Footer() {
           any real system.
         </p>
         <nav aria-label="Project links" className="flex gap-3 sm:ml-auto">
-          <a className="hover:text-accent" href={PLAN_URL} target="_blank" rel="noreferrer">
-            Project plan
+          <a className="hover:text-accent" href={DESIGN_URL} target="_blank" rel="noreferrer">
+            Design
           </a>
           <a className="hover:text-accent" href={SAFETY_URL} target="_blank" rel="noreferrer">
             Safety &amp; scope

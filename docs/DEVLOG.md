@@ -1,320 +1,92 @@
 # Devlog
 
-One short entry per release, newest first: what was built and the decisions behind it.
+One short entry per release, newest first: what was built and the key decisions. Each entry also becomes the notes of its GitHub Release.
 
 ## v1.0.0 · The complete simulator (2026-11-09)
 
-The simulator is complete. Six steps took it from an empty console to a battery that sees through terrain and weather, tracks and identifies what it sees, and engages under rules the user sets, explaining every decision on the way. Version 1.0.0 is the finished project, released together with Step 5.
+The simulator is complete, released together with Step 5. It covers the whole loop from detection to kill assessment, an honest radar over fictional terrain, tracking and identification that can go wrong, rules the user controls, 22 concept cards and exact replays.
 
-**What is in it**
+- The header shows "v1.0.0 · Complete"; the step badges and the two placeholder panels (telemetry, replay timeline) are gone.
+- The release job reads every commit of a push, so one rebase merge can release several tags, each at its own commit.
+- 267 unit and 35 browser tests.
 
-- **The whole defense loop:** Detect → Track → Identify → Evaluate → Assign → Engage → Assess, counted live in the header analysis bar, with a plain-language NOW line.
-- **Drag-and-drop threats:** small drones, drone swarms, cruise-missile-like targets and fast jets, plus friendly aircraft and airliners that must not be engaged, dropped on the 3D view or the radar scope.
-- **An honest radar over fictional terrain:** the radar horizon, terrain masking, detection probability, measurement noise, false alarms, clutter and Doppler, with coverage maps on the scope and in 3D.
-- **Air and flight:** the standard atmosphere, wind, drag, turn radius, dog-leg routes and evasive breaks.
-- **Tracking and identification:** a Kalman filter with uncertainty ellipses, truth vs. perception, identification checks that can fail, a kinematic classifier and civil air corridors.
-- **Decisions you control and can question:** threat ranking with "Why?", weapons control, operator approval, fire channels and saturation, kill probability, shoot-look-shoot and the engagement envelope.
-- **Physics in plain language:** 22 concept cards, in the README and in the app, and every model's equations and limits in [MODELS.md](MODELS.md).
-- **Exact replays:** a seed and the recorded commands rebuild any run, and a link such as `?seed=7&t=60` opens a run at a given moment.
-
-**Finishing touches**
-
-- The header shows the version, "v1.0.0 · Complete", and the welcome card says "Open source · Version 1.0.0".
-- The "Arrives in Step N" badges and tooltips are gone, and so are the two placeholder panels they marked: telemetry and the replay timeline. The inspector and the event log now share the bottom row.
-- The README, the project plan, ARCHITECTURE, MODELS, the concept cards and CLAUDE.md describe the finished simulator. The rules of engagement, fire channels, kill probability and the engagement envelope, built alongside Step 5, are documented as part of it, and their concept cards are now numbered with Step 5's.
-- **One merge, several releases:** the release job now reads every commit of a push, so a rebase merge releases Step 4, Step 5 and v1.0.0, each at its own commit. One commit may carry several `Step-Tag:` trailers, and when several commits of a push name the same tag, the newest one gets it.
-- **Tests:** a new browser test checks the finished header: the version pill, and no step badges, build-progress text or placeholder panels anywhere on the console. 267 unit and 35 browser tests in all.
-
-**Decisions**
-
-- **Finish at Step 5.** The simulator already teaches what it set out to: why low flyers hide, why small targets are seen late, why raw radar data must be filtered, why identification matters more than shooting, what saturation does, and why outcomes are probabilities. Everything on screen works; nothing waits for a later step.
-- **No placeholders.** A panel that only describes what it might one day show reads as unfinished, so the console keeps only what works.
+**Decision:** finish at Step 5. The simulator already teaches what it set out to, and the console keeps only what works.
 
 ## Step 5 · Track & identify (2026-11-08)
 
-The battery's picture of the sky becomes an honest estimate, its judgement of what each track is becomes evidence it can explain, and the command node gets rules to follow, limits to live with and odds to beat. Parts 1 (tracking) and 2 (identification, defended assets and threat ranking), together with the rules of engagement, were built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08; part 3 (the kinematic classifier, civil air corridors and the identification card) completes the step, and with it the simulator.
+Tracks become honest estimates, identities come with their evidence, and the command node gets rules, limits and odds.
 
-**Built: tracking (part 1)**
-
-- **Kalman filter (`src/sim/kalman.ts`):** a 6-state constant-velocity filter (position and velocity in 3D) with white-noise-acceleration process noise and a Joseph-form update. The radar's range, bearing and elevation errors become a measurement covariance in metres through the Jacobian. Includes the innovation and its normalized square (NIS) for gating, and the horizontal uncertainty ellipse.
-- **Tracker (`src/sim/tracker.ts`):**
-  - Gating at `d² ≤ 16.27` (chi-square, 3 degrees of freedom, 99.9%) and global nearest-neighbour association, with every track predicted to each plot's own tick.
-  - At most one plot per track per antenna pass.
-  - The truth link is gone from association: a track's `truthId` now only records which aircraft made its last echo, for the overlay, tests and physics.
-- **Batched association:** plots are matched in 0.2 s (18°) batches and committed 0.2 s late, and kill assessment looks at the same lagged arc.
-- **Views:**
-  - A 2σ uncertainty ellipse around every track on the scope.
-  - A ±1σ column in the track table.
-  - A truth vs. perception toggle: the "truth" button under the scope, the T key or `?truth=1`. It shows grey true positions and dashed error lines on the scope, the battery's tracks as identity-coloured rings with error lines in 3D, and a "Track vs truth" row in the inspector with the real error next to the filter's own estimate.
-- **Concept cards:** the Kalman filter, and gating and association (also opened from the track table).
-- **Tests:** 16 new unit tests and 2 new browser tests, 168 unit and 25 browser tests in all.
-  - The filter is checked against hand-worked values: prediction and process noise, the halfway update, velocity from two plots, measurement geometry, ellipse axes and a 3 × 3 inverse. A consistency test checks that the NIS averages 3 over 390 updates.
-  - Association tests cover crossing tracks, the gate and the once-per-pass rule.
-  - Simulation tests check that tracks beat raw echoes, that velocities settle within a few m/s, and that a swarm ends with one track per drone.
-
-**Built: identification, defended assets and threat ranking (part 2)**
-
-- **Defended assets (`src/sim/assets.ts`):** the battery, a town and a power plant, each with a threat ring and a leak radius. Scenario hostiles head for one of them; leaks name the asset reached.
-- **Threat evaluation:** the closest point of approach to every asset, from the filtered track. A threat is assigned to the asset it reaches soonest.
-- **Identification with mistakes:**
-  - IFF checks 4 s apart. Friendly transponders answer 90% of checks and civil codes are received 98% of the time.
-  - Silence on the first check makes a track **unknown**, on both **hostile**.
-  - A friendly aircraft destroyed is an identification error: counted in the stats, shown in the header and on a result card.
-- **Views:**
-  - A "Why?" section in the inspector, one sentence per step: identity, threat, rules, shot or reason for waiting.
-  - Assets on the scope and in 3D (threat rings that follow the ground, markers, labels).
-  - The narrator learns unknown and hostile identifications, the threatened asset and ID errors.
-- **Concept card:** closest point of approach.
-- **Tests:** 19 new unit tests and 3 new browser tests, shared with the rules of engagement below, 187 unit and 28 browser tests in all. For this part: IFF answers, CPA to any point and the asset ranking; a friendly with a dead transponder shot down and counted, and leaks at the power plant; the inspector's "Why?" in the browser.
-
-**Built: rules of engagement, fire channels and kill probability (with part 2)**
-
-- **Rules of engagement:**
-  - Weapons control HOLD, TIGHT or FREE, and operator mode AUTO or SEMI-AUTO, set with a recorded `setRules` command.
-  - In SEMI-AUTO each shot is proposed and waits for `approveEngagement` or `holdFire`; proposals lapse when the shot becomes impossible.
-  - The header badges are clickable, and A and H answer from the keyboard.
-- **Fire channels:** at most three engagements at once (proposed, waiting or flying). The header meter is live, and the NOW line reports saturation.
-- **Kill probability:** a fuze within the lethal radius kills with `Pk = Pk_target × clamp(v / 600, 0.5, 1)`. It is predicted at assignment and drawn at the fuze (miss reason "survived"). `certainKill` keeps exact tests exact.
-- **Engagement envelope:** `envelopeRangeM(h)` from the planner's reach, drawn as a dome in 3D (umbrella button, `?envelope=1`).
-- **Views:**
-  - An approval card with the evidence (identity, threatened asset, intercept point, chance of a kill).
-  - The rules, the shot and the reason for waiting in the inspector's "Why?".
-  - The narrator learns proposals, approvals, holds, rule changes and "burst … but survived".
-- **Concept cards:** engagement envelope, kill probability, rules of engagement.
-- **Tests:** counted with part 2 above.
-  - Unit tests cover the rules, Pk values and the envelope.
-  - Simulation tests cover approval, holding fire and switching back to AUTO, HOLD, FREE engaging one check sooner, fire-channel limits, survivals under Pk, and replay of rule changes.
-  - Browser tests cycle the rule badges, approve a shot in SEMI-AUTO and switch the envelope on.
-
-**Built: classifier, corridors and the identification card (part 3)**
-
-- **Kinematic classifier (`src/sim/classify.ts`):** every confirmed track is sorted, from its filtered speed and height, into one of five flight profiles, tested in this order:
-  - drone-like: under 80 m/s;
-  - cruise-missile-like: 120 m/s or more, under 300 m above the ground below it (from the terrain map);
-  - jet-like: 290 m/s or more;
-  - airliner-like: 180 m/s or more, at 8 km or higher;
-  - anything else: an ordinary aircraft.
-- **A "suspect" identity (`src/sim/c2.ts`):** a silent track flying one of the first three profiles, which no friendly or civil aircraft here flies, is suspect at the first check instead of unknown. A second silent check still declares it hostile. Threat evaluation weighs suspects like unknowns, and weapons FREE engages them like unknowns.
-- **Civil air corridors (`src/sim/airspace.ts`):** two fictional lanes, 10 km wide and 8 to 13 km up, 18 km north and 22 km south-west of the battery, at least 7 km clear of every threat ring. Scenario airliners fly them end to end; an airliner placed by hand joins the nearest one at 45° and flies it out of the area.
-- **Assumed civil:** a track inside a lane, along it (within 30°) and flying like an airliner is assumed civil. Silence leaves it unknown, check after check, instead of making it hostile. Once it leaves the lane, the next silent check declares it hostile.
-- **Threats counted by what they were:** "threats down" now counts the kills of real hostiles, so a suspect shot down under FREE counts, the way ID errors always counted the friendly and civil aircraft destroyed.
-- **Views:**
-  - A shape for every identity, as on military situation maps: a diamond for hostile (red) and suspect (orange, dashed), a quatrefoil for unknown (yellow) and identifying (yellow, dashed), a circle for friend (blue) and a square for civil (green). The scope legend lists them all.
-  - The corridors as faint green lanes on the scope, named along their far edge, and as translucent boxes in 3D, named on the ground below with their height band. In 3D, corridor names and range-ring distances step aside wherever an aircraft tag covers them.
-  - A "Classifier" line in the inspector: what the track flies like, the rule behind it, and the corridor it flies. "Why?" counts the silent checks and says when the corridor holds back a declaration; the event log and the approval card give the same evidence.
-  - The placement readout says which corridor a placed airliner joins and how soon, and its ghost points the way.
-- **Concept card:** identification friend-or-foe, in odds form: each silent check multiplies the odds that a track is hostile by 10.
-- **Tests:** 37 new unit tests and 3 new browser tests, 267 unit and 34 browser tests in all.
-  - The classifier is checked at every threshold and on every traffic type; the corridors on their geometry, the "flies the lane" test, the clearance from the assets and the 45° join; scenario airliners on where they enter, how far off the centreline they fly and where they leave; 3D labels on which ones step aside, and for what.
-  - Simulation-level tests: a silent jet suspect at the first check; a silent friendly unknown, then hostile; a silent airliner in a corridor never hostile, even under FREE, and hostile once it leaves a lane; a silent airliner off the corridors shot down and counted as an ID error; a suspect engaged under FREE and counted as a threat down; every scenario airliner flying a corridor.
-  - Browser tests check the legend, a suspect track and its log line, the corridor labels in 3D, the inspector's classifier for a cruise-missile-like target and a corridor airliner, the identification card, and the readout for a placed airliner.
+- **Tracking:** a 6-state Kalman filter, gating and nearest-neighbour association in 0.2 s batches, uncertainty ellipses and a truth vs. perception toggle (T).
+- **Identification:** IFF checks that friendly transponders fail one time in ten, a kinematic classifier (drone-, cruise-missile-, jet- or airliner-like), a "suspect" identity and two civil air corridors.
+- **Threats:** a town and a power plant join the battery; threats are ranked by their closest point of approach, and "Why?" explains every decision.
+- **Rules:** weapons control (TIGHT, FREE, HOLD), AUTO or SEMI-AUTO approval, three fire channels, kill probability with shoot-look-shoot, and the engagement envelope.
 
 **Decisions**
 
-- **Batches to stop track theft.** Matching each echo as it arrived let the first echo of a swarm grab the wide gate of a neighbour's brand-new track, and the swarm's tracks never settled. Matching 18° of sweep together, and committing late, fixes it at a cost of 0.2 s.
-- **Truth still guides interceptors in view.** The fire-control picture stays perfect while the target is visible. Guiding by the 4-second search track would turn every shot into a near miss for reasons that have nothing to do with the lesson; misses come from the kill probability instead.
-- **A filter that tests its own honesty.** The NIS consistency test fails if the filter claims to be surer (or less sure) than it really is, which catches wrong Q or R much better than a single error threshold.
-- **σ, not Σ.** CSS upper-casing turned the column header's σ into Σ; that header opts out.
-- **Silence is evidence, not proof.** "Unknown" between the two checks gives weapons control something real to decide. FREE fires one check (4 s) sooner, at ten times the risk to a friend with a faulty transponder. The lesson is the trade-off, so neither setting is "right".
-- **Drops still aim at the battery.** Scenario hostiles spread over the three assets; dropped threats keep flying at the battery, so the placement readout stays simple. Only a dropped airliner goes elsewhere: to its corridor.
-- **Evidence, not a verdict.** The classifier never declares anything on its own: it makes silence more suspicious (suspect after one check) or less (assumed civil in a lane), and only the checks decide. A track that answers is friendly or civil, whatever it flies like.
-- **A new identity, not a new rule.** Suspect tracks are weighed and engaged exactly like unknown ones; under TIGHT, the default, both wait for the second silent check. What changes is what the operator sees: an orange diamond, a higher place in the track table, and the reason.
-- **Round numbers between the traffic types.** The thresholds sit in the gaps between this simulator's own types (a drone at 40 m/s, a cruise-missile-like target at 240 m/s and 50 m above the ground, a friendly at 200 m/s and 4 km, an airliner at 230 m/s and 11 km, a jet at 340 m/s), with room for the filter's errors. They sort generic classes, not real aircraft.
-- **The price of the corridors.** A hostile flying exactly like an airliner along a lane would stay unknown too. The card says so: its course is still evaluated, and under FREE an unknown that threatens an asset can still be engaged. The lanes keep at least 7 km clear of every threat ring, so an airliner following one never threatens an asset (the tests try every course within 10° of a lane's direction).
-- **Names that step aside.** A corridor's name up at the lane's floor floated over the middle of the map for the lane nearer the camera, as if that lane crossed the town. On the ground below the centreline it marks where the lane really is, and it hides wherever an aircraft tag covers it, as the range-ring distances now do, so the tags stay readable.
-- **Airliners fly lanes, not random crossings.** Scenario airliners used to cross toward a point near the battery, so a silent one could look like an attack and be shot down. They now enter at a lane's end, up to 2.5 km off its centreline, and fly it out. Their random draws changed with it, so seeds that bring airliners play out differently than in Step 4.
-- **Rules as recorded commands.** Clicking a header badge dispatches `setRules`, so a run where a friendly was shot down replays exactly.
-- **A generic kill probability.** Two textbook trends (agile targets are harder, slow interceptors steer worse) and nothing about real seekers or warheads. Jets now survive a first shot a third of the time or more, which makes shoot-look-shoot visible.
+- **Batches stop track theft:** matching 18° of sweep together lets a swarm's tracks settle, at a cost of 0.2 s.
+- **Silence is evidence, not proof:** FREE fires one check sooner than TIGHT, at ten times the risk to a friend with a faulty transponder. Neither setting is "right".
+- **The classifier adds evidence, never a verdict:** only the checks declare a track hostile.
+- **Truth still guides interceptors in view:** misses come from the kill probability, not from a blurry fire-control picture.
+- **A filter that tests its own honesty:** its normalized innovation must average 3.
 
 ## Step 4 · Environment & radar (2026-11-08)
 
-The battlespace gets a landscape and weather, threats fly real routes, and the radar learns what it cannot see. Part 1 (terrain and radar) was built on a side branch on 2026-11-07 and brought onto `main` on 2026-11-08; part 2 (the atmosphere, wind, routes, clutter and Doppler) completes the step.
+The battlespace gets terrain and weather, threats fly real routes, and the radar becomes honest about what it cannot see.
 
-**Built: terrain and radar (part 1)**
-
-- **Procedural terrain (`src/sim/terrain.ts`):** seeded value noise with rotated octaves and one ridged octave, flat within 3 km of the battery, rising to about 750 m. A 257 × 257 grid, sampled bilinearly, generated once and shared by everything.
-- **Line of sight, horizon and coverage (`src/sim/propagation.ts`):** the 4/3 Earth model, a sampled line of sight that tells "below the horizon" from "masked by terrain", and a radial-sweep coverage map of the lowest visible height at every bearing and range.
-- **Radar realism (`src/sim/radar.ts`):**
-  - Swerling 1 detection probability from the SNR (`Pd = Pfa^(1/(1+SNR))`), with the old ranges now meaning "seen on half the looks".
-  - Gaussian noise on range, bearing and elevation.
-  - False alarms at `λ = Pfa × cells = 0.6` per turn.
-- **Tracks:** a tentative track is dropped if the next look brings nothing (the log says "dropped", usually a false alarm); confirmed tracks survive three silent turns. The command node only fires at tracks seen within the last look.
-- **Terrain following:** drones and cruise-missile-like targets hold their height above the ground ahead, jets keep their altitude but clear the hills, all within a climb rate per type.
-- **Air drag:** a ballistic coefficient and the air density slow the coasting interceptor. The planner's reach uses the closed form `s = ln(1 + k·v₀·t)/k`, at the air density halfway up to the target.
-- **Guidance out of sight:** while terrain hides the target, the interceptor steers toward the track's extrapolated position; it can now hit the ground.
-- **Views:**
-  - The 3D terrain mesh is drawn by one shader: relief, contours, a 10 km grid, the sweep's glow and the blind zones. Range rings follow the ground, and drops land where the pointer's ray meets the terrain.
-  - The scope gets a faint relief layer and the blind-zone overlay. The switch (off, 50 m, 300 m, 1 km) is shared with 3D and the URL (`?coverage=50`).
-  - The placement readout predicts where on its route the radar first sees the threat and warns when the terrain hides it. The inspector gains a "Radar view" row: in view (with the chance per look), hidden by terrain (and from what height it would show), or below the horizon.
-- **Tests:** 31 new unit tests and 3 new browser tests, 152 unit and 23 browser tests in all.
-  - The physics is checked against hand-computed values: the horizon, curvature drop, ridge shadows, Pd, the 50% range, λ, air density, drag deceleration and the analytic coast (including step-by-step integration against it).
-  - Simulation-level tests cover masking behind a ridge, terrain following, the noise level, false alarms that never confirm, detection odds near and far, the full loop over terrain, and replay.
-  - Browser tests switch the blind zones on and off, open them from a link, check the inspector's radar view and the placement warning.
-
-**Built: atmosphere, wind, routes, clutter (part 2)**
-
-- **Standard atmosphere (`src/sim/atmosphere.ts`):** the International Standard Atmosphere's first three layers (to 32 km), from hydrostatic balance and the ideal gas law, checked against the published table. Interceptor drag and the planner's reach use it; the exponential model stays for comparison.
-- **Wind (`src/sim/flight.ts`):** one steady wind per run, drawn from the seed (2–12 m/s at 10 m, any direction), growing with height by the one-seventh power law. Aircraft hold their ground track by the wind triangle, nose crabbed into the wind; the interceptor's drag acts on its velocity through the air.
-- **Turns and routes:** coordinated turns at each type's routine bank angle, `r = V² / (g·√(n² − 1))`; routes of waypoints flown with lead turns; a dog-leg for cruise-missile-like targets on long routes; and a 6 g evasive break for fast jets when an interceptor guided at them comes within 6 km.
-- **Clutter and Doppler (`src/sim/radar.ts`, `src/sim/propagation.ts`):** the closing speed and its Doppler shift `f = 2v/λ`, and a low-Doppler notch (under 10 m/s) that applies only where the ground at the target's slant range is lit. A target crossing the beam over lit ground is not painted.
-- **Maneuver gate (`src/sim/tracker.ts`):** a second association pass, with a far larger process noise, for confirmed tracks left without a plot, so a jet breaking at 6 g keeps its track.
-- **Views:**
-  - A wind arrow by the scope. The coverage switch gains a "clutter" view that shades the lit ground on the scope and the 3D terrain (`?coverage=clutter`).
-  - The placement ghost draws the route a threat will fly, dog-leg included, on the scope and in 3D; its time to the battery accounts for the wind, and its "first seen" estimate walks the route.
-  - The inspector adds Wind (headwind, tailwind or crosswind, and the crab), Flight (turn radius and bank, dog-leg, break) and Doppler (closing speed, shift, notch), and its radar view can say "Lost in clutter". 3D models point their nose along the heading, not the track.
-- **Concept cards:** radar horizon, terrain masking, detection probability and air drag (part 1); the standard atmosphere, wind, turn radius, radar cross section, and clutter and Doppler (part 2).
-- **Tests:** part 2 adds 43 unit tests and 3 browser tests, 230 unit and 31 browser tests in all.
-  - The physics is checked against known values: the standard atmosphere table, the wind profile, the wind triangle (head, tail and crosswind, and drift), turn radii, the dog-leg geometry, Doppler shifts, and the lit ground of a 12 m antenna over flat ground ending at its 14.3 km horizon.
-  - Simulation-level tests fly a dog-leg to the battery, a break and the return, a track kept through the break (and lost without the maneuver gate), drones in a head, tail and crosswind, and a crossing drone lost in the clutter while an inbound one is painted.
-  - Browser tests check the wind arrow and the inspector's wind, flight and Doppler lines, the clutter view (also from a link), and the dog-leg in the placement readout.
+- **World:** procedural terrain, the standard atmosphere, a per-run wind, turn radii, dog-leg routes and a 6 g evasive break for jets.
+- **Radar:** the horizon, terrain masking, detection probability, measurement noise, false alarms, clutter and the Doppler notch, with coverage maps on the scope and in 3D.
+- **Interceptors:** air drag, and guidance toward the track while the target is hidden.
 
 **Decisions**
 
-- **An "ideal" radar for exact tests.** `IDEAL_SEARCH_RADAR` (threshold detection, no noise, no false alarms) with `terrain: false` keeps the Step 3 tests exact. New tests cover the realistic radar separately.
-- **The terrain has its own seed.** Every run uses the same map, so a scenario's geometry doesn't change when you press "New seed", and the app builds the terrain and coverage once.
-- **Masking where it matters.** A first landscape hid little inside 17 km (the cruise-missile-like target's detection range). The hills now start 6 km out, so the south and west hide low flyers until 7 to 10 km out, while the north and east stay open. The contrast is the lesson.
-- **False alarms are honest.** They start real tentative tracks, which the M-of-N rule (here: two echoes in a row) drops. The tracker never "knows" which echoes are false.
-- **Kill assessment survives masking.** A hit target's track is kept until the beam comes round, even if the target was last seen several turns earlier. Without that, kills behind a ridge went unconfirmed.
-- **The wind depends on the seed alone.** It comes from a random generator of its own, so a seed always brings the same wind, whatever happens during the run; the dog-leg sides have a generator of their own too. A seed still gives a different run than in Step 3: aircraft fly other paths, so the radar's random draws, and every draw after them, change.
-- **Clutter at the target's own range.** The clutter that competes with a target comes from the ground at the same range in the same beam. A first version tested the ground below the aircraft instead, which wrongly buried high flyers in clutter.
-- **A lesson on demand.** Scenario traffic heads for the battery or an asset and closes fast, so the notch hides only 0.3 to 0.6% of its looks. The effect is shown where you look for it: the clutter view, the inspector's Doppler line and the card.
-- **A wider gate, not a new filter.** A 6 g break moves the echo about 760 m off the straight-line prediction in one antenna turn, outside the gate. A second pass with a wider gate, for confirmed tracks only and after the normal pass, keeps the track without letting it steal a neighbour's echo. Interacting multiple models would be more precise, at the cost of a much harder explanation.
-- **Back to the target after a break.** An aim point that ends up inside the turn circle is kept: the jet flies on until it can turn back in, instead of flying away.
-
-**Next:** the rest of Step 5: a kinematic classifier, air corridors and the identification friend-or-foe card.
+- **The terrain has its own seed,** so every run shares one map; the wind comes from the run's seed.
+- **False alarms are honest:** they start real tentative tracks, which need a second echo to survive.
+- **Clutter at the target's own range,** not below it, so high flyers are not buried in ground echo.
+- **A wider second gate, not a new filter,** keeps a jet's track through its break.
 
 ## Step 3 · First intercept (2026-11-07)
 
-**Built**
+The first full defense loop: drag a threat onto the map and watch the battery detect, track, identify, evaluate, assign, engage and assess it.
 
-- **Drag-and-drop threats (`src/app/placement`):**
-  - Drag a palette card onto the 3D view or the radar scope; or click a card, then the map (this also works on touch screens); or press Enter twice.
-  - While placing, a ghost shows the route to the battery in both views, with a readout of range, bearing, altitude, time to the battery and the range at which the radar will first see it. The mouse wheel sets the altitude.
-  - Each drop becomes a recorded `spawnTraffic` command, so drops replay exactly.
-- **Detection range by radar size:** every size class has an illustrative radar cross section, and the detection range follows the fourth-root law, `R = 30 km × (σ / 1 m²)^¼`. A drone is first seen at 9.5 km, a jet at 36 km.
-- **The defense loop, version 1 (`src/sim`):**
-  - **Track:** the first echo creates a tentative track; the second confirms it and gives its velocity.
-  - **Identify:** an identification check 2 s later: friends answer, civil aircraft broadcast a transponder code, anything else is hostile.
-  - **Evaluate:** a hostile whose course passes within 5 km of the battery is a threat, ranked by time to its closest approach.
-  - **Assign:** the command node solves for the predicted intercept point and gives the most urgent reachable threat the next launch slot (1.5 s preparation, 2 s between launches, 12 rounds, one reloaded every 30 s).
-  - **Engage:** interceptors boost, coast and steer by true proportional navigation with a 30 g limit, integrated in 2 ms sub-steps; the fuze goes off at the analytically computed closest approach, lethal within 15 m.
-  - **Assess:** on its next look the radar confirms the kill (no echo where the track should be), or sees the target again and the battery fires another interceptor.
-  - **Leaks:** a hostile that comes within 2 km of the battery got through.
-  - Scenario hostiles now head for the battery; friendly and civil traffic still passes by.
-- **Analysis bar v1:** a live count for each stage (as a funnel; a chip pulses when a track moves on), threats active, down and leaked, interceptors ready, flying and used, the next impact, and a NOW line that narrates the engagement from the battery's point of view.
-- **Views:** identity symbols, track numbers, velocity leaders, interceptors and predicted intercept points on the scope; a live track table; a launcher, interceptor models with trails and boost glow, intercept rings and the defended area in 3D; result cards after each kill or leak; the inspector shows the selected aircraft's track and what the defense is doing about it.
-- **Concept cards:** detection range, and proportional navigation.
-- **Tests:** 32 new unit tests and 4 new browser tests.
-  - Unit tests check proportional navigation against hand-computed commands, a full flight from launch to fuze, the analytic closest approach, the intercept solver, detection ranges, the whole loop (including shoot-look-shoot after a miss, leaks, launch intervals, and never engaging friendly or civil traffic), replays with engagements, the header funnel, the track table, the NOW line and the placement rules.
-  - Browser tests drag a threat onto the map and wait for its confirmed kill, check the stage counts, and place threats from the keyboard and by tapping.
+- Drag-and-drop threats with a ghost readout; detection range by radar size; interceptors with proportional navigation and an exact closest-approach fuze.
+- The live analysis bar, track table, result cards and inspector.
 
 **Decisions**
 
-- **The command node only sees its tracks.** Identification, evaluation and the intercept solution use the battery's perception, never the truth. Two simplifications remain, both marked in the code: echoes are linked to tracks by the true identity of their source (Step 5 replaces this with gating), and the interceptor is guided to the real target, as if the tracking radar were perfect (Step 5 keeps this on purpose and lets the kill probability decide the misses).
-- **One visible step at a time.** A track needs a second echo (4 s) to be confirmed, identification takes 2 s, and a launch 1.5 s more. Instant decisions would be unrealistic, and every stage of the analysis bar would flash past in one tick.
-- **Shoot-look-shoot.** After a shot the battery waits for the radar's next look before firing again at the same target, so interceptors are not wasted on targets that are already destroyed.
-- **Exact endgames.** At closing speeds near 1 km/s a 20 ms tick is 20 m, more than the lethal radius. Interceptors move in 2 ms sub-steps, and the closest approach inside each sub-step is solved in closed form, so a fast pair cannot skip past each other.
-- **Perfect hits, for now.** With perfect tracking and no drag, proportional navigation hits a non-maneuvering target almost dead centre. Misses arrive with radar noise, drag and maneuvering targets in Step 4; the shoot-look-shoot path is already tested by forcing a miss.
-- **Touch places by tapping.** A finger dragging a card would fight the palette's scrolling, so on touch screens you tap a card, then the map. Mouse and pen can do both; the keyboard can place too.
-- **Media as animated WebP.** The Step 3 clip shows the whole console, so it uses WebP (2.3 MB) like Step 2. The clip script can now script drags.
-
-**Next: Step 4 · Environment & radar.** Procedural terrain, the standard atmosphere, wind and drag; threat behaviors with routes, terrain following and evasive turns; then the radar equation, measurement noise, false alarms, the radar horizon, terrain masking, clutter and coverage maps.
+- **The command node only sees its tracks,** never the truth.
+- **One visible step at a time:** confirmation, identification and launch each take seconds, so every stage shows.
+- **Exact endgames:** 2 ms sub-steps and a closed-form closest approach, so fast pairs cannot skip past each other.
 
 ## Step 2 · 3D scene (2026-11-06)
 
-**Built**
+The battlespace in 3D, in step with the radar scope.
 
-- **3D battlespace (`src/app/views/3d`):** React Three Fiber, loaded on demand.
-  - The ground grid, range rings every 10 km and compass letters.
-  - The radar site with its turning antenna, the search beam and the beam's sweep on the ground, all driven by the same snapshots as the radar scope.
-- **Aircraft:**
-  - models extruded from the palette silhouettes (the drone is built from simple parts);
-  - drawn at a fixed size on screen, with a drop line to the ground and a fading 30-second trail;
-  - name tags that show the true altitude.
-- **Trails in the simulation:** each aircraft keeps its position every 0.5 s for the last 30 s, so trails are part of the deterministic state.
-- **Cameras:** Orbit, Top (north up, like the scope), Follow (behind the selected aircraft) and Radar (stand at the antenna and look out), on keys 1–4. Heights can be stretched ×1, ×2 or ×4, and the labels can be toggled (L).
-- **One selection everywhere:**
-  - Click an aircraft in 3D, an echo on the scope or a line in the event log.
-  - The scope boxes the aircraft's newest echo, and the inspector shows its ground truth: speed, altitude, heading, range, and what the radar knows about it.
-  - Esc clears the selection.
-- **Shareable views:** `?select=3&camera=follow&heights=4`, next to the simulation's `?seed=7&t=60`.
-- **Welcome card** for first-time visitors (dismissed once, it stays dismissed). The 3D view falls back to a drawing while it loads, or when the browser has no WebGL.
-- **Concept cards:** local coordinates (one map for the scope and the 3D view) and seeing scale (why heights are stretched and aircraft enlarged).
-- **Tests:** 28 new unit tests and 7 new browser tests.
-  - Unit tests cover the ENU-to-scene mapping, constant screen size, interpolation, trails, label projection, echo picking, the inspector's facts, the view store and URL view options.
-  - Browser tests cover rendering and the welcome card, selection from the 3D view, the scope and the event log, the cameras, heights and labels, and view links. The scope test runs the same seed in Node to know exactly where to click.
+- Terrain grid, radar site, aircraft with trails, four cameras, height stretch and labels.
+- One selection across the 3D view, the scope, the inspector and the event log; shareable view links.
 
 **Decisions**
 
-- **Truth in 3D, perception on the scope.** The 3D view is labelled "Ground truth": it shows where aircraft really are, while the scope shows only what the radar painted. When tracking arrives (Step 5), the 3D view will show tracks next to the truth.
-- **Readable beats true to scale.** At true scale, a drone 30 km away is a twentieth of a pixel and the airspace is a thin sheet. So heights are stretched (×2 by default) and aircraft keep a fixed size on screen, while labels and the inspector always show true values. A concept card explains it.
-- **Draw only when something changes.** The canvas renders on demand: a new simulation frame, a view change or a camera move. A paused simulation costs no GPU time.
-- **Camera controls with a clamped clock.** drei's component passes the raw time since the last drawing to the camera controls. After a pause that time is seconds long, and camera transitions would jump to the end. The rig owns its camera-controls instance and clamps the step to 50 ms.
-- **Labels are one DOM layer, moved every frame.** drei's `Html` gives each label its own React root, which logged unmount errors as aircraft came and went. Labels are now ordinary elements, projected onto their anchors after the camera moves: crisp text, normal clicks, one pass.
-- **Trails are fat lines that fade to black.** Plain WebGL lines are one device pixel wide, which is barely visible on high-density screens. Wide lines in three.js have no per-point transparency, so a trail fades its colour towards black and uses max blending. On the dark scene that looks like transparency, and it avoids the bright dots that adding colours leaves where short segments overlap.
-- **Ground layers do not write depth.** From 100 km away, the depth buffer cannot separate layers a few metres apart, so they flickered. The ground, grid, sweep and rings are drawn in a fixed order instead; nothing is ever below the ground.
-- **three.js loads in its own chunk** (about 270 kB compressed) after the console is on screen, and stays cached between deploys because it rarely changes.
-- **A ready signal for tests.** The extra start-up work made one browser test press a key before React was listening. The app now sets `html[data-app-ready]`, and the tests and media scripts wait for it.
-- **Phones start without labels.** Seven tags crowd a small screen; tapping an aircraft shows its tag.
-
-**Next: Step 3 · First intercept.** Drag threats onto the map and run the first full loop, from detection to an interceptor guided by proportional navigation, with the analysis bar counting every stage.
+- **Readable beats true to scale:** heights are stretched and aircraft keep a fixed size on screen; labels show true values.
+- **Draw only when something changes,** and load three.js in its own chunk.
 
 ## Step 1 · Simulation core (2026-11-06)
 
-**Built**
+A deterministic engine at 50 ticks per second, a live radar scope, and play, pause, step and replay controls.
 
-- **Simulation engine (`src/sim`):**
-  - a fixed 20 ms time step (`FixedStepClock`) and seeded random numbers (sfc32, with save and restore);
-  - traffic performance data;
-  - scenario traffic that crosses the area;
-  - a search radar whose rotating beam paints each aircraft as it sweeps past.
-  - Commands are applied at tick boundaries and logged, and `Simulation.replay()` rebuilds any run from its seed and command log.
-- **Driver (`SimController`):**
-  - turns animation frames into whole ticks at the chosen speed;
-  - blends the antenna angle between ticks for smooth motion;
-  - publishes UI state about ten times per second;
-  - reads `seed`, `t`, `paused` and `speed` from the URL.
-- **Live radar scope:** a canvas PPI with a sweeping beam and echoes that fade like phosphor. Echo size follows radar size.
-- **Live player bar:** play, pause, step (one tick or one second), speed ¼× to 16×, seed, restart and new seed, all with keyboard shortcuts.
-- **Live header:** Detect counts radar contacts, and the NOW line narrates the radar picture. Stages that later steps build show "—" until then.
-- **Event log:** fed by simulation events, split into SCENARIO lines (truth) and RADAR lines (perception).
-- **First concept cards (fixed time step, antenna rotation):** they appear in the README through `npm run docs:sync` and in the app through popovers. CI fails if the README falls out of sync.
-- **Tests:** 43 new unit tests and 5 new browser tests.
-  - Unit tests cover random numbers, the clock, the radar sweep, determinism, replay, kinematics, contacts, scenario traffic, the narrator, URL options and the card parser.
-  - Browser tests cover the controls, the keyboard shortcuts, radar contacts, same-seed replay and the concept cards.
+- Fixed 20 ms step, seeded random numbers, scenario traffic and a rotating search radar.
+- The first concept cards, in the README and in the app.
 
 **Decisions**
 
-- **The scope shows what the radar painted, not the truth.** Only aircraft the beam has swept past appear. That makes the gap between truth and perception visible from the first step, and the event log labels both sides.
-- **Main thread.** The engine has a worker-ready interface (commands in, snapshots out) but runs on the main thread, which is fast enough for one live run.
-- **Auto-play, unless the visitor prefers reduced motion.** First-time visitors see the radar working immediately; people who prefer reduced motion start paused.
-- **Physics data lives in the sim.** The palette reads speed, altitude and radar size from `src/sim/traffic.ts`, so the interface and the physics cannot disagree.
-- **Determinism has one limit.** Runs are identical within one JavaScript engine, but browsers may differ in the last bits of `Math.sin` and similar functions. Replays across different browsers will therefore rely on recorded snapshots.
-
-**Next: Step 2 · 3D scene.** Three.js ground, aircraft models, trails, labels and cameras, kept in sync with the radar scope.
+- **The scope shows what the radar painted,** not the truth.
+- **Determinism has one limit:** runs are identical within one JavaScript engine.
 
 ## Step 0 · Launchpad (2026-11-06)
 
-**Built**
-
-- Project scaffold: Vite 8, React 19, TypeScript 6 (strict), Tailwind CSS 4, ESLint, Prettier, Vitest 5 and Playwright.
-- Console shell: the header analysis bar (seven-stage pipeline, KPIs, plain-language Now line), the threat palette with six traffic types, an animated radar scope, a 3D battlespace illustration, and placeholder panels for the track table, inspector, telemetry, event log and timeline. Later steps filled in the first three; version 1.0.0 removed the telemetry and timeline placeholders.
-- CI/CD: lint, type-check, unit tests, format check, build and browser tests on every push; `main` deploys to GitHub Pages.
-- Media scripts: README screenshots and social preview images, rendered with Playwright.
-- Docs: README, project plan, architecture, safety, contributing and CLAUDE.md.
-- Author credit: "Created by Mohammad Alyounes" is a fixed part of the header on every screen size. It also appears in the footer (© 2026), the README, the social preview card, `NOTICE` and `CITATION.cff`.
+The foundation: Vite, React, strict TypeScript, Tailwind, ESLint, Prettier, Vitest and Playwright; CI and GitHub Pages; the console shell; and the fixed author credit.
 
 **Decisions**
 
-- **TypeScript 6, not 7.** TypeScript 7 (the native compiler) is out, but typescript-eslint supports TypeScript only up to 6.0 today. We will move when the linter does.
-- **Playwright pinned to 1.63.0,** the version whose browser build is preinstalled in the cloud dev environment. In CI, browser tests run inside Playwright's official `v1.63.0-noble` container, so nothing is downloaded (installing Chromium on a bare runner took over eight minutes on the first run).
-- **CI and deploy are separate workflows.** `CI` checks the code; `Deploy` publishes to GitHub Pages only after CI passes on `main`. The CI badge therefore reports code health, not hosting.
-- **Tags and releases come from CI.** This cloud session can push branches but its git proxy rejects tag pushes (HTTP 403). The final commit of each step carries a `Step-Tag:` trailer, and CI creates the tag and a GitHub Release with notes taken from this devlog. Adding `Step-Retag: true` moves an existing step release to the new commit; Step 0 used it once, when the author credit was added.
-- **License stays MIT** (owner's choice): maximum reuse. Attribution rests on the copyright notice in LICENSE, plus `NOTICE` and `CITATION.cff`. In this repository, the credit is protected by a browser test and `CODEOWNERS`.
-- **Commits are authored by Mohammad Alyounes,** with Claude as co-author. Commits stay signed, so GitHub keeps showing them as verified.
-- **Determinism is enforced by the linter.** `src/sim` cannot import UI libraries or call `Math.random()`, `Date.now()`, `new Date()` or browser APIs.
-- **The header belongs to the analysis bar.** Play, pause, step and the clock live in the bottom player bar, like a video player's controls.
-- **Deploy paths come from the environment.** CI sets `BASE_PATH=/<repo>/` and `VITE_SITE_URL`, so forks deploy to their own GitHub Pages without code changes.
-- **Codespaces first.** The README offers a one-click GitHub Codespaces button (devcontainer with Node 22). A StackBlitz button was left out, since it was not verified to run Vite 8.
-
-**Next: Step 1 · Simulation core.** A deterministic fixed-step clock, seeded random numbers, entities and events; play, pause, step and speed controls; and the first target moving on the 2D scope.
+- **Tags and releases come from CI,** from a `Step-Tag:` trailer, because the cloud session cannot push tags.
+- **Determinism is enforced by the linter** in `src/sim`.
+- **Playwright is pinned** to the version preinstalled in the cloud environment.
