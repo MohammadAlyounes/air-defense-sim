@@ -9,11 +9,11 @@ Drag a drone, missile or jet onto the map and watch a generic defense battery de
 
 Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built with [Claude Code](https://claude.com/claude-code)
 
-[**Live demo**](https://mohammadalyounes.github.io/air-defense-sim/) · [**Run it locally**](#quick-start) · [**Follow the build**](#build-log) · [**Project plan**](docs/PROJECT_PLAN.md)
+[**Live demo**](https://mohammadalyounes.github.io/air-defense-sim/) · [**Run it locally**](#quick-start) · [**Build log**](#build-log) · [**Project plan**](docs/PROJECT_PLAN.md)
 
 [![CI](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammadAlyounes/air-defense-sim/actions/workflows/ci.yml)
-![Status: building in public](https://img.shields.io/badge/status-building_in_public-fbbf24)
-![Progress: step 4 of 9](https://img.shields.io/badge/progress-step_4_of_9-22d3ee)
+![Status: complete](https://img.shields.io/badge/status-complete-34d399)
+[![Version 1.0.0](https://img.shields.io/badge/version-1.0.0-22d3ee)](https://github.com/MohammadAlyounes/air-defense-sim/releases/tag/v1.0.0)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34d399)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
@@ -24,13 +24,14 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 > [!NOTE]
 > **Educational and generic.** Every radar, launcher and interceptor in this project is fictional, with round-number parameters chosen for teaching. The physics is textbook-level and the terrain is procedurally generated. See [SAFETY.md](SAFETY.md).
 
-## What you'll be able to do
+## What you can do
 
 - **Drag threats onto the map.** Small drones, drone swarms, cruise-missile-like targets and fast jets, plus friendly and civil aircraft that must _not_ be engaged.
 - **Watch the whole defense loop.** A live analysis bar follows every track through **Detect → Track → Identify → Evaluate → Assign → Engage → Assess**, with a plain-language "Now" line.
 - **Ask "Why?"** Click any decision to see the reasoning: the evidence, the threat score, the intercept geometry and the chance of a hit.
 - **See the physics, not magic.** Radar horizon, terrain masking, clutter and Doppler, wind, turn radius, air drag, Kalman filtering and proportional navigation, each explained in three sentences and one formula.
-- **Experiment.** Tune parameters, save and share scenarios, rewind and try a different decision, or run a scenario hundreds of times to see the odds.
+- **Make the calls.** Switch weapons control between TIGHT, FREE and HOLD, approve or hold every shot yourself in SEMI-AUTO, and see what a mistake costs.
+- **Compare perception with the truth.** Show where the aircraft really are next to what the radar believes, switch on the coverage maps, or restart any run from its seed and watch it play out exactly the same way.
 
 ## Quick start
 
@@ -74,7 +75,7 @@ flowchart LR
 
 ## The physics, in plain language
 
-Every step adds short concept cards: the idea in three sentences, one formula, one worked example, and where to see it in the simulator. The same cards open inside the app from the graduation-cap buttons.
+Every model comes with a short concept card: the idea in three sentences, one formula, one worked example, and where to see it in the simulator. The same cards open inside the app from the graduation-cap buttons.
 
 <!-- concepts:start -->
 <!-- Generated from docs/concepts by `npm run docs:sync`. Edit the cards there. -->
@@ -277,7 +278,7 @@ An interceptor can only meet a target it can reach in time, before its motor's e
 - **Example:** with a 34 s planned flight, the dome reaches about 17 km at ground level and a little farther, 17.2 km, at 3 km up, where the thinner air saps less speed; it closes over the top just below 20 km.
 - **See it:** press the umbrella button in the 3D view to show the dome. Drop a jet 35 km out: the command node waits ("out of reach for now") until the jet enters it.
 
-[Going deeper →](docs/concepts/06-1-engagement-envelope.md)
+[Going deeper →](docs/concepts/05-5-engagement-envelope.md)
 
 ### Kill probability — why one interceptor is not always enough
 
@@ -287,7 +288,7 @@ Even an interceptor that passes within its lethal radius does not always destroy
 - **Example:** a fast jet met by an interceptor slowed to 450 m/s: Pk = 0.75 × 0.75 = 0.56. A second shot raises the chance to 1 − 0.44² = 0.81.
 - **See it:** the approval card, the log and the inspector show the chance of a kill for each shot. Watch for "burst … but survived" in the event log, followed by a second launch.
 
-[Going deeper →](docs/concepts/06-2-kill-probability.md)
+[Going deeper →](docs/concepts/05-6-kill-probability.md)
 
 ### Rules of engagement — why speed and safety pull in opposite directions
 
@@ -297,43 +298,44 @@ Before firing, the battery must decide what a track is. It interrogates it with 
 - **Example:** FREE engages a jet 4 s sooner than TIGHT, but out of every ten friendly aircraft with a faulty transponder heading for a defended asset, about one would be shot down. Under TIGHT, about one in a hundred.
 - **See it:** click "WCS TIGHT" in the header to switch to FREE or HOLD, and "AUTO" to SEMI-AUTO to approve every shot yourself (A to approve, H to hold fire).
 
-[Going deeper →](docs/concepts/06-3-rules-of-engagement.md)
+[Going deeper →](docs/concepts/05-7-rules-of-engagement.md)
 
 <!-- concepts:end -->
 
-**Coming next:** identification friend-or-foe, the kinematic classifier and air corridors (Step 5) · missile energy, kill assessment and saturation (Step 6).
-
 ## Build log
 
-Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of the project, for example `git checkout step-03-first-intercept`. Newest step first. Steps 5 and 6 are still in progress, so their entries are not tagged yet.
+The simulator is complete. It was built in six steps, from an empty console to a battery that tracks, identifies and engages under rules you set, and **version 1.0.0** is the finished project. Every step is a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage of it, for example `git checkout step-03-first-intercept`. Newest step first.
 
-### Steps 5 and 6 · Decide & engage (the rest of Step 5, the start of Step 6)
+### Step 5 · Track & identify
 
-The command node gets things worth defending, rules to follow, limits to live with, and a reason for every decision.
+<p align="center"><img src="docs/media/step-05-track-identify.webp" alt="The 3D view, the radar scope and the track table side by side, with the two civil corridors drawn as green lanes and airliners flying inside them. A cruise-missile-like target heading for the battery is tracked: identifying at first, then suspect (an orange diamond), then hostile (red) after a second silent identification check. An interceptor destroys it and a result card sums up the engagement, while a new airliner entering a corridor turns civil." width="100%" /></p>
 
-- **Defended assets:** a town and a power plant join the battery, each with a threat ring. Threats are ranked by the closest point of approach to the asset they will reach soonest, and leaks are counted where they happen.
-- **Identification that can go wrong:** friendly transponders fail one check in ten. A silent track is "unknown" after one check and "hostile" after two, so a friend with a dead transponder can be shot down: an identification error, counted as a failure.
-- **Rules of engagement:** click the header badges to switch weapons control (TIGHT, FREE, HOLD) and the operator mode (AUTO, SEMI-AUTO). In SEMI-AUTO the battery proposes each shot with its evidence; approve with A, hold fire with H.
-- **Kill probability:** a burst inside the lethal radius destroys the target only with the chance Pk, lower against fast, agile targets and with a tired interceptor. The battery looks again and fires again.
-- **Fire channels and saturation:** three engagements at a time. A swarm fills them, and the NOW line says when the defense is saturated.
-- **"Why?" for every decision:** the inspector explains the identity, the threatened asset, what the rules allow, and the shot and its chance of a kill. The engagement envelope can be shown as a dome in 3D.
-
-> **Engineering note: the rules are commands too.** Rule changes, approvals and holds are recorded like drops, so a run where a friendly was shot down under weapons FREE replays exactly, ready to be studied.
-
-_Screenshots and a clip for this step come with the v1.0 media pass._
-
-### Step 5 · Track & identify (part 1: tracking)
-
-The battery's picture of the sky becomes a real estimate, with an honest measure of how sure it is.
+The battery's picture of the sky becomes an honest estimate, every identity it gives a track comes with its evidence, and the command node gets rules to follow, limits to live with and odds to beat.
 
 - **Kalman filter:** every track blends its prediction with each new echo, weighted by how much it trusts each. Positions jitter less than the raw echoes and velocities settle within a few m/s.
 - **Association without the truth:** echoes join tracks by gating and global nearest neighbour, matched in 0.2 s batches so close neighbours like a drone swarm compete fairly. The tracker never knows which aircraft made an echo.
-- **Uncertainty you can see:** a faint 2σ ellipse around each track on the scope, stretched sideways far out where bearing errors dominate, and a ±1σ column in the track table.
-- **Truth vs. perception:** press T (or "truth" under the scope) to see where aircraft really are: grey crosses and error lines on the scope, the battery's tracks as rings next to the real aircraft in 3D, and the tracking error in the inspector.
+- **Uncertainty you can see:** a faint 2σ ellipse around each track on the scope, stretched sideways far out where bearing errors dominate, and a ±1σ column in the track table. Press T (or "truth" under the scope) to see where the aircraft really are.
+- **Defended assets:** a town and a power plant join the battery, each with a threat ring. Threats are ranked by the closest point of approach to the asset they will reach soonest, and leaks are counted where they happen.
+- **Identification that can go wrong:** friendly transponders fail one check in ten. A silent track is "unknown" after one check and "hostile" after two, so a friend with a dead transponder can be shot down: an identification error, counted as a failure.
+- **What it flies like:** a kinematic classifier sorts every track by its speed and height: drone-like, cruise-missile-like, jet-like, airliner-like or an ordinary aircraft. Silent and flying like one of the first three, which no friend or airliner here does, a track is "suspect" at the first check.
+- **Civil air corridors:** two lanes, 8 to 13 km up, in green on the scope and in 3D. Airliners fly them, and a silent track flying one like an airliner stays "unknown" instead of turning hostile. An airliner dropped anywhere joins the nearest lane.
+- **A shape and a reason for every identity:** a diamond for hostile (red) and suspect (orange), a quatrefoil for unknown (yellow), a circle for friend (blue) and a square for civil (green). The inspector says what the track flies like, how many checks it has failed and what that makes it; the event log and the approval card give the same evidence.
+- **Rules of engagement:** click the header badges to switch weapons control (TIGHT, FREE, HOLD) and the operator mode (AUTO, SEMI-AUTO). In SEMI-AUTO the battery proposes each shot with its evidence; approve with A, hold fire with H.
+- **Kill probability:** a burst inside the lethal radius destroys the target only with the chance Pk, lower against fast, agile targets and with a tired interceptor. The battery looks again and fires again.
+- **Fire channels and saturation:** three engagements at a time. A swarm fills them, and the NOW line says when the defense is saturated.
+- **Engagement envelope:** where the battery can reach, shown as a dome in 3D (the umbrella button).
 
-> **Engineering note: a filter that checks its own honesty.** The unit tests feed the filter noisy measurements and check that its normalized innovation averages 3, the value a chi-square law with three degrees of freedom predicts. A filter that claimed to be surer than it is would fail.
+> **Engineering note: tests that keep perception honest.** The tracker, the classifier and the corridor check read only echoes and filtered tracks, never the truth, and the tests check what that costs. The filter's normalized innovation must average 3, as a chi-square law with three degrees of freedom predicts, and a silent airliner flown off the corridors at the battery must be shot down and counted as an identification error.
 
-_Screenshots and a clip for this step come with the v1.0 media pass._
+> **Engineering note: the rules are commands too.** Rule changes, approvals and holds are recorded like drops, so a run where a friendly was shot down under weapons FREE replays exactly, ready to be studied.
+
+<img src="docs/media/step-05-track-identify.png" alt="The finished console: the civil corridors as green lanes on the radar scope and as boxes in 3D with airliners inside, a suspect cruise-missile-like target selected and heading for the town, a hostile drone being engaged, the track table listing suspect, hostile, friendly and civil tracks, and the event log explaining why the target is suspect" width="100%" />
+
+<details>
+<summary>Phone layout</summary>
+<br />
+<img src="docs/media/step-05-track-identify-mobile.png" alt="The Step 5 console on a phone, with the civil corridors over the 3D terrain" width="320" />
+</details>
 
 ### Step 4 · Environment & radar
 
@@ -353,7 +355,7 @@ The battlespace gets a landscape and weather, threats fly real routes, and the r
 
 > **Engineering note: one terrain, many readers.** The landscape is generated once and shared by the simulation, the scope, the 3D mesh and the placement readout. The blind zones and lit ground you see are exactly the ones the radar uses, and a dropped threat flies exactly the route its ghost showed.
 
-<img src="docs/media/step-04-environment-radar.png" alt="The console with the ground the radar lights shaded on the radar scope and the 3D terrain, the wind arrow above the scope, the header at Step 4 of 9, and the inspector following a small drone" width="100%" />
+<img src="docs/media/step-04-environment-radar.png" alt="The console with the ground the radar lights shaded on the radar scope and the 3D terrain, the wind arrow above the scope, and the inspector following a small drone" width="100%" />
 
 <details>
 <summary>Phone layout</summary>
@@ -415,7 +417,7 @@ The simulator comes alive: a deterministic engine running at 50 ticks per second
 - **Simulation engine (`src/sim`):** pure TypeScript with a fixed 20 ms time step, a seeded random-number generator, scenario traffic that crosses the area, and a search radar whose rotating beam paints each aircraft as it sweeps past.
 - **Live radar scope:** a sweeping beam and echoes that fade like old phosphor; bigger aircraft return bigger blips.
 - **Player bar:** play/pause (Space), step one tick (.) or one second (Shift + .), speed from ¼× to 16× (+ / −), the seed, Restart (R) and New seed.
-- **Live header:** the Detect stage counts radar contacts and the NOW line describes the radar picture in plain words. Stages that arrive later say which step brings them.
+- **Live header:** the Detect stage counts radar contacts and the NOW line describes the radar picture in plain words.
 - **Event log:** SCENARIO lines (what really happens) next to RADAR lines (what the radar actually sees).
 - **Concept cards in the app:** the graduation-cap buttons open the same cards as this README.
 
@@ -435,11 +437,11 @@ The simulator comes alive: a deterministic engine running at 50 ticks per second
 
 The foundation everything else builds on.
 
-- **Console shell:** the header analysis bar (seven-stage pipeline, key numbers, plain-language "Now" line), the threat palette, an animated radar scope, and a panel for every future feature, each labelled with the step that brings it to life.
+- **Console shell:** the header analysis bar (seven-stage pipeline, key numbers, plain-language "Now" line), the threat palette, an animated radar scope, and the console's panels.
 - **Tooling:** strict TypeScript, Vite 8, React 19, Tailwind CSS 4, ESLint, Prettier, Vitest and Playwright.
 - **CI/CD:** every push is linted, type-checked, tested in a real browser and deployed to GitHub Pages.
 
-> **Engineering note: determinism, enforced from day one.** The simulation core (`src/sim`) is not allowed to call `Math.random()`, read the wall clock or touch browser APIs, and the linter rejects any attempt. Same inputs, same outputs, every time: that is what will make exact replays, "rewind and try again" and Monte Carlo runs possible.
+> **Engineering note: determinism, enforced from day one.** The simulation core (`src/sim`) is not allowed to call `Math.random()`, read the wall clock or touch browser APIs, and the linter rejects any attempt. Same inputs, same outputs, every time: that is what makes every run replay exactly.
 
 <details>
 <summary>Phone layout</summary>
@@ -447,23 +449,18 @@ The foundation everything else builds on.
 <img src="docs/media/step-00-launchpad-mobile.png" alt="The console shell on a phone" width="320" />
 </details>
 
-## Roadmap
+## Status
+
+**Complete: version 1.0.0.** All six build steps are done, released and tagged.
 
 - [x] **Step 0 · Launchpad:** project scaffold, CI, live demo and the console shell
 - [x] **Step 1 · Simulation core:** deterministic clock, play/pause/step/speed, live radar scope
 - [x] **Step 2 · 3D scene:** 3D ground, models, trails, labels and cameras
 - [x] **Step 3 · First intercept:** the first full loop, drag-and-drop threats and the live analysis bar
 - [x] **Step 4 · Environment & radar:** terrain, atmosphere, wind and drag, threat routes; radar equation, noise, horizon, terrain masking, clutter and coverage maps
-- [ ] **Step 5 · Track & identify:** Kalman tracking, uncertainty ellipses, truth vs. perception; identification, civil traffic, defended assets, threat ranking with "Why?"
-  - In: Kalman tracking, gating and association, uncertainty ellipses, track quality, truth vs. perception, identification with transponder failures, defended assets, threat ranking with "Why?"
-  - Still to come: the kinematic classifier and air corridors
-- [ ] **Step 6 · Engage & assess:** fire channels, engagement envelopes, kill probability, doctrine and operator approval; kill assessment, saturation, telemetry and the full analysis bar
-  - In: fire channels, the engagement envelope, kill probability, rules of engagement and operator approval
-- [ ] **Step 7 · Scenarios & replay:** save, load and share, editor and raid generator; timeline scrubbing, rewind and branch, Monte Carlo, CSV export
-- [ ] **Step 8 · Learning layer:** ten guided lessons, live equations, challenges, after-action review
-- [ ] **Step 9 · Polish & release v1.0:** cinematic intro, effects, sound, themes, accessibility, demo video and the v1.0 release
+- [x] **Step 5 · Track & identify:** Kalman tracking, uncertainty ellipses, truth vs. perception; identification, the kinematic classifier, civil air corridors, defended assets, threat ranking with "Why?"; rules of engagement, operator approval, fire channels, kill probability and the engagement envelope
 
-The full specification is in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
+The design and the models are described in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 
 ## Under the hood
 
@@ -504,12 +501,12 @@ This is a learning tool, not a model of any real system. Equipment and terrain a
 
 ## Built with Claude
 
-This project is being built in public, step by step, with [Claude Code](https://claude.com/claude-code). The rules Claude follows in this repository are in [CLAUDE.md](CLAUDE.md), and every step's decisions are logged in [docs/DEVLOG.md](docs/DEVLOG.md).
+This project was built step by step with [Claude Code](https://claude.com/claude-code). The rules Claude follows in this repository are in [CLAUDE.md](CLAUDE.md), and every step's decisions are logged in [docs/DEVLOG.md](docs/DEVLOG.md).
 
 Created by [Mohammad Alyounes](https://github.com/MohammadAlyounes). Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Code: [MIT](LICENSE). Documentation, lessons and concept cards: [CC BY 4.0](LICENSE-docs.md).
+Code: [MIT](LICENSE). Documentation and concept cards: [CC BY 4.0](LICENSE-docs.md).
 
 If you share, fork or build on this project, please keep the credit "Created by Mohammad Alyounes" (see [NOTICE](NOTICE)). To cite it, use the **Cite this repository** button on GitHub ([CITATION.cff](CITATION.cff)).

@@ -14,4 +14,4 @@ A search radar's antenna spins, so it sees each aircraft only when its beam swee
 
 **Why the scope is a circle.** This display is called a PPI (plan position indicator). The battery sits at the centre, north is up, and distance from the centre is ground range. The rings are every 10 km, out to the radar's 40 km range.
 
-**What is simplified in this step.** Detection is perfect: every aircraft in range is painted on every pass, at its exact position. Later steps make it realistic: how strongly a target reflects radio waves (radar cross section), noise in the measured position, the curve of the Earth hiding low flyers, hills masking targets, and ground clutter.
+**What is simplified in this step.** Detection is perfect: every aircraft in range is painted on every pass, at its exact position. Steps 3 and 4 make it realistic: how strongly a target reflects radio waves (radar cross section), noise in the measured position, the curve of the Earth hiding low flyers, hills masking targets, and ground clutter.

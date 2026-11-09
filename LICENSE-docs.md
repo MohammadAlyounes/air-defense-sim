@@ -1,6 +1,6 @@
 # Documentation license
 
-The documentation, lessons and concept cards in this repository (the `docs/` folder, `README.md`, `SAFETY.md` and lesson content) are licensed under the **Creative Commons Attribution 4.0 International** license (CC BY 4.0).
+The documentation and concept cards in this repository (the `docs/` folder, `README.md` and `SAFETY.md`) are licensed under the **Creative Commons Attribution 4.0 International** license (CC BY 4.0).
 
 You may share and adapt them for any purpose, including commercially, as long as you give appropriate credit, link to the license, and indicate if changes were made.
 

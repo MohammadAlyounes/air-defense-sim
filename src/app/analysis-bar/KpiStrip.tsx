@@ -1,11 +1,9 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import { Tooltip } from '../components/Tooltip';
-import { CURRENT_STEP, roadmapStep } from '../data/roadmap';
 import { formatCountdown } from '../lib/format';
 import { useSimController } from '../sim/simContext';
 import {
-  KPI_ARRIVES_IN_STEP,
   NEXT_OPERATOR_MODE,
   NEXT_WEAPONS_CONTROL,
   OPERATOR_MODE_HELP,
@@ -45,7 +43,6 @@ function KpiGroup({ situation: s }: { situation: SituationSummary }) {
       <Kpi
         label="Threats"
         hint="Hostile tracks now, threats the radar confirmed destroyed, threats that reached a defended asset, and identification errors: friendly or civil aircraft shot down."
-        arrivesInStep={KPI_ARRIVES_IN_STEP.threats}
       >
         <Num value={s.threats?.active} unit="active" />
         <Num value={s.threats?.down} unit="down" tone="ok" />
@@ -57,7 +54,6 @@ function KpiGroup({ situation: s }: { situation: SituationSummary }) {
       <Kpi
         label="Interceptors"
         hint="Rounds ready on the launcher (one is reloaded every 30 s), in flight, and fired so far."
-        arrivesInStep={KPI_ARRIVES_IN_STEP.interceptors}
       >
         <Num value={s.interceptors?.ready} unit="ready" />
         <Num value={s.interceptors?.flying} unit="flying" />
@@ -72,7 +68,6 @@ function KpiGroup({ situation: s }: { situation: SituationSummary }) {
       <Kpi
         label="Next impact"
         hint="Time until the most urgent threat reaches its closest point to the defended asset it is heading for: the battery, the town or the power plant."
-        arrivesInStep={KPI_ARRIVES_IN_STEP.nextImpact}
       >
         <span className="font-mono tabular-nums text-ink-100">
           {formatCountdown(s.nextImpact?.inSeconds ?? null)}
@@ -115,33 +110,7 @@ function KpiGroup({ situation: s }: { situation: SituationSummary }) {
   );
 }
 
-function Kpi({
-  label,
-  hint,
-  arrivesInStep,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  /** The roadmap step that builds this number; before it, the tooltip says "Arrives in Step N". */
-  arrivesInStep?: number;
-  children: ReactNode;
-}) {
-  const arrives =
-    arrivesInStep === undefined || arrivesInStep <= CURRENT_STEP
-      ? undefined
-      : roadmapStep(arrivesInStep);
-  const tooltip =
-    hint || arrives ? (
-      <>
-        {hint}
-        {arrives && (
-          <span className={clsx('block text-ink-300', hint && 'mt-1.5')}>
-            Arrives in Step {arrives.step} · {arrives.title}.
-          </span>
-        )}
-      </>
-    ) : null;
+function Kpi({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   const text = (
     <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-300">
       {label}
@@ -149,8 +118,8 @@ function Kpi({
   );
   return (
     <div className="flex items-center gap-2">
-      {tooltip ? (
-        <Tooltip content={tooltip}>
+      {hint ? (
+        <Tooltip content={hint}>
           <span tabIndex={0} className="cursor-help border-b border-dotted border-ink-500">
             {text}
           </span>

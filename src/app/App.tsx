@@ -9,7 +9,7 @@ import { TooltipProvider } from './components/Tooltip';
 import { Footer } from './layout/ChromeBars';
 import { PlayerBar } from './layout/PlayerBar';
 import { ThreatPalette } from './palette/ThreatPalette';
-import { EventLogPanel, TelemetryPanel, TrackTablePanel } from './panels/ConsolePanels';
+import { EventLogPanel, TrackTablePanel } from './panels/ConsolePanels';
 import { InspectorPanel } from './panels/InspectorPanel';
 import { PlacementOverlay } from './placement/PlacementOverlay';
 import { SimProvider } from './sim/SimProvider';
@@ -88,10 +88,9 @@ function Console() {
         <TrackTablePanel className="area-tracks" />
         <div className="area-bottom bottom-grid">
           <InspectorPanel />
-          <TelemetryPanel />
           <EventLogPanel />
         </div>
-        <PlayerBar className="area-timeline" />
+        <PlayerBar className="area-player" />
       </main>
       <Footer />
       <PlacementOverlay />

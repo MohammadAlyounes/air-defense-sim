@@ -44,6 +44,19 @@ test('the header always credits the author', async ({ page }) => {
   }
 });
 
+test('the console is the finished version, with no placeholders for later steps', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto('/?paused=1');
+  const version = page.getByTestId('version-pill');
+  await expect(version).toHaveText('v1.0.0 · Complete');
+  await version.hover();
+  await expect(page.getByRole('tooltip')).toContainText('Version 1.0.0, complete');
+  await expect(page.getByText(/Arrives in|Step \d+\/\d+|Building in public/)).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /Telemetry|Timeline/ })).toHaveCount(0);
+});
+
 test('stage chips explain themselves on hover', async ({ page }) => {
   await page.goto('/');
   await page.locator('[data-stage="track"]').hover();

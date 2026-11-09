@@ -5,8 +5,8 @@ import type { DefenseSummary } from '../sim/defenseSummary';
 export type { OperatorMode, WeaponsControl };
 
 /**
- * Everything the header analysis bar shows. A number whose feature is not built yet is null:
- * the bar shows "—" and a tooltip names the roadmap step that brings it.
+ * Everything the header analysis bar shows. A number that is not available is null, and the
+ * bar shows "—".
  */
 export interface SituationSummary {
   stageCounts: Readonly<Record<StageId, number | null>>;
@@ -20,16 +20,6 @@ export interface SituationSummary {
   /** What is happening right now, in plain language. */
   now: string;
 }
-
-/**
- * Roadmap step in which each header number comes to life. The fire-channel meter has no entry:
- * it came early, with the Step 6 engagement work that landed before Step 4 shipped.
- */
-export const KPI_ARRIVES_IN_STEP = {
-  threats: 3,
-  interceptors: 3,
-  nextImpact: 3,
-} as const;
 
 /** The header from the battery's summary: every number is live. */
 export function liveSituation(input: { defense: DefenseSummary; now: string }): SituationSummary {

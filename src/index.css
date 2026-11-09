@@ -93,7 +93,7 @@
     display: grid;
     gap: 0.5rem;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'view' 'palette' 'scope' 'tracks' 'bottom' 'timeline';
+    grid-template-areas: 'view' 'palette' 'scope' 'tracks' 'bottom' 'player';
   }
 
   .area-palette {
@@ -111,8 +111,8 @@
   .area-bottom {
     grid-area: bottom;
   }
-  .area-timeline {
-    grid-area: timeline;
+  .area-player {
+    grid-area: player;
   }
 
   .bottom-grid {
@@ -123,7 +123,7 @@
 
   @media (width >= 48rem) {
     .bottom-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
@@ -135,11 +135,7 @@
         'palette view scope'
         'palette view tracks'
         'palette bottom bottom'
-        'palette timeline timeline';
-    }
-
-    .bottom-grid {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+        'palette player player';
     }
   }
 }

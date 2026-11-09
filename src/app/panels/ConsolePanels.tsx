@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Activity, ListOrdered, ScrollText } from 'lucide-react';
+import { ListOrdered, ScrollText } from 'lucide-react';
 import { ConceptPopover } from '../components/ConceptPopover';
 import { Panel } from '../components/Panel';
 import { Tooltip } from '../components/Tooltip';
@@ -147,49 +147,6 @@ export function TrackTablePanel({ className }: { className?: string }) {
           )}
         </tbody>
       </table>
-    </Panel>
-  );
-}
-
-const TELEMETRY_SERIES = ['Altitude', 'Speed', 'g-load', 'Signal'] as const;
-
-export function TelemetryPanel() {
-  return (
-    <Panel title="Telemetry" icon={Activity} step={6} bodyClassName="flex flex-col">
-      <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
-        {TELEMETRY_SERIES.map((series) => (
-          <span
-            key={series}
-            className="rounded border border-ink-700 px-1.5 py-0.5 text-[10.5px] text-ink-300"
-          >
-            {series}
-          </span>
-        ))}
-      </div>
-      <svg
-        viewBox="0 0 400 120"
-        preserveAspectRatio="none"
-        className="min-h-0 w-full flex-1 px-3 pb-2"
-        aria-hidden="true"
-      >
-        {[20, 50, 80, 110].map((y) => (
-          <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="#22304f" strokeDasharray="2 4" />
-        ))}
-        {[80, 160, 240, 320].map((x) => (
-          <line key={x} x1={x} y1="10" x2={x} y2="110" stroke="#18243f" />
-        ))}
-        <path
-          d="M0 95 C60 95 90 60 150 58 S260 70 300 40 S370 30 400 28"
-          fill="none"
-          stroke="#22d3ee"
-          strokeOpacity="0.25"
-          strokeWidth="2"
-          strokeDasharray="5 5"
-        />
-      </svg>
-      <p className="px-3 pb-2.5 text-[11px] text-ink-300">
-        Live graphs for the selected object: altitude, speed, g-load and radar signal over time.
-      </p>
     </Panel>
   );
 }
