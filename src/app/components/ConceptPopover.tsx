@@ -1,65 +1,13 @@
 import * as Popover from '@radix-ui/react-popover';
 import { GraduationCap } from 'lucide-react';
-import fixedTimeStep from '../../../docs/concepts/01-1-fixed-time-step.md?raw';
-import antennaRotation from '../../../docs/concepts/01-2-antenna-rotation.md?raw';
-import localCoordinates from '../../../docs/concepts/02-1-local-coordinates.md?raw';
-import seeingScale from '../../../docs/concepts/02-2-seeing-scale.md?raw';
-import detectionRange from '../../../docs/concepts/03-1-detection-range.md?raw';
-import proportionalNavigation from '../../../docs/concepts/03-2-proportional-navigation.md?raw';
-import radarHorizon from '../../../docs/concepts/04-1-radar-horizon.md?raw';
-import terrainMasking from '../../../docs/concepts/04-2-terrain-masking.md?raw';
-import detectionProbability from '../../../docs/concepts/04-3-detection-probability.md?raw';
-import airDrag from '../../../docs/concepts/04-4-air-drag.md?raw';
-import standardAtmosphere from '../../../docs/concepts/04-5-standard-atmosphere.md?raw';
-import wind from '../../../docs/concepts/04-6-wind.md?raw';
-import turnRadius from '../../../docs/concepts/04-7-turn-radius.md?raw';
-import radarCrossSection from '../../../docs/concepts/04-8-radar-cross-section.md?raw';
-import clutterDoppler from '../../../docs/concepts/04-9-clutter-doppler.md?raw';
-import kalmanFilter from '../../../docs/concepts/05-1-kalman-filter.md?raw';
-import gatingAssociation from '../../../docs/concepts/05-2-gating-association.md?raw';
-import closestApproach from '../../../docs/concepts/05-3-closest-point-of-approach.md?raw';
-import identification from '../../../docs/concepts/05-4-identification-friend-or-foe.md?raw';
-import engagementEnvelope from '../../../docs/concepts/05-5-engagement-envelope.md?raw';
-import killProbability from '../../../docs/concepts/05-6-kill-probability.md?raw';
-import rulesOfEngagement from '../../../docs/concepts/05-7-rules-of-engagement.md?raw';
-import { REPO_URL } from '../data/links';
-import { parseConceptCard, parseInline } from '../lib/cardMarkdown';
+import { conceptCard, KEY_NUMBERS_URL, type ConceptId } from '../data/concepts';
+import { parseInline } from '../lib/cardMarkdown';
 
-/** Concept cards, imported from the same files the README is built from. */
-const CONCEPTS = {
-  fixedTimeStep: { markdown: fixedTimeStep, file: '01-1-fixed-time-step.md' },
-  antennaRotation: { markdown: antennaRotation, file: '01-2-antenna-rotation.md' },
-  localCoordinates: { markdown: localCoordinates, file: '02-1-local-coordinates.md' },
-  seeingScale: { markdown: seeingScale, file: '02-2-seeing-scale.md' },
-  detectionRange: { markdown: detectionRange, file: '03-1-detection-range.md' },
-  proportionalNavigation: {
-    markdown: proportionalNavigation,
-    file: '03-2-proportional-navigation.md',
-  },
-  radarHorizon: { markdown: radarHorizon, file: '04-1-radar-horizon.md' },
-  terrainMasking: { markdown: terrainMasking, file: '04-2-terrain-masking.md' },
-  detectionProbability: { markdown: detectionProbability, file: '04-3-detection-probability.md' },
-  airDrag: { markdown: airDrag, file: '04-4-air-drag.md' },
-  standardAtmosphere: { markdown: standardAtmosphere, file: '04-5-standard-atmosphere.md' },
-  wind: { markdown: wind, file: '04-6-wind.md' },
-  turnRadius: { markdown: turnRadius, file: '04-7-turn-radius.md' },
-  radarCrossSection: { markdown: radarCrossSection, file: '04-8-radar-cross-section.md' },
-  clutterDoppler: { markdown: clutterDoppler, file: '04-9-clutter-doppler.md' },
-  kalmanFilter: { markdown: kalmanFilter, file: '05-1-kalman-filter.md' },
-  gatingAssociation: { markdown: gatingAssociation, file: '05-2-gating-association.md' },
-  closestApproach: { markdown: closestApproach, file: '05-3-closest-point-of-approach.md' },
-  identification: { markdown: identification, file: '05-4-identification-friend-or-foe.md' },
-  engagementEnvelope: { markdown: engagementEnvelope, file: '05-5-engagement-envelope.md' },
-  killProbability: { markdown: killProbability, file: '05-6-kill-probability.md' },
-  rulesOfEngagement: { markdown: rulesOfEngagement, file: '05-7-rules-of-engagement.md' },
-} as const;
-
-export type ConceptId = keyof typeof CONCEPTS;
+export type { ConceptId };
 
 /** A small "learn" button that opens a concept card next to the feature it explains. */
 export function ConceptPopover({ concept, label }: { concept: ConceptId; label: string }) {
-  const { markdown, file } = CONCEPTS[concept];
-  const card = parseConceptCard(markdown);
+  const card = conceptCard(concept);
   return (
     <Popover.Root>
       <Popover.Trigger
@@ -98,12 +46,12 @@ export function ConceptPopover({ concept, label }: { concept: ConceptId; label: 
             ))}
           </dl>
           <a
-            href={`${REPO_URL}/blob/main/docs/concepts/${file}`}
+            href={KEY_NUMBERS_URL}
             target="_blank"
             rel="noreferrer"
             className="mt-3 inline-block text-[11.5px] font-semibold text-accent hover:underline"
           >
-            Going deeper →
+            Key numbers and limits →
           </a>
           <Popover.Arrow className="fill-ink-600" />
         </Popover.Content>

@@ -1,6 +1,6 @@
 /**
- * Parses the small Markdown subset used by concept cards (docs/concepts/*.md) so the app can
- * show the exact same text as the README, rendered as React elements (never raw HTML).
+ * Parses the small Markdown subset used by the concept cards in docs/PHYSICS.md so the app can
+ * show the exact same text as the docs, rendered as React elements (never raw HTML).
  */
 
 export interface ConceptCardData {
@@ -42,6 +42,23 @@ export function parseConceptCard(markdown: string): ConceptCardData {
   }
   flush();
   return { title: title.trim(), hook: hook.trim(), paragraphs, facts };
+}
+
+/** Every card in a document: each `### ` heading starts one, and any other heading ends it. */
+export function parseConceptCards(markdown: string): ConceptCardData[] {
+  const chunks: string[][] = [];
+  let current: string[] | null = null;
+  for (const line of markdown.split('\n')) {
+    if (line.startsWith('### ')) {
+      current = [line];
+      chunks.push(current);
+    } else if (line.startsWith('#')) {
+      current = null;
+    } else {
+      current?.push(line);
+    }
+  }
+  return chunks.map((lines) => parseConceptCard(lines.join('\n')));
 }
 
 /** Splits a line into text, **bold** and `code` parts. */

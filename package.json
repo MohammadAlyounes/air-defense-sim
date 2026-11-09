@@ -36,9 +36,7 @@
     "typecheck": "tsc -b",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run lint && npm run typecheck && npm test && npm run format:check && npm run docs:check",
-    "docs:sync": "node scripts/docs-sync.mjs",
-    "docs:check": "node scripts/docs-sync.mjs --check",
+    "check": "npm run lint && npm run typecheck && npm test && npm run format:check",
     "media:screenshots": "node scripts/media/screenshots.mjs",
     "media:previews": "node scripts/media/previews.mjs",
     "media:gif": "node scripts/media/record-gif.mjs"

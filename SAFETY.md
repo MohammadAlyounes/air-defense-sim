@@ -19,4 +19,4 @@ Code, models and documentation contributed to this repository must follow the sa
 
 ## Limitations
 
-The models are deliberately simplified, and every simplification is documented in `docs/MODELS.md`. Results illustrate principles; they are not predictions about real-world systems.
+The models are deliberately simplified; the main simplifications are listed under [Limits](docs/PHYSICS.md#limits). Results illustrate principles; they are not predictions about real-world systems.

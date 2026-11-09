@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import fixedTimeStep from '../../../docs/concepts/01-1-fixed-time-step.md?raw';
-import antennaRotation from '../../../docs/concepts/01-2-antenna-rotation.md?raw';
-import localCoordinates from '../../../docs/concepts/02-1-local-coordinates.md?raw';
-import seeingScale from '../../../docs/concepts/02-2-seeing-scale.md?raw';
-import detectionRange from '../../../docs/concepts/03-1-detection-range.md?raw';
-import proportionalNavigation from '../../../docs/concepts/03-2-proportional-navigation.md?raw';
-import { parseConceptCard, parseInline } from './cardMarkdown';
+import physics from '../../../docs/PHYSICS.md?raw';
+import { CONCEPT_TITLES, conceptCard, type ConceptId } from '../data/concepts';
+import { parseConceptCard, parseConceptCards, parseInline } from './cardMarkdown';
 
 describe('parseConceptCard', () => {
   it('reads title, hook, paragraph and facts, and stops at the "more" marker', () => {
@@ -35,27 +31,20 @@ describe('parseConceptCard', () => {
     });
   });
 
-  it('parses every concept card in docs/concepts', () => {
-    const files = import.meta.glob<string>('../../../docs/concepts/[0-9][0-9]-*.md', {
-      query: '?raw',
-      import: 'default',
-      eager: true,
-    });
-    expect(Object.keys(files).length).toBeGreaterThanOrEqual(22);
-    for (const markdown of [
-      fixedTimeStep,
-      antennaRotation,
-      localCoordinates,
-      seeingScale,
-      detectionRange,
-      proportionalNavigation,
-      ...Object.values(files),
-    ]) {
-      const card = parseConceptCard(markdown);
+  it('parses every concept card in docs/PHYSICS.md', () => {
+    const cards = parseConceptCards(physics);
+    expect(cards).toHaveLength(22);
+    for (const card of cards) {
       expect(card.title.length).toBeGreaterThan(3);
       expect(card.hook.length).toBeGreaterThan(3);
       expect(card.paragraphs).toHaveLength(1);
       expect(card.facts.map((fact) => fact.label)).toEqual(['Formula', 'Example', 'See it']);
+    }
+  });
+
+  it('finds the card of every concept the app opens', () => {
+    for (const id of Object.keys(CONCEPT_TITLES) as ConceptId[]) {
+      expect(conceptCard(id).title).toBe(CONCEPT_TITLES[id]);
     }
   });
 });

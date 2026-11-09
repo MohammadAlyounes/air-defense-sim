@@ -9,7 +9,7 @@ export const AUTHOR = {
 } as const;
 
 export const REPO_URL = 'https://github.com/MohammadAlyounes/air-defense-sim';
-export const PLAN_URL = `${REPO_URL}/blob/main/docs/PROJECT_PLAN.md`;
+export const DESIGN_URL = `${REPO_URL}/blob/main/docs/DESIGN.md`;
 export const SAFETY_URL = `${REPO_URL}/blob/main/SAFETY.md`;
 export const BUILD_LOG_URL = `${REPO_URL}#build-log`;
 export const RELEASES_URL = `${REPO_URL}/releases`;
