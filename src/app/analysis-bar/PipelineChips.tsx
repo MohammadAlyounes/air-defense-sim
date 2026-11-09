@@ -2,11 +2,10 @@ import clsx from 'clsx';
 import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { Tooltip } from '../components/Tooltip';
-import { roadmapStep } from '../data/roadmap';
 import { STAGES, type Stage, type StageId } from '../data/stages';
 
 interface PipelineChipsProps {
-  /** Tracks in each stage; `null` for a stage that is not built yet. */
+  /** Tracks in each stage; `null` shows a dash. */
   counts: Readonly<Record<StageId, number | null>>;
   className?: string;
 }
@@ -32,7 +31,6 @@ export function PipelineChips({ counts, className }: PipelineChipsProps) {
 /** One stage: its name and live count. The chip pulses when a track enters the stage. */
 function StageChip({ stage, count }: { stage: Stage; count: number | null }) {
   const active = count !== null && count > 0;
-  const arrives = roadmapStep(stage.arrivesInStep);
   // Remember the last count while rendering, so a rise can restart the pulse animation.
   const [previous, setPrevious] = useState(count);
   const [pulses, setPulses] = useState(0);
@@ -47,11 +45,6 @@ function StageChip({ stage, count }: { stage: Stage; count: number | null }) {
           <strong className="text-accent">{stage.label}</strong>
           <br />
           {stage.description}
-          {count === null && arrives && (
-            <span className="mt-1.5 block text-ink-300">
-              Arrives in Step {arrives.step} · {arrives.title}.
-            </span>
-          )}
         </>
       }
     >

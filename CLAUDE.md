@@ -1,7 +1,9 @@
 # CLAUDE.md
 
 This is the working guide for Claude Code and human contributors on **Air Defense Simulator**.
-The full specification is in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). Read it before starting a step.
+The full specification is in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). Read it before changing the simulator.
+
+**Status: complete (version 1.0.0).** The simulator was built in six steps (0 to 5), each released as a git tag. There are no further steps: changes now are fixes and improvements to what is there.
 
 ## What we are building
 
@@ -17,8 +19,8 @@ An open-source, browser-based, educational air-defense simulator.
 1. **Polished and approachable.** Attractive and intuitive for the general public, credible for specialists: simple by default, deep on demand.
 2. **Drag-and-drop threats.** Palette cards (drone, swarm, cruise-missile-like, fast jet, friendly aircraft, airliner) are dropped on the 2D map or the 3D terrain, and the battery reacts live.
 3. **Header analysis bar.** Live counts for each stage, KPIs, and a plain-language "Now" line, always visible.
-4. **Easy to run.** A live demo on GitHub Pages, a demo video, and `npm install && npm run dev`.
-5. **A README that teaches.** Easy to scan. Every step adds concise physics concept cards and a build-log entry.
+4. **Easy to run.** A live demo on GitHub Pages, animated clips in the README, and `npm install && npm run dev`.
+5. **A README that teaches.** Easy to scan. Every model has a concise physics concept card, and every step has a build-log entry.
 6. **Safe and generic.** See the safety guardrails below.
 7. **Fixed author credit.** The header always shows "Created by Mohammad Alyounes" on every screen size, and the footer shows "© 2026 Mohammad Alyounes". Both come from `AUTHOR` in `src/app/data/links.ts`. Never remove, hide or change them; a browser test fails CI if you do. Keep the credit in the README, `NOTICE`, `CITATION.cff` and the social preview card too.
 
@@ -42,13 +44,13 @@ An open-source, browser-based, educational air-defense simulator.
 - **Defensive framing.** Effects stay non-graphic. Identification and rules-of-engagement mistakes count as failures.
 - **Community scenarios** follow the same rules (`SAFETY.md`).
 
-## Definition of done (every step)
+## Definition of done (every change)
 
 1. **It works in the running app.** Verify it in headless Chromium and capture screenshots, plus an animated clip for visual features (GIF, or WebP when most of the picture moves).
 2. **Checks pass.** `npm run lint`, `npm run typecheck` and `npm test` all pass, and new physics has unit tests against known values.
-3. **README updated.** Progress checklist, a concept card for any new physics, and a build-log entry with a screenshot.
-4. **Devlog entry.** Add an entry to `docs/DEVLOG.md`: what was built, key decisions, and what comes next.
-5. **Shipped.** Commit and push to `main`. The step's final commit ends with the trailer `Step-Tag: step-NN-<slug>`; once CI passes, the `release-step` job creates that tag and a GitHub Release from the devlog entry. (The cloud session's git proxy rejects tag pushes, so never push tags by hand from there.) To move an already released step to a newer commit, add `Step-Retag: true` as well.
+3. **README updated.** A concept card for any new physics, and the build log and screenshots where the change shows.
+4. **Devlog entry.** For anything beyond a small fix, add an entry to `docs/DEVLOG.md`: what was built and the key decisions.
+5. **Shipped.** Commit and push to `main`. A release commit ends with a trailer such as `Step-Tag: v1.0.1` (step releases used `Step-Tag: step-NN-<slug>`; one commit may carry several). Once CI passes, the `release-step` job creates the tag and a GitHub Release, from the devlog entry, for every trailer in the pushed commits. (The cloud session's git proxy rejects tag pushes, so never push tags by hand from there.) To move an already released tag to a newer commit, add `Step-Retag: true` as well.
 
 ## Concept card format (README, docs and in-app)
 
@@ -66,7 +68,7 @@ The full concept texts live in `docs/concepts/NN-M-slug.md` (step `NN`, order `M
 
 ## README style
 
-- **Hero first:** title, one-liner, demo GIF, buttons (Live demo · Video · Run locally), badges.
+- **Hero first:** title, one-liner, preview image, buttons (Live demo · Run it locally · Build log · Project plan), badges.
 - **Easy to scan:** short sections and bullets, one idea per paragraph. Plain language first, math second.
 - **Quick start** in four commands or fewer. Deep math goes in `docs/MODELS.md`, not the README.
 
@@ -88,8 +90,6 @@ The full concept texts live in `docs/concepts/NN-M-slug.md` (step `NN`, order `M
 
 Both media scripts accept `--query "seed=2026&t=75&paused=0"` for repeatable shots: simulation options from `src/app/sim/params.ts`, view options (`select`, `camera`, `heights`, `labels`, `welcome=0`) from `src/app/view/viewParams.ts`. `media:gif` can also script the clip with `--actions` (timed key presses and clicks).
 
-Planned: `npm run demo:record` (Step 9).
-
 ## Environment notes
 
 - `@playwright/test` is pinned to the version whose browser build is preinstalled in the cloud dev environment. Bump it together with `npx playwright install chromium`.
@@ -99,6 +99,6 @@ Planned: `npm run demo:record` (Step 9).
 ## Conventions
 
 - **Code:** strict TypeScript, ESLint + Prettier, small pure functions in the sim.
-- **Commits:** imperative mood, prefixed with the step (`step-05: add radar horizon model`).
+- **Commits:** imperative mood. Build-step commits were prefixed with their step (`step-05: add radar horizon model`); later changes use a short area prefix (`sim:`, `app:`, `docs:`).
 - **Commit author:** Mohammad Alyounes <fcbmoh98@gmail.com>. In a fresh clone, run `git config author.name "Mohammad Alyounes"` and `git config author.email "fcbmoh98@gmail.com"`, and leave the committer and signing as configured. Keep the Claude `Co-Authored-By` trailer.
 - **Secrets:** never commit them. The optional Claude tutor uses the visitor's own API key, never a key stored in the repo.

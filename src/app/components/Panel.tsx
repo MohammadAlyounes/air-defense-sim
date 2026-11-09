@@ -1,13 +1,10 @@
 import clsx from 'clsx';
 import type { LucideIcon } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
-import { StepBadge } from './StepBadge';
 
 interface PanelProps {
   title: string;
   icon?: LucideIcon;
-  /** Roadmap step in which this panel comes to life (shows an "arrives in" badge). */
-  step?: number;
   subtitle?: string;
   /** Small controls shown at the right of the header (for example a concept card). */
   actions?: ReactNode;
@@ -18,11 +15,10 @@ interface PanelProps {
   children: ReactNode;
 }
 
-/** The frame every console panel shares: icon, title, optional step badge, body. */
+/** The frame every console panel shares: icon, title, optional actions, body. */
 export function Panel({
   title,
   icon: Icon,
-  step,
   subtitle,
   actions,
   panelId,
@@ -49,12 +45,7 @@ export function Panel({
           {title}
         </h2>
         {subtitle && <span className="truncate text-[11px] text-ink-300">{subtitle}</span>}
-        {(actions || step !== undefined) && (
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            {actions}
-            {step !== undefined && <StepBadge step={step} />}
-          </div>
-        )}
+        {actions && <div className="ml-auto flex shrink-0 items-center gap-1.5">{actions}</div>}
       </header>
       <div className={clsx('min-h-0 flex-1', bodyClassName)}>{children}</div>
     </section>

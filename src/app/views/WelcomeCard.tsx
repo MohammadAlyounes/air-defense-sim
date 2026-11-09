@@ -1,8 +1,8 @@
 import { Hand, Keyboard, MousePointerClick, Rotate3d, X } from 'lucide-react';
 import { useId, useState } from 'react';
 import { GithubMark } from '../components/marks';
+import { VERSION } from '../data/buildHistory';
 import { REPO_URL } from '../data/links';
-import { CURRENT_STEP, LAST_STEP } from '../data/roadmap';
 import { parseViewOptions } from '../view/viewParams';
 
 const STORAGE_KEY = 'ads.welcomeDismissed';
@@ -58,7 +58,7 @@ export function WelcomeCard() {
         <X aria-hidden="true" className="size-4" />
       </button>
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">
-        Building in public · Step {CURRENT_STEP} of {LAST_STEP}
+        Open source · Version {VERSION}
       </p>
       <h2 id={titleId} className="mt-1 pr-6 text-[17px] font-semibold leading-snug text-ink-100">
         See how an <span className="whitespace-nowrap">air-defense</span> system thinks.

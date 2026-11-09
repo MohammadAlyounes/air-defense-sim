@@ -1,6 +1,6 @@
 # Concept cards
 
-Short, plain-language explanations of the physics and engineering behind the simulator. Each card is used in three places: the README, these docs, and the in-app tooltips and lessons.
+Short, plain-language explanations of the physics and engineering behind the simulator. Each card is used in three places: the README, these docs, and the in-app concept cards (the graduation-cap buttons).
 
 ## Format
 
@@ -22,11 +22,11 @@ The Earth curves away, so a radar cannot see targets below its horizon. Radio wa
 
 - **Formula:** `d ≈ 4.12 × (√h_radar + √h_target)` km, heights in metres
 - **Example:** a radar mast of 12 m sees a target flying at 50 m only within ~43 km.
-- **See it:** Lesson 2, or the target-altitude slider on the coverage map (Step 4).
+- **See it:** select a low aircraft far out: the inspector's "Radar view" row says when it is below the horizon.
 
 ## Index
 
-Cards are added as their steps land. File names are `NN-M-slug.md`: step `NN`, order `M` within the step.
+Each build step added the cards for the models it introduced. File names are `NN-M-slug.md`: step `NN`, order `M` within the step.
 
 | Step | Concepts                                                                                                                                                                                                                                                                                                                                                                                           |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -34,6 +34,4 @@ Cards are added as their steps land. File names are `NN-M-slug.md`: step `NN`, o
 | 2    | [Local coordinates](02-1-local-coordinates.md) · [Seeing scale](02-2-seeing-scale.md)                                                                                                                                                                                                                                                                                                              |
 | 3    | [Detection range](03-1-detection-range.md) · [Proportional navigation](03-2-proportional-navigation.md)                                                                                                                                                                                                                                                                                            |
 | 4    | [Radar horizon](04-1-radar-horizon.md) · [Terrain masking](04-2-terrain-masking.md) · [Detection probability](04-3-detection-probability.md) · [Air drag](04-4-air-drag.md) · [Standard atmosphere](04-5-standard-atmosphere.md) · [Wind](04-6-wind.md) · [Turn radius](04-7-turn-radius.md) · [Radar cross section](04-8-radar-cross-section.md) · [Clutter and Doppler](04-9-clutter-doppler.md) |
-| 5    | [Kalman filter](05-1-kalman-filter.md) · [Gating and association](05-2-gating-association.md) · [Closest point of approach](05-3-closest-point-of-approach.md) · [Identification friend-or-foe](05-4-identification-friend-or-foe.md)                                                                                                                                                              |
-| 6    | [Engagement envelope](06-1-engagement-envelope.md) · [Kill probability](06-2-kill-probability.md) · [Rules of engagement](06-3-rules-of-engagement.md) · coming: missile energy · kill assessment · saturation                                                                                                                                                                                     |
-| 7    | Monte Carlo and probability                                                                                                                                                                                                                                                                                                                                                                        |
+| 5    | [Kalman filter](05-1-kalman-filter.md) · [Gating and association](05-2-gating-association.md) · [Closest point of approach](05-3-closest-point-of-approach.md) · [Identification friend-or-foe](05-4-identification-friend-or-foe.md) · [Engagement envelope](05-5-engagement-envelope.md) · [Kill probability](05-6-kill-probability.md) · [Rules of engagement](05-7-rules-of-engagement.md)     |

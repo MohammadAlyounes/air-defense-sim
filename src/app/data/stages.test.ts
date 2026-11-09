@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ROADMAP, CURRENT_STEP, LAST_STEP, roadmapStep } from './roadmap';
+import pkg from '../../../package.json';
+import { BUILD_STEPS, VERSION } from './buildHistory';
 import { STAGES } from './stages';
 
 describe('defense loop stages', () => {
@@ -23,14 +24,12 @@ describe('defense loop stages', () => {
   });
 });
 
-describe('roadmap', () => {
-  it('numbers steps 0 to 9 without gaps', () => {
-    expect(ROADMAP.map((s) => s.step)).toEqual(Array.from({ length: 10 }, (_, i) => i));
-    expect(LAST_STEP).toBe(9);
+describe('build history', () => {
+  it('numbers the six build steps 0 to 5 without gaps', () => {
+    expect(BUILD_STEPS.map((s) => s.step)).toEqual([0, 1, 2, 3, 4, 5]);
   });
 
-  it('points the current step at a real roadmap entry', () => {
-    expect(roadmapStep(CURRENT_STEP)).toBeDefined();
-    expect(roadmapStep(99)).toBeUndefined();
+  it('carries the version in package.json', () => {
+    expect(VERSION).toBe(pkg.version);
   });
 });

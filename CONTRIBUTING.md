@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest! This project is being built in public, one step at a time (see the [roadmap](README.md#roadmap)).
+Thanks for your interest! The simulator is complete at version 1.0.0: it was built in six steps, each one a tagged release (see the [build log](README.md#build-log)). Fixes, clearer explanations and better tests are welcome.
 
 ## Run it
 

@@ -23,8 +23,8 @@ The physics and decision-making engine. The app imports it only through `index.t
 
 Rules (enforced by ESLint, see `eslint.config.js`):
 
-- **Pure TypeScript.** No React, Three.js, DOM or browser APIs. The same code runs in a
-  Web Worker, in Node for tests, and in batch (Monte Carlo) runs.
+- **Pure TypeScript.** No React, Three.js, DOM or browser APIs, so the same code runs in the
+  browser and in Node for the tests.
 - **Deterministic.** All randomness comes from the seeded random number generator. Never
   call `Math.random()`, `Date.now()` or `new Date()`. Simulation time comes from the
   simulation clock.

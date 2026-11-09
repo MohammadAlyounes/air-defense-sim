@@ -12,6 +12,6 @@ Even an interceptor that passes within its lethal radius does not always destroy
 
 **A generic teaching model.** Real kill probabilities depend on guidance accuracy, fuze and warhead details that this project deliberately leaves out (see SAFETY.md). The model here keeps two textbook trends: agile targets are harder, and an interceptor that has bled its energy manoeuvres less well.
 
-**Shoot-look-shoot.** After each shot the battery waits for the radar's next look before firing again at the same target. It saves interceptors (no second round wasted on a target already destroyed) at the cost of time. Against fast threats close in, firing two at once (shoot-shoot-look) would buy a higher chance sooner: one of the trade-offs on the "Later" list.
+**Shoot-look-shoot.** After each shot the battery waits for the radar's next look before firing again at the same target. It saves interceptors (no second round wasted on a target already destroyed) at the cost of time. Against fast threats close in, firing two at once (shoot-shoot-look) would buy a higher chance sooner for twice the interceptors; this battery always fires one at a time.
 
 **Fire channels and saturation.** The tracking radar can guide only three engagements at once. When more threats arrive than channels, the rest must wait their turn: the defense is saturated. A drone swarm does exactly that: many cheap targets at once.

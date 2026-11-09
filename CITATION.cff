@@ -13,7 +13,8 @@ authors:
 repository-code: 'https://github.com/MohammadAlyounes/air-defense-sim'
 url: 'https://mohammadalyounes.github.io/air-defense-sim/'
 license: MIT
-date-released: 2026-11-06
+version: 1.0.0
+date-released: 2026-11-09
 keywords:
   - simulation
   - education

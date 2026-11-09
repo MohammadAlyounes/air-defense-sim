@@ -1,8 +1,7 @@
 import clsx from 'clsx';
-import { History, Minus, Pause, Play, Plus, RotateCcw, Shuffle, StepForward } from 'lucide-react';
+import { Minus, Pause, Play, Plus, RotateCcw, Shuffle, StepForward } from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
 import { ConceptPopover } from '../components/ConceptPopover';
-import { StepBadge } from '../components/StepBadge';
 import { Tooltip } from '../components/Tooltip';
 import { formatSimClock } from '../lib/format';
 import { formatSpeedLabel, SPEED_PRESETS } from '../sim/params';
@@ -10,8 +9,8 @@ import { useSimController, useSimState } from '../sim/simContext';
 import { SHORTCUTS } from '../sim/useKeyboardShortcuts';
 
 /**
- * Player bar: simulation controls next to the replay timeline (Step 7), the way a video
- * player keeps its buttons beside the scrubber.
+ * Player bar: play, pause, step and speed with the simulation clock on the left; the run's
+ * seed, Restart and New seed on the right.
  */
 export function PlayerBar({ className }: { className?: string }) {
   const controller = useSimController();
@@ -92,7 +91,7 @@ export function PlayerBar({ className }: { className?: string }) {
         <ConceptPopover concept="fixedTimeStep" label="How the simulation clock works" />
       </div>
 
-      <div className="flex items-center gap-1.5" role="group" aria-label="Run">
+      <div className="ml-auto flex items-center gap-1.5" role="group" aria-label="Run">
         <Tooltip content="The seed fixes every random choice in the run. Same seed, same run.">
           <span tabIndex={0} className="cursor-help font-mono text-[11px] text-ink-300">
             Seed{' '}
@@ -115,17 +114,6 @@ export function PlayerBar({ className }: { className?: string }) {
         >
           <Shuffle aria-hidden="true" />
         </ControlButton>
-      </div>
-
-      <div className="flex min-w-48 flex-1 items-center gap-3">
-        <History aria-hidden="true" className="size-4 shrink-0 text-accent" />
-        <span className="hidden text-[11.5px] font-semibold uppercase tracking-[0.12em] text-ink-200 sm:inline">
-          Timeline
-        </span>
-        <div className="relative h-1.5 min-w-16 flex-1 rounded-full bg-ink-800" aria-hidden="true">
-          <span className="absolute top-1/2 left-0 size-3 -translate-y-1/2 rounded-full border-2 border-accent bg-ink-950" />
-        </div>
-        <StepBadge step={7} />
       </div>
     </div>
   );

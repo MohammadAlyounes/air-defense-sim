@@ -26,7 +26,7 @@ const jetInbound = (sim: Simulation) =>
     headingRad: Math.PI,
   });
 
-describe('Step 6: operator approval (SEMI mode)', () => {
+describe('operator approval (SEMI mode)', () => {
   it('proposes the shot and waits; launches only once the operator approves', () => {
     const sim = sky({ rules: { operatorMode: 'SEMI' } });
     jetInbound(sim);
@@ -65,7 +65,7 @@ describe('Step 6: operator approval (SEMI mode)', () => {
   });
 });
 
-describe('Step 6: weapons control', () => {
+describe('weapons control', () => {
   it('never fires on HOLD', () => {
     const sim = sky({ rules: { weaponsControl: 'HOLD' } });
     jetInbound(sim);
@@ -84,7 +84,7 @@ describe('Step 6: weapons control', () => {
   });
 });
 
-describe('Step 6: identification errors', () => {
+describe('identification errors', () => {
   it('shoots down a friendly aircraft whose transponder stays silent, and counts it as a failure', () => {
     const sim = sky({
       defense: { friendReplyProbability: 0 },
@@ -122,7 +122,7 @@ describe('Step 6: identification errors', () => {
   });
 });
 
-describe('Step 6: fire channels and saturation', () => {
+describe('fire channels and saturation', () => {
   it('never guides more engagements than it has fire channels', () => {
     const sim = sky({ defense: { fireChannels: 2 } });
     sim.dispatch({
@@ -143,7 +143,7 @@ describe('Step 6: fire channels and saturation', () => {
   });
 });
 
-describe('Step 6: defended assets', () => {
+describe('defended assets', () => {
   it('counts a leak at the asset a hostile reaches', () => {
     const plant = DEFAULT_ASSETS[2]?.position;
     const sim = sky({ defense: { launcherCapacity: 0 } });
@@ -163,7 +163,7 @@ describe('Step 6: defended assets', () => {
   });
 });
 
-describe('Step 6: kill probability', () => {
+describe('kill probability', () => {
   it('sometimes lets a target survive a burst within the lethal radius', () => {
     let survived = 0;
     let hits = 0;

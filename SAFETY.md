@@ -6,12 +6,12 @@ Air Defense Simulator is an **educational** project. It explains, at a textbook 
 
 - **Fictional equipment only.** No real system names, specifications or performance data. All parameters are round numbers chosen to make concepts visible.
 - **Textbook-level physics.** Point-mass motion and public, widely taught equations (the radar range equation, Kalman filtering, proportional navigation). No real seeker, warhead or propulsion detail.
-- **Fictional terrain.** Terrain is procedurally generated. No real-world locations, bases or borders.
+- **Fictional terrain and airspace.** Terrain is procedurally generated, and the civil air corridors are invented lanes. No real-world locations, bases, borders or air routes.
 - **Defensive and non-graphic.** Effects stay abstract. Identification and rules-of-engagement mistakes, such as engaging a civil airliner, count as failures.
 
 ## Community contributions
 
-Scenarios, lessons and models contributed to this repository must follow the same rules. We will not accept:
+Code, models and documentation contributed to this repository must follow the same rules. We will not accept:
 
 - recreations of real sites, bases, units or events;
 - real-system parameter sheets or performance data;
@@ -19,4 +19,4 @@ Scenarios, lessons and models contributed to this repository must follow the sam
 
 ## Limitations
 
-The models are deliberately simplified, and every simplification will be documented in `docs/MODELS.md` as the models arrive. Results illustrate principles; they are not predictions about real-world systems.
+The models are deliberately simplified, and every simplification is documented in `docs/MODELS.md`. Results illustrate principles; they are not predictions about real-world systems.

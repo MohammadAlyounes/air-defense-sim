@@ -1,6 +1,6 @@
 {
   "name": "air-defense-sim",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Interactive, educational air-defense simulator: drag a drone, missile or jet onto the map and watch a generic defense battery detect, track, identify, evaluate, engage and assess it.",
   "keywords": [

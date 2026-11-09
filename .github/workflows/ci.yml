@@ -51,10 +51,12 @@ jobs:
           path: test-results
           retention-days: 7
 
-  # The last commit of a roadmap step carries a trailer such as `Step-Tag: step-00-launchpad`.
-  # Once the checks pass, this job creates that tag and a GitHub Release from docs/DEVLOG.md.
+  # A release commit carries a trailer such as `Step-Tag: step-05-track-identify` or
+  # `Step-Tag: v1.0.0`. When the head commit of a push to main has one, and the checks pass,
+  # this job creates the tag and GitHub Release that each commit of the push names, with notes
+  # from docs/DEVLOG.md.
   release-step:
-    name: Tag and release the step
+    name: Tag and release
     needs: [quality, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'Step-Tag:')
     runs-on: ubuntu-latest
