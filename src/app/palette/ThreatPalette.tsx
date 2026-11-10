@@ -24,15 +24,7 @@ export function ThreatPalette({ className }: { className?: string }) {
       icon={Crosshair}
       panelId="palette"
       className={className}
-      actions={
-        <>
-          <ConceptPopover concept="detectionRange" label="Why small drones are seen late" />
-          <ConceptPopover
-            concept="radarCrossSection"
-            label="Why a hundred times smaller is only three times closer"
-          />
-        </>
-      }
+      actions={<ConceptPopover concept="detectionRange" label="Why small drones are seen late" />}
       bodyClassName="overflow-y-auto"
     >
       <p className="flex items-start gap-1.5 px-3 pt-2.5 text-[11.5px] leading-snug text-ink-300">

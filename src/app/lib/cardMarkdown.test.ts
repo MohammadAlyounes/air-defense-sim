@@ -33,12 +33,24 @@ describe('parseConceptCard', () => {
 
   it('parses every concept card in docs/PHYSICS.md', () => {
     const cards = parseConceptCards(physics);
-    expect(cards).toHaveLength(22);
+    expect(cards).toHaveLength(20);
     for (const card of cards) {
       expect(card.title.length).toBeGreaterThan(3);
       expect(card.hook.length).toBeGreaterThan(3);
       expect(card.paragraphs).toHaveLength(1);
       expect(card.facts.map((fact) => fact.label)).toEqual(['Formula', 'Example', 'See it']);
+    }
+  });
+
+  it('keeps every card short: two sentences at most, and three one-line facts', () => {
+    for (const card of parseConceptCards(physics)) {
+      const [paragraph = ''] = card.paragraphs;
+      const sentences = paragraph.split(/(?<=[.!?])\s+(?=[A-Z"])/);
+      expect(sentences.length, card.title).toBeLessThanOrEqual(2);
+      expect(paragraph.length, card.title).toBeLessThanOrEqual(320);
+      for (const fact of card.facts) {
+        expect(fact.text.length, `${card.title}: ${fact.label}`).toBeLessThanOrEqual(210);
+      }
     }
   });
 

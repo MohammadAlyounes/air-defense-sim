@@ -30,12 +30,12 @@ Working rules for Claude Code and human contributors on **Air Defense Simulator*
 
 ## Concept cards
 
-The cards live in `docs/PHYSICS.md`, one `### ` heading each. The app parses them (`src/app/data/concepts.ts`), so keep this exact format:
+The cards live in `docs/PHYSICS.md`, one `### ` heading each. The app parses them (`src/app/data/concepts.ts`) and a unit test keeps them short, so keep this exact format, with each fact on one line:
 
 ```
 ### <Concept> — <one-line hook>
 
-<At most 3 plain sentences. Explain any jargon you use.>
+<At most 2 plain sentences. Explain any jargon you use.>
 
 - **Formula:** `<one line>`
 - **Example:** <one concrete number example>
@@ -44,16 +44,16 @@ The cards live in `docs/PHYSICS.md`, one `### ` heading each. The app parses the
 
 ## Commands
 
-| Command                                              | Purpose                                                   |
-| ---------------------------------------------------- | --------------------------------------------------------- |
-| `npm run dev`                                        | Local dev server                                          |
-| `npm run build` / `npm run preview`                  | Production build / preview it                             |
-| `npm test` / `npm run test:e2e`                      | Unit tests (Vitest) / browser tests (Playwright)          |
-| `npm run check`                                      | Lint, typecheck, unit tests and format check              |
-| `npm run format`                                     | Prettier                                                  |
-| `npm run media:screenshots -- --name step-NN-<slug>` | README screenshots (run `npm run build` first)            |
-| `npm run media:gif -- --name … --selector …`         | Animated GIF or WebP (`--format webp`) of part of the app |
-| `npm run media:previews`                             | Social preview images                                     |
+| Command                                      | Purpose                                                   |
+| -------------------------------------------- | --------------------------------------------------------- |
+| `npm run dev`                                | Local dev server                                          |
+| `npm run build` / `npm run preview`          | Production build / preview it                             |
+| `npm test` / `npm run test:e2e`              | Unit tests (Vitest) / browser tests (Playwright)          |
+| `npm run check`                              | Lint, typecheck, unit tests and format check              |
+| `npm run format`                             | Prettier                                                  |
+| `npm run media:screenshots`                  | Console screenshots (run `npm run build` first)           |
+| `npm run media:gif -- --name … --selector …` | Animated GIF or WebP (`--format webp`) of part of the app |
+| `npm run media:previews`                     | Social preview images                                     |
 
 The media scripts accept `--query "seed=2026&t=75&paused=0"` for repeatable shots (options in `src/app/sim/params.ts` and `src/app/view/viewParams.ts`); `media:gif` can script the clip with `--actions`.
 
