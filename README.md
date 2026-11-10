@@ -29,11 +29,11 @@ Created by **[Mohammad Alyounes](https://github.com/MohammadAlyounes)** · Built
 - **Drag threats onto the map.** Small drones, drone swarms, cruise-missile-like targets and fast jets, plus friendly and civil aircraft that must _not_ be engaged.
 - **Watch the whole defense loop.** A live analysis bar follows every track through **Detect → Track → Identify → Evaluate → Assign → Engage → Assess**, with a plain-language "Now" line.
 - **Ask "Why?"** Click any decision to see the reasoning: the evidence, the threat score, the intercept geometry and the chance of a hit.
-- **See the physics, not magic.** Radar horizon, terrain masking, clutter and Doppler, wind, turn radius, air drag, Kalman filtering and proportional navigation, each explained in three sentences and one formula.
+- **See the physics, not magic.** Radar horizon, terrain masking, clutter and Doppler, wind, turn radius, air drag, Kalman filtering and proportional navigation, each explained in two sentences and one formula.
 - **Make the calls.** Switch weapons control between TIGHT, FREE and HOLD, approve or hold every shot yourself in SEMI-AUTO, and see what a mistake costs.
 - **Compare perception with the truth.** Show where the aircraft really are next to what the radar believes, switch on the coverage maps, or restart any run from its seed and watch it play out exactly the same way.
 
-<p align="center"><img src="docs/media/step-05-track-identify.webp" alt="The 3D view, the radar scope and the track table side by side, with the two civil corridors drawn as green lanes and airliners flying inside them. A cruise-missile-like target heading for the battery is identified as suspect, then hostile, and an interceptor destroys it." width="100%" /></p>
+<p align="center"><img src="docs/media/demo.webp" alt="The 3D view, the radar scope and the track table side by side, with the two civil corridors drawn as green lanes and airliners flying inside them. A cruise-missile-like target heading for the battery is identified as suspect, then hostile, and an interceptor destroys it." width="100%" /></p>
 
 ## Quick start
 
@@ -65,38 +65,35 @@ flowchart LR
     G -. "threat survived" .-> E
 ```
 
-| Stage        | In one sentence                                                                                       |
-| ------------ | ----------------------------------------------------------------------------------------------------- |
-| **Detect**   | The search radar scans the sky; any echo strong enough to stand out from the noise becomes a blip.    |
-| **Track**    | Blips from successive scans are linked into a track, and a filter estimates position and velocity.    |
-| **Identify** | Speed and altitude suggest the type; an identification check separates friend, civil and hostile.     |
-| **Evaluate** | Threats are ranked by how soon, and how close, they will reach a defended asset.                      |
-| **Assign**   | The system checks range, free radar channels and ammunition, then picks a launcher.                   |
-| **Engage**   | The interceptor flies toward a predicted intercept point, then homes in with proportional navigation. |
-| **Assess**   | The radar watches what happens next; if the threat survived, the loop goes again.                     |
-
 ## The physics, in plain language
 
-Every model has a short card: the idea in three sentences, one formula, one worked example and where to see it in the simulator. The same cards open in the app from the graduation-cap buttons. Read them all in **[docs/PHYSICS.md](docs/PHYSICS.md)**:
+Every model has a short card: the idea in two sentences, one formula, one example and where to see it in the simulator. The same cards open in the app from the graduation-cap buttons. Read them all in **[docs/PHYSICS.md](docs/PHYSICS.md)**:
 
 - **Time and space:** fixed time step · antenna rotation · local coordinates · seeing scale
-- **Radar:** detection range · radar cross section · radar horizon · terrain masking · detection probability · clutter and Doppler
-- **Air and flight:** standard atmosphere · air drag · wind · turn radius
+- **Radar:** detection range · radar horizon · terrain masking · detection probability · clutter and Doppler
+- **Air and flight:** air drag · wind · turn radius
 - **Tracking and identification:** Kalman filter · gating and association · identification friend-or-foe
 - **Engagement:** closest point of approach · engagement envelope · proportional navigation · kill probability · rules of engagement
 
 ## Build log
 
-The simulator is complete at **version 1.0.0**. It was built in six steps, each a git tag and a [GitHub Release](https://github.com/MohammadAlyounes/air-defense-sim/releases), so you can check out any stage (`git checkout step-03-first-intercept`). The decisions behind each step are in [docs/DEVLOG.md](docs/DEVLOG.md).
+The simulator is complete at **version 1.0.0**. It was built in six steps, each a git tag and a GitHub Release with a screenshot of that stage, so you can check out any of them (`git checkout step-03-first-intercept`). The decisions behind each step are in [docs/DEVLOG.md](docs/DEVLOG.md).
 
-| Step                                                                | What it added                                                                                                             |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [5 · Track & identify](docs/media/step-05-track-identify.png)       | Kalman tracking, identification and civil corridors, threat ranking with "Why?", rules of engagement and kill probability |
-| [4 · Environment & radar](docs/media/step-04-environment-radar.png) | Terrain, atmosphere and wind, threat routes; radar horizon, masking, noise, clutter and coverage maps                     |
-| [3 · First intercept](docs/media/step-03-first-intercept.png)       | The first full loop, drag-and-drop threats and the live analysis bar                                                      |
-| [2 · 3D scene](docs/media/step-02-3d-scene.png)                     | 3D battlespace, cameras, trails and one selection across every view                                                       |
-| [1 · Simulation core](docs/media/step-01-sim-core.png)              | Deterministic 50 Hz engine, live radar scope and replayable runs                                                          |
-| [0 · Launchpad](docs/media/step-00-launchpad.png)                   | Tooling, CI, live demo and the console shell                                                                              |
+| Step                          | What it added                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| [5 · Track & identify][s5]    | Kalman tracking, identification and civil corridors, threat ranking with "Why?", rules of engagement and kill probability |
+| [4 · Environment & radar][s4] | Terrain, atmosphere and wind, threat routes; radar horizon, masking, noise, clutter and coverage maps                     |
+| [3 · First intercept][s3]     | The first full loop, drag-and-drop threats and the live analysis bar                                                      |
+| [2 · 3D scene][s2]            | 3D battlespace, cameras, trails and one selection across every view                                                       |
+| [1 · Simulation core][s1]     | Deterministic 50 Hz engine, live radar scope and replayable runs                                                          |
+| [0 · Launchpad][s0]           | Tooling, CI, live demo and the console shell                                                                              |
+
+[s5]: https://github.com/MohammadAlyounes/air-defense-sim/releases/tag/step-05-track-identify
+[s4]: https://github.com/MohammadAlyounes/air-defense-sim/releases/tag/step-04-environment-radar
+[s3]: https://github.com/MohammadAlyounes/air-defense-sim/releases/tag/step-03-first-intercept
+[s2]: https://github.com/MohammadAlyounes/air-defense-sim/releases/tag/step-02-3d-scene
+[s1]: https://github.com/MohammadAlyounes/air-defense-sim/releases/tag/step-01-sim-core
+[s0]: https://github.com/MohammadAlyounes/air-defense-sim/releases/tag/step-00-launchpad
 
 ## Documentation
 
@@ -119,12 +116,8 @@ npm run test:e2e   # browser tests
 
 Keep `src/sim` pure (no UI imports, browser APIs, `Math.random()` or wall-clock time), give new physics a concept card in [docs/PHYSICS.md](docs/PHYSICS.md) and unit tests against known values, and follow [SAFETY.md](SAFETY.md).
 
-## Safety and scope
-
-This is a learning tool, not a model of any real system. Equipment and terrain are fictional, parameters are illustrative, and the physics stays at textbook level.
-
 ## License
 
-Code: [MIT](LICENSE). Documentation and concept cards: [CC BY 4.0](LICENSE-docs.md).
+Code: [MIT](LICENSE). Documentation and concept cards: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (see [NOTICE](NOTICE)).
 
 Created by [Mohammad Alyounes](https://github.com/MohammadAlyounes) and built with [Claude Code](https://claude.com/claude-code). If you share, fork or build on this project, please keep the credit "Created by Mohammad Alyounes" (see [NOTICE](NOTICE)). To cite it, use the **Cite this repository** button on GitHub ([CITATION.cff](CITATION.cff)).

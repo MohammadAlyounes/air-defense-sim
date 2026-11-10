@@ -5,9 +5,14 @@ Copyright (c) 2026 Mohammad Alyounes
 Original concept, product design and specification by Mohammad Alyounes.
 Built with Claude Code.
 
-The source code is licensed under the MIT License (see LICENSE). The
-documentation and concept cards are licensed under CC BY 4.0
-(see LICENSE-docs.md).
+The source code, including code samples inside the documentation, is licensed
+under the MIT License (see LICENSE).
+
+The documentation and concept cards (README.md, SAFETY.md and the docs/ folder)
+are licensed under the Creative Commons Attribution 4.0 International license
+(CC BY 4.0). You may share and adapt them for any purpose, as long as you give
+appropriate credit, link to the license and indicate if changes were made.
+Full legal text: https://creativecommons.org/licenses/by/4.0/legalcode
 
 If you share, fork or build on this project, please keep the credit
 "Created by Mohammad Alyounes" visible in the user interface and in your README.

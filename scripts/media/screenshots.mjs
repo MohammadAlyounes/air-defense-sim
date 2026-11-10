@@ -1,6 +1,6 @@
-// Captures screenshots of the production build with Playwright, for the README build log.
+// Captures screenshots of the production build with Playwright.
 //
-//   npm run build && npm run media:screenshots -- --name step-01-sim-core --query "seed=2026&t=75&paused=1"
+//   npm run build && npm run media:screenshots -- --query "seed=2026&t=75&paused=1"
 //
 // Output: docs/media/<name>.png (desktop) and docs/media/<name>-mobile.png (phone).
 // `--query` is passed to the app (see src/app/sim/params.ts): pausing at a fixed simulated

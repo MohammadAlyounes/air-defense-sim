@@ -129,7 +129,7 @@ export function ViewControls() {
         </Tooltip>
         <div className="flex rounded-lg border border-ink-600 bg-ink-900/85 shadow-lg shadow-black/30 backdrop-blur">
           <ConceptPopover concept="engagementEnvelope" label="Where the battery can reach" />
-          <ConceptPopover concept="standardAtmosphere" label="Why the air thins with height" />
+          <ConceptPopover concept="airDrag" label="Why reach depends on altitude" />
           <ConceptPopover concept="seeingScale" label="Why heights are stretched" />
         </div>
       </div>

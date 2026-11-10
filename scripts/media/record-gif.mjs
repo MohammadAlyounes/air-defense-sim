@@ -1,6 +1,6 @@
 // Records a short GIF of one part of the running app (Playwright video + ffmpeg).
 //
-//   npm run build && npm run media:gif -- --name step-01-sim-core \
+//   npm run build && npm run media:gif -- --name demo \
 //     --query "seed=2026&t=30&speed=4" --selector '[data-panel="scope"]' --seconds 8
 //
 // The clip is cropped to the element(s) matching `--selector` (the box around all of them).
