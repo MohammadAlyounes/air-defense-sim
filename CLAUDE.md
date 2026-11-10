@@ -68,4 +68,4 @@ The media scripts accept `--query "seed=2026&t=75&paused=0"` for repeatable shot
 - **Code:** strict TypeScript, ESLint + Prettier, small pure functions in the sim.
 - **Commits:** imperative mood, with a short area prefix (`sim:`, `app:`, `docs:`).
 - **Commit author:** Mohammad Alyounes <fcbmoh98@gmail.com>. In a fresh clone, run `git config author.name "Mohammad Alyounes"` and `git config author.email "fcbmoh98@gmail.com"`, and leave the committer and signing as configured. Keep the Claude `Co-Authored-By` trailer.
-- **Secrets:** never commit them. The optional Claude tutor uses the visitor's own API key.
+- **Secrets:** never commit them.
